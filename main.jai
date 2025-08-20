@@ -14,7 +14,17 @@ window_height := 600;
 should_quit_game := false;
 
 player_map : Texture;
-tile_map   : Texture;
+
+DIRT_MAP_COLS        :: 16;
+DIRT_MAP_ROWS        :: 15;
+dirt_map             : Texture;
+dirt_map_width       : s32;
+dirt_map_height      : s32;
+dirt_map_tile_width  : float;
+dirt_map_tile_height : float;
+
+WORLD_TILE_WIDTH  :: 50;
+WORLD_TILE_HEIGHT :: 50;
 
 player_position: Vector2;
 
@@ -75,14 +85,27 @@ main :: () {
         //
         Simp.clear_render_target(.2, .3, .3, 1);
 
-        // Draw some tiles
-        Simp.set_shader_for_images(*tile_map);
-        // TODO: Do some math to figure out the actual UV coordinates.
-        Simp.immediate_quad(
-            p0=Vector2.{50, 50}, p1=Vector2.{100, 50}, p2=Vector2.{100, 100}, p3=Vector2.{50, 100},
-            color=Vector4.{1,1,1,1},
-            uv0=Vector2.{0, 0}, uv1=Vector2.{0.05, 0}, uv2=Vector2.{0.05, 0.05}, uv3=Vector2.{0, 0.05}
-        );
+        // Draw tiles
+        Simp.set_shader_for_images(*dirt_map);
+        dirt_map_tile_width  = DIRT_MAP_COLS / cast(float)dirt_map_width;
+        dirt_map_tile_height = DIRT_MAP_ROWS / cast(float)dirt_map_height;
+
+        for col: 0..10 { 
+            for row: 0..10 {
+                Simp.immediate_quad(
+                    p0    = Vector2.{ cast(float)(col + 0) * WORLD_TILE_WIDTH, cast(float)(row + 0) * WORLD_TILE_HEIGHT },
+                    p1    = Vector2.{ cast(float)(col + 1) * WORLD_TILE_WIDTH, cast(float)(row + 0) * WORLD_TILE_HEIGHT },
+                    p2    = Vector2.{ cast(float)(col + 1) * WORLD_TILE_WIDTH, cast(float)(row + 1) * WORLD_TILE_HEIGHT },
+                    p3    = Vector2.{ cast(float)(col + 0) * WORLD_TILE_WIDTH, cast(float)(row + 1) * WORLD_TILE_HEIGHT },
+                    color = Vector4.{ 1, 1, 1, 1 },
+                    uv0   = Vector2.{ 0, 0 },
+
+                    uv1   = Vector2.{ dirt_map_tile_width, 0 },
+                    uv2   = Vector2.{ dirt_map_tile_width, dirt_map_tile_height },
+                    uv3   = Vector2.{ 0, dirt_map_tile_height }
+                );
+            }
+        }
 
         // Draw player
         // Simp.set_shader_for_images(*player_map);
@@ -103,5 +126,11 @@ make_texture :: (name: string) -> Texture, bool {
 
 init_textures :: () {
     player_map = make_texture("ship.png");
-    tile_map   = make_texture("tiles_0.png");
+    dirt_map   = make_texture("tiles_0.png");
+
+    print("dirt_map.width: %", dirt_map.width);
+    print("dirt_map.height: %", dirt_map.height);
+
+    dirt_map_width  = dirt_map.width;
+    dirt_map_height = dirt_map.height;
 }
