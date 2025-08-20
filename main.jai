@@ -13,7 +13,8 @@ window_height := 600;
 
 should_quit_game := false;
 
-player_map: Texture;
+player_map : Texture;
+tile_map   : Texture;
 
 player_position: Vector2;
 
@@ -36,7 +37,8 @@ main :: () {
     init_textures();
     player_position.x = .5;
     player_position.y = .05;
-    player_color := Vector4.{1, 1, 1, 1};
+    base_color   := Vector4.{1, 1, 1, 1};
+    player_color, tile_color := base_color; 
     player_size  := Vector2.{50*2, 50*2};
 
     while !should_quit_game {
@@ -73,9 +75,18 @@ main :: () {
         //
         Simp.clear_render_target(.2, .3, .3, 1);
 
+        // Draw some tiles
+        Simp.set_shader_for_images(*tile_map);
+        // TODO: Do some math to figure out the actual UV coordinates.
+        Simp.immediate_quad(
+            p0=Vector2.{50, 50}, p1=Vector2.{100, 50}, p2=Vector2.{100, 100}, p3=Vector2.{50, 100},
+            color=Vector4.{1,1,1,1},
+            uv0=Vector2.{0, 0}, uv1=Vector2.{0.05, 0}, uv2=Vector2.{0.05, 0.05}, uv3=Vector2.{0, 0.05}
+        );
+
         // Draw player
-        Simp.set_shader_for_images(*player_map);
-        Simp.immediate_quad(50, 100, 150, 200, player_color);
+        // Simp.set_shader_for_images(*player_map);
+        // Simp.immediate_quad(Vector2.{50, 100}, 150, 200, player_color);
 
         Simp.swap_buffers(window);
     }
@@ -92,4 +103,5 @@ make_texture :: (name: string) -> Texture, bool {
 
 init_textures :: () {
     player_map = make_texture("ship.png");
+    tile_map   = make_texture("tiles_0.png");
 }
