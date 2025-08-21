@@ -14,14 +14,12 @@ window_height := 600;
 should_quit_game := false;
 
 player_map : Texture;
+dirt_map   : Texture;
 
-DIRT_MAP_COLS        :: 16;
-DIRT_MAP_ROWS        :: 15;
-dirt_map             : Texture;
-dirt_map_width       : s32;
-dirt_map_height      : s32;
-dirt_map_tile_width  : float;
-dirt_map_tile_height : float;
+DIRT_MAP_COLS :: 16;
+DIRT_MAP_ROWS :: 15;
+DIRT_TILE_TEXEL_WIDTH  :: 18;
+DIRT_TILE_TEXEL_HEIGHT :: 18;
 
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
@@ -87,39 +85,23 @@ main :: () {
 
         // Draw tiles
         Simp.set_shader_for_images(*dirt_map);
-        dirt_map_tile_width  = DIRT_MAP_COLS / cast(float)dirt_map_width;
-        dirt_map_tile_height = DIRT_MAP_ROWS / cast(float)dirt_map_height;
 
-        // There is one pixel-art pixel (which I'm calling a "UV pixel") of transparency to the right of each tile for
-        // the dirt tiles. So, we actually don't want the uv coords going all the way to the right and bottom of the
-        // tile solely based on, say, the column count divided by the entire map width. We need it to go one uv pixel
-        // less than that. So, here we define how wide that is so we can later subtract it from  the right and bottom
-        // uv coords.
-        //
-        // There are 9 uv pixels to each dirt tile, only 8 of which are part of each tile per row and column. So, the
-        // length of a uv pixel for a dirt tile is 1/9th of the width or height. Let's use the width.
-        DIRT_TILE_UV_PIXEL_COUNT :: 9; // name this magic number just to be thorough, even though it's explained. 
-        uv_pixel_length := dirt_map_tile_width / DIRT_TILE_UV_PIXEL_COUNT;
+        for col: 0..50 { 
+            for row: 0..5 {
+                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 5}, *dirt_map, DIRT_TILE_TEXEL_WIDTH, DIRT_TILE_TEXEL_HEIGHT, Vector4.{2, 2, 0, 0});
 
-        // The "art width" is the area of the tile that is non-spacing transparency. In other words, the tile area minus
-        // the transparency between each tile.
-        dirt_map_tile_art_width  := dirt_map_tile_width  - uv_pixel_length;
-        dirt_map_tile_art_height := dirt_map_tile_height + uv_pixel_length;
-
-        for col: 0..100 { 
-            for row: 0..10 {
-                // tile_map := ifx row == 10 
+                left   := cast(float)((col + 0) * WORLD_TILE_WIDTH ); 
+                right  := cast(float)((col + 1) * WORLD_TILE_WIDTH );
+                top    := cast(float)((row + 1) * WORLD_TILE_HEIGHT);
+                bottom := cast(float)((row + 0) * WORLD_TILE_HEIGHT);  
 
                 Simp.immediate_quad(
-                    p0    = Vector2.{ cast(float)(col + 0) * WORLD_TILE_WIDTH, cast(float)(row + 0) * WORLD_TILE_HEIGHT },
-                    p1    = Vector2.{ cast(float)(col + 1) * WORLD_TILE_WIDTH, cast(float)(row + 0) * WORLD_TILE_HEIGHT },
-                    p2    = Vector2.{ cast(float)(col + 1) * WORLD_TILE_WIDTH, cast(float)(row + 1) * WORLD_TILE_HEIGHT },
-                    p3    = Vector2.{ cast(float)(col + 0) * WORLD_TILE_WIDTH, cast(float)(row + 1) * WORLD_TILE_HEIGHT },
+                    p0 = Vector2.{ left,  bottom },
+                    p1 = Vector2.{ right, bottom },
+                    p2 = Vector2.{ right, top    },
+                    p3 = Vector2.{ left,  top    },
                     color = Vector4.{ 1, 1, 1, 1 },
-                    uv0   = Vector2.{                       0, uv_pixel_length },          // Since the uv coordinates start from the bottom of the texture like 
-                    uv1   = Vector2.{ dirt_map_tile_art_width, uv_pixel_length },          // a middle school algebra plot, we actually have to bump up the v coord
-                    uv2   = Vector2.{ dirt_map_tile_art_width, dirt_map_tile_art_height }, // by the uv_pixel_length to remove the bottom transparency.
-                    uv3   = Vector2.{                       0, dirt_map_tile_art_height }
+                    uv0, uv1, uv2, uv3,
                 );
             }
         }
@@ -143,11 +125,23 @@ make_texture :: (name: string) -> Texture, bool {
 
 init_textures :: () {
     player_map = make_texture("ship.png");
-    dirt_map   = make_texture("tiles_0.png");
+    dirt_map   = make_texture("Tiles_0.png");
+}
 
-    print("dirt_map.width: %", dirt_map.width);
-    print("dirt_map.height: %", dirt_map.height);
+// Transparency margin texels is Vector4.{ bottom, right, top, left }.
+get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_texel_width: s32, tile_texel_height: s32, transparency_margin_texels: Vector4) -> Vector2, Vector2, Vector2, Vector2 {
+    tile_uv_width  := cast(float)tile_texel_width  / map.width;
+    tile_uv_height := cast(float)tile_texel_height / map.height;
 
-    dirt_map_width  = dirt_map.width;
-    dirt_map_height = dirt_map.height;
+    left   := (tile_uv_width  * (tile_id.x + 0)) - (transparency_margin_texels.w / map.width );
+    right  := (tile_uv_width  * (tile_id.x + 1)) - (transparency_margin_texels.y / map.width );
+    bottom := (tile_uv_height * (tile_id.y + 0)) + (transparency_margin_texels.x / map.height);
+    top    := (tile_uv_height * (tile_id.y + 1)) + (transparency_margin_texels.z / map.height);
+
+    uv0 := Vector2.{ left,  bottom };
+    uv1 := Vector2.{ right, bottom };
+    uv2 := Vector2.{ right, top    };
+    uv3 := Vector2.{ left,  top    };
+
+    return uv0, uv1, uv2, uv3;
 }
