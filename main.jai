@@ -1,6 +1,7 @@
 #import "Basic";
 #import "Input";
 #import "Math";
+#import "Sloppy_Math";
 #import "String";
 #import "System";
 #import "Window_Creation";
@@ -17,11 +18,11 @@ paused           := false;
 current_dt : float = 0.016667;
 last_time  : float64;
 DT_MAX     : float : 0.15;
+EPSILON   :: 0.0001;
 
-// @TODO: why are these u32s?...
-move_player_left  : u32;
-move_player_right : u32;
-try_to_jump       : u32;
+move_player_left  : bool;
+move_player_right : bool;
+try_to_jump       : bool;
 
 player_map : Texture;
 dirt_map   : Texture;
@@ -32,8 +33,9 @@ PLAYER_MAP_TILE_WIDTH  :: 40;
 PLAYER_MAP_TILE_HEIGHT :: 56;
 PLAYER_TILE_WORLD_WIDTH  :: 40 * 2;
 PLAYER_TILE_WORLD_HEIGHT :: 56 * 2;
-PLAYER_MOVE_SPEED :: 200; // @TODO: Probably want to tie this to the window size or something
-PLAYER_JUMP_SPEED :: 300; // @TODO: Probably want to tie this to the window size or something
+// @TODO: Probably want to tie these to the window size or something
+PLAYER_MOVE_SPEED :: PLAYER_TILE_WORLD_WIDTH * 5; // px / s
+PLAYER_JUMP_SPEED :: PLAYER_TILE_WORLD_HEIGHT * 5; // px / s
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -43,13 +45,13 @@ DIRT_TILE_TEXEL_HEIGHT :: 18;
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
 
-ACCEL_DUE_TO_GRAVITY :: 5; // m^2 / s
+ACCEL_DUE_TO_GRAVITY :: 10; // px^2 / s
 
 Rectangle :: struct {
-    x      : float; // bottom-left corner position x 
-    y      : float; // bottom-left corner position y 
-    width  : float;
-    height : float;
+    x      : int; // bottom-left corner position x 
+    y      : int; // bottom-left corner position y 
+    width  : int;
+    height : int;
 }
 
 Entity :: struct {
@@ -80,7 +82,6 @@ main :: () {
     //
     base_path := path_strip_filename(get_path_of_running_executable());
     data_folder = join(base_path, "data");
-    print("data_folder is '%'\n", data_folder);
 
     last_time = seconds_since_init();
 
@@ -101,8 +102,8 @@ main :: () {
         using dirt_blocks[i];
 
         rect = Rectangle.{
-            x = cast(float)i * WORLD_TILE_WIDTH,
-            y = 0,
+            x      = i * WORLD_TILE_WIDTH,
+            y      = 0,
             width  = WORLD_TILE_WIDTH,
             height = WORLD_TILE_HEIGHT,
         };
@@ -117,7 +118,7 @@ main :: () {
     while !should_quit_game {
         reset_temporary_storage();
 
-        try_to_jump = 0;
+        try_to_jump = false;
 
         //
         // Input
@@ -159,9 +160,9 @@ main :: () {
                     key := event.key_code;
 
                     // @TODO: metaprogram this?
-                    if keycode_array_contains(keybinds.move_player_left, key)  move_player_left  = event.key_pressed;
-                    if keycode_array_contains(keybinds.move_player_right, key) move_player_right = event.key_pressed;
-                    if keycode_array_contains(keybinds.jump, key)              try_to_jump       = event.key_pressed;
+                    if keycode_array_contains(keybinds.move_player_left, key)  move_player_left  = event.key_pressed > 0;
+                    if keycode_array_contains(keybinds.move_player_right, key) move_player_right = event.key_pressed > 0;
+                    if keycode_array_contains(keybinds.jump, key)              try_to_jump       = event.key_pressed > 0;
                 }
             }
         }
@@ -181,20 +182,19 @@ main :: () {
             if move_player_right {
                 player.vel.x += PLAYER_MOVE_SPEED;
             }
+
             if try_to_jump && can_jump(player) {
                 player.vel.y = PLAYER_JUMP_SPEED;
                 player.jumps_remaining -= 1;
             }
+
+            // Apply gravity
             player.vel.y -= ACCEL_DUE_TO_GRAVITY;
 
-            // Normalize, so that you don't move faster diagonally!
-            // if length(player.vel) > 1 {
-            //     player.vel = unit_vector(player.vel);
-            // }
-            // Stretch to actual length we want to move.
             delta_pos := player.vel * current_dt;
 
-            try_to_move(*player, delta_pos, dirt_blocks);
+            try_to_move_x(*player, delta_pos.x, dirt_blocks);
+            try_to_move_y(*player, delta_pos.y, dirt_blocks);
 
             if is_grounded(player, dirt_blocks) {
                 player.jumps_remaining = player.jumps_capacity;
@@ -217,10 +217,10 @@ main :: () {
                     uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 3}, *dirt_map, DIRT_TILE_TEXEL_WIDTH, DIRT_TILE_TEXEL_HEIGHT, Vector4.{2, 2, 0, 0});
 
                     // @TODO: function for this?
-                    left   : float = it.rect.x;
-                    right  : float = it.rect.x + it.rect.width;
-                    top    : float = it.rect.y + it.rect.height;
-                    bottom : float = it.rect.y + 0;
+                    left   := cast(float)it.rect.x;
+                    right  := cast(float)it.rect.x + it.rect.width;
+                    top    := cast(float)it.rect.y + it.rect.height;
+                    bottom := cast(float)it.rect.y + 0;
 
                     Simp.immediate_quad(
                         p0 = Vector2.{ left,  bottom },
@@ -237,10 +237,10 @@ main :: () {
             {
                 uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 25}, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 0, 0, 0});
 
-                left   : float = player.rect.x;
-                right  : float = player.rect.x + player.rect.width;
-                top    : float = player.rect.y + player.rect.height;
-                bottom : float = player.rect.y;
+                left   := cast(float)player.rect.x;
+                right  := cast(float)player.rect.x + player.rect.width;
+                top    := cast(float)player.rect.y + player.rect.height;
+                bottom := cast(float)player.rect.y;
 
                 Simp.set_shader_for_images(*player_map);
                 Simp.immediate_quad(
@@ -271,8 +271,8 @@ make_texture :: (name: string) -> Texture, bool {
 }
 
 init_textures :: () {
-    player_map = make_texture("Player_Default.png");
-    dirt_map   = make_texture("Tiles_0.png");
+    player_map = make_texture("Player_Default_Green.png");
+    dirt_map   = make_texture("Tiles_0_Red.png");
 }
 
 // Transparency margin texels is Vector4.{ bottom, right, top, left }.
@@ -317,63 +317,69 @@ sign :: (n: float) -> float {
     return 0;
 }
 
+round :: (f: float) -> int {
+    i := cast(int)f;
+    decimal_part := f - i;
+    return ifx decimal_part >= 0.5 then i + 1 else i;
+}
+
 // Returns whether or not the entity collided with something in each dimension
-try_to_move :: (entity: *Entity, delta: Vector2, collidables: []Entity) -> bool, bool {
-    STEPS :: 10;
-    
-    x_remaining_steps := STEPS;
-    y_remaining_steps := STEPS;
+try_to_move_x :: (entity: *Entity, distance: float, collidables: []Entity) {
+    x_remainder := distance;
+    move := round(distance);
+    if (move == 0) return;
 
-    x_collided := false;
-    y_collided := false;
-
-    if (x_remaining_steps == 0 && y_remaining_steps == 0) return x_collided, y_collided;
-
-    x_epsilon := delta.x / STEPS;
-    y_epsilon := delta.y / STEPS;
-
-    // @PERF: looping through all collidable things seems like it'll probably be super slow
-    while x_remaining_steps > 0 || y_remaining_steps > 0 {
-        // Try to move in the x direction first
-        {
-            entity_rect_if_move := entity.rect;
-            entity_rect_if_move.x += x_epsilon;
-
-            for collidables {
-                if check_collisions_rects(it.rect, entity_rect_if_move) {
-                    x_collided = true;
-                }
-            }
-
-            if x_collided {
-                x_remaining_steps = 0;
-            } else {
-                entity.rect.x += x_epsilon;
-                x_remaining_steps -= 1;
+    x_remainder -= move;
+    sign := ifx move > 0 then 1 else -1;
+    while move != 0 {
+        collided := false;
+        new_entity_rect := entity.rect;
+        new_entity_rect.x += sign;
+        
+        // @TODO: extract?
+        for collidables {
+            if check_collisions_rects(it.rect, new_entity_rect) {
+                collided = true;
+                break;
             }
         }
 
-        // Then try to move in the y direction
-        {
-            entity_rect_if_move := entity.rect;
-            entity_rect_if_move.y += y_epsilon;
-
-            for collidables {
-                if check_collisions_rects(it.rect, entity_rect_if_move) {
-                    y_collided = true;
-                }
-            }
-
-            if y_collided {
-                y_remaining_steps = 0;
-            } else {
-                entity.rect.y += y_epsilon;
-                y_remaining_steps -= 1;
-            }
+        if collided {
+            break;
+        } else {
+            entity.rect.x += sign;
+            move -= sign;
         }
     }
+}
 
-    return x_collided, y_collided;
+try_to_move_y :: (entity: *Entity, distance: float, collidables: []Entity) {
+    y_remainder := distance;
+    move := round(distance);
+    if (move == 0) return;
+
+    y_remainder -= move;
+    sign := ifx move > 0 then 1 else -1;
+    while move != 0 {
+        collided := false;
+        new_entity_rect := entity.rect;
+        new_entity_rect.y += sign;
+        
+        // @TODO: extract?
+        for collidables {
+            if check_collisions_rects(it.rect, new_entity_rect) {
+                collided = true;
+                break;
+            }
+        }
+
+        if collided {
+            break;
+        } else {
+            entity.rect.y += sign;
+            move -= sign;
+        }
+    }
 }
 
 can_jump :: (entity: Entity) -> bool {
