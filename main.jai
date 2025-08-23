@@ -18,10 +18,10 @@ current_dt : float = 0.016667;
 last_time  : float64;
 DT_MAX     : float : 0.15;
 
+// @TODO: why are these u32s?...
 move_player_left  : u32;
 move_player_right : u32;
-move_player_down  : u32;
-move_player_up    : u32;
+try_to_jump       : u32;
 
 player_map : Texture;
 dirt_map   : Texture;
@@ -32,7 +32,8 @@ PLAYER_MAP_TILE_WIDTH  :: 40;
 PLAYER_MAP_TILE_HEIGHT :: 56;
 PLAYER_TILE_WORLD_WIDTH  :: 40 * 2;
 PLAYER_TILE_WORLD_HEIGHT :: 56 * 2;
-PLAYER_MOVE_SPEED :: 2; // @TODO: Probably want to tie this to the window size or something
+PLAYER_MOVE_SPEED :: 200; // @TODO: Probably want to tie this to the window size or something
+PLAYER_JUMP_SPEED :: 300; // @TODO: Probably want to tie this to the window size or something
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -41,6 +42,8 @@ DIRT_TILE_TEXEL_HEIGHT :: 18;
 
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
+
+ACCEL_DUE_TO_GRAVITY :: 5; // m^2 / s
 
 Rectangle :: struct {
     x      : float; // bottom-left corner position x 
@@ -51,19 +54,16 @@ Rectangle :: struct {
 
 Entity :: struct {
     rect : Rectangle; // Used for collision
-}
+    vel  : Vector2;
 
-// @TODO: I almost wonder if I should dispense with the "Player" struct and only have entities... that's in style now. Tempting.
-Player :: struct {
-    #as using base: Entity;
+    jumps_remaining : int;
+    jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 }
 
 Keybinds :: struct {
-    // @TODO: can I have an arbitrary length array as a member?
     move_player_left  : [2] Key_Code;
     move_player_right : [2] Key_Code;
-    move_player_down  : [2] Key_Code;
-    move_player_up    : [2] Key_Code;
+    jump              : [2] Key_Code;
 }
 
 data_folder: string; 
@@ -86,8 +86,12 @@ main :: () {
 
     init_textures();
     
-    player := Player.{
-        rect = Rectangle.{100, 100, 65, 100}
+    player := Entity.{
+        rect = Rectangle.{100, 100, 65, 100},
+        vel  = Vector2.{0, 0},
+
+        jumps_capacity  = 2,
+        jumps_remaining = 2,
     };
     base_color   := Vector4.{1, 1, 1, 1};
     player_color, tile_color := base_color; 
@@ -108,76 +112,95 @@ main :: () {
     
     keybinds.move_player_left  = .[.ARROW_LEFT , #char "A"];
     keybinds.move_player_right = .[.ARROW_RIGHT, #char "D"];
-    keybinds.move_player_down  = .[.ARROW_DOWN , #char "S"];
-    keybinds.move_player_up    = .[.ARROW_UP   , #char "W"];
+    keybinds.jump              = .[.SPACEBAR   , .SPACEBAR]; // @TODO: can I pass null here or something? or even better, arbitrarily sized arrays
 
     while !should_quit_game {
         reset_temporary_storage();
 
+        try_to_jump = 0;
+
         //
         // Input
         //
-        update_window_events();
-        for get_window_resizes() {
-            Simp.update_window(it.window);
+        {
+            update_window_events();
+            for get_window_resizes() {
+                Simp.update_window(it.window);
 
-            if it.window == window {
-                window_width  = it.width;
-                window_height = it.height;
+                if it.window == window {
+                    window_width  = it.width;
+                    window_height = it.height;
+                }
+            }
+
+            now := seconds_since_init();
+            delta : float64 = now - last_time;
+            current_dt = cast(float) delta;
+
+            if current_dt > DT_MAX current_dt = DT_MAX;
+            last_time = now;
+
+            for event : events_this_frame {
+                if event.type == .QUIT {
+                    should_quit_game = true;
+                    break;
+                }
+
+                if event.key_code == .ESCAPE && event.key_pressed {
+                    should_quit_game = true;
+                    break;
+                }
+
+                if event.key_code == #char "P" && event.key_pressed {
+                    paused = !paused;
+                }
+
+                if event.type == .KEYBOARD {
+                    key := event.key_code;
+
+                    // @TODO: metaprogram this?
+                    if keycode_array_contains(keybinds.move_player_left, key)  move_player_left  = event.key_pressed;
+                    if keycode_array_contains(keybinds.move_player_right, key) move_player_right = event.key_pressed;
+                    if keycode_array_contains(keybinds.jump, key)              try_to_jump       = event.key_pressed;
+                }
             }
         }
-
-        now := seconds_since_init();
-        delta : float64 = now - last_time;
-        current_dt = cast(float) delta;
-
-        if current_dt > DT_MAX current_dt = DT_MAX;
-        last_time = now;
-
-        for event : events_this_frame {
-            if event.type == .QUIT {
-                should_quit_game = true;
-                break;
-            }
-
-            if event.key_code == .ESCAPE && event.key_pressed {
-                should_quit_game = true;
-                break;
-            }
-
-            if event.key_code == .SPACEBAR && event.key_pressed {
-                paused = true;
-            }
-
-            if event.type == .KEYBOARD {
-                key := event.key_code;
-
-                // @TODO: metaprogram this?
-                if keycode_array_contains(keybinds.move_player_left, key)  move_player_left  = event.key_pressed;
-                if keycode_array_contains(keybinds.move_player_right, key) move_player_right = event.key_pressed;
-                if keycode_array_contains(keybinds.move_player_down, key)  move_player_down  = event.key_pressed;
-                if keycode_array_contains(keybinds.move_player_up, key)    move_player_up    = event.key_pressed;
-            }
-        }
-
-        delta_pos: Vector2;
-
-        if move_player_up    delta_pos.y += 1;
-        if move_player_left  delta_pos.x -= 1;
-        if move_player_down  delta_pos.y -= 1;
-        if move_player_right delta_pos.x += 1;
-        
-        // Normalize, so that you don't move faster diagonally!
-        if length(delta_pos) > 1 {
-            delta_pos = unit_vector(delta_pos);
-        }
-        // Stretch to actual length we want to move.
-        delta_pos = delta_pos * PLAYER_MOVE_SPEED * current_dt;
 
         //
         // Update
         //
-        try_to_move(*player, delta_pos, dirt_blocks);
+        if !paused {
+            print("jumps: %\n", player.jumps_remaining);
+            // I think since we are always going to be controlling the player velocity directly, we can just reset
+            // the velocity like this for now. Although, this will have to change if we ever want momentum.
+            player.vel.x = 0;
+
+            if move_player_left {
+                player.vel.x -= PLAYER_MOVE_SPEED;
+            }
+            if move_player_right {
+                player.vel.x += PLAYER_MOVE_SPEED;
+            }
+            if try_to_jump && can_jump(player) {
+                player.vel.y = PLAYER_JUMP_SPEED;
+                player.jumps_remaining -= 1;
+            }
+            player.vel.y -= ACCEL_DUE_TO_GRAVITY;
+
+            // Normalize, so that you don't move faster diagonally!
+            // if length(player.vel) > 1 {
+            //     player.vel = unit_vector(player.vel);
+            // }
+            // Stretch to actual length we want to move.
+            delta_pos := player.vel * current_dt;
+
+            try_to_move(*player, delta_pos, dirt_blocks);
+
+            if is_grounded(player, dirt_blocks) {
+                player.jumps_remaining = player.jumps_capacity;
+                player.vel.y = 0;
+            }
+        }
 
         //
         // Draw
@@ -230,6 +253,9 @@ main :: () {
                 );
             }
 
+            // Draw UI
+            // @TODO: Draw "paused"
+
             Simp.swap_buffers(window);
         }
     }
@@ -267,7 +293,6 @@ get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_texel_width: 
     return uv0, uv1, uv2, uv3;
 }
 
-// @TODO: does this exist already?
 // @TODO: probably use generics here.
 keycode_array_contains :: (haystack: [] Key_Code, needle: Key_Code) -> bool {
     for haystack {
@@ -292,55 +317,78 @@ sign :: (n: float) -> float {
     return 0;
 }
 
-try_to_move :: (entity: *Entity, delta: Vector2, collidables: []Entity) {
-    x_remainder := delta.x;
-    y_remainder := delta.y;
+// Returns whether or not the entity collided with something in each dimension
+try_to_move :: (entity: *Entity, delta: Vector2, collidables: []Entity) -> bool, bool {
+    STEPS :: 10;
+    
+    x_remaining_steps := STEPS;
+    y_remaining_steps := STEPS;
 
-    if (x_remainder == 0 && y_remainder == 0) return;
+    x_collided := false;
+    y_collided := false;
 
-    x_sign := sign(delta.x);
-    y_sign := sign(delta.y);
+    if (x_remaining_steps == 0 && y_remaining_steps == 0) return x_collided, y_collided;
 
-    // @TODO: this has potential to be stupendously slow
-    if x_remainder * x_sign > 0 || y_remainder * y_sign > 0 {
+    x_epsilon := delta.x / STEPS;
+    y_epsilon := delta.y / STEPS;
+
+    // @PERF: looping through all collidable things seems like it'll probably be super slow
+    while x_remaining_steps > 0 || y_remaining_steps > 0 {
         // Try to move in the x direction first
-        // @TODO: this might be nice to have as a function?
         {
             entity_rect_if_move := entity.rect;
-            entity_rect_if_move.x += x_sign;
+            entity_rect_if_move.x += x_epsilon;
 
-            collided := false;
             for collidables {
                 if check_collisions_rects(it.rect, entity_rect_if_move) {
-                    collided = true;
+                    x_collided = true;
                 }
             }
 
-            if collided {
-                x_remainder = 0;
+            if x_collided {
+                x_remaining_steps = 0;
             } else {
-                entity.rect.x += x_sign;
-                x_remainder -= x_sign;
+                entity.rect.x += x_epsilon;
+                x_remaining_steps -= 1;
             }
         }
 
+        // Then try to move in the y direction
         {
             entity_rect_if_move := entity.rect;
-            entity_rect_if_move.y += y_sign;
+            entity_rect_if_move.y += y_epsilon;
 
-            collided := false;
             for collidables {
                 if check_collisions_rects(it.rect, entity_rect_if_move) {
-                    collided = true;
+                    y_collided = true;
                 }
             }
 
-            if collided {
-                y_remainder = 0;
+            if y_collided {
+                y_remaining_steps = 0;
             } else {
-                entity.rect.y += y_sign;
-                y_remainder -= y_sign;
+                entity.rect.y += y_epsilon;
+                y_remaining_steps -= 1;
             }
         }
     }
+
+    return x_collided, y_collided;
+}
+
+can_jump :: (entity: Entity) -> bool {
+    return entity.jumps_remaining > 0;
+}
+
+is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
+    entity_rect_if_move := entity.rect;
+    entity_rect_if_move.y -= 1;
+
+    for collidables {
+        if check_collisions_rects(it.rect, entity_rect_if_move) {
+            return true;
+        }
+    }
+
+    return false;
 }
