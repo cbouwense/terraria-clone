@@ -5,6 +5,7 @@
 #import "String";
 #import "System";
 #import "Window_Creation";
+#import "GL";
 
 Simp    :: #import "Simp"; 
 Texture :: Simp.Texture;
@@ -12,18 +13,22 @@ Texture :: Simp.Texture;
 window_width  := 1600;
 window_height := 800;
 
+// Metagame state
 should_quit_game := false;
 paused           := false;
+debug_mode       := true;
 
 current_dt : float = 0.016667;
 last_time  : float64;
 DT_MAX     : float : 0.15;
 EPSILON   :: 0.0001;
 
+// Controls
 move_player_left  : bool;
 move_player_right : bool;
 try_to_jump       : bool;
 
+// Texture maps
 player_map : Texture;
 dirt_map   : Texture;
 
@@ -160,6 +165,10 @@ main :: () {
                     paused = !paused;
                 }
 
+                if event.key_code == .F1 && event.key_pressed {
+                    debug_mode = !debug_mode;
+                }
+
                 if event.type == .KEYBOARD {
                     key := event.key_code;
 
@@ -215,10 +224,11 @@ main :: () {
 
             // Draw tiles
             {
-                Simp.set_shader_for_images(*dirt_map);
 
                 // Dirt 
                 for dirt_blocks {
+                    Simp.set_shader_for_images(*dirt_map);
+                    
                     uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 3}, *dirt_map, DIRT_TILE_TEXEL_WIDTH, DIRT_TILE_TEXEL_HEIGHT, Vector4.{2, 2, 0, 0});
 
                     // @TODO: function for this?
@@ -235,6 +245,11 @@ main :: () {
                         color = Vector4.{ 1, 1, 1, 1 },
                         uv0, uv1, uv2, uv3,
                     );
+
+                    if debug_mode {
+                        using it.rect;
+                        draw_rect_outline(xx x, xx y, xx width, xx height, color = Vector4.{0,1,0,1});
+                    }
                 }
             }
 
@@ -256,6 +271,11 @@ main :: () {
                     color = Vector4.{ 1, 1, 1, 1 },
                     uv0, uv1, uv2, uv3,
                 );
+
+                if debug_mode {
+                    using player.rect;
+                    draw_rect_outline(xx x, xx y, xx width, xx height, color = Vector4.{0,1,0,1});
+                }
             }
 
             // Draw UI
@@ -402,4 +422,18 @@ is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
     }
 
     return false;
+}
+
+draw_rect_outline :: (x: float, y: float, w: float, h: float, color := Vector4.{1,1,1,1}, thickness: float = 1.0) {
+    p0 := Vector2.{ x-thickness/2     , y-thickness/2     };  // tl
+    p1 := Vector2.{ x+thickness/2 + w , y-thickness/2     };  // tr
+    p2 := Vector2.{ x-thickness/2     , y+thickness/2 + h };  // bl
+    p3 := Vector2.{ x+thickness/2 + w , y+thickness/2 + h };  // br
+    
+    Simp.set_shader_for_color(true);
+    
+    Simp.immediate_line(p0-.{thickness/2, 0}, p1+.{thickness/2, 0}, thickness, color);  // top
+    Simp.immediate_line(p2-.{thickness/2, 0}, p3+.{thickness/2, 0}, thickness, color);  // bottom
+    Simp.immediate_line(p1, p3, thickness, color);  // right
+    Simp.immediate_line(p2, p0, thickness, color);  // left
 }
