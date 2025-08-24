@@ -60,6 +60,8 @@ Entity :: struct {
 
     jumps_remaining : int;
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
+
+    is_facing_left : bool;
 }
 
 Keybinds :: struct {
@@ -93,6 +95,8 @@ main :: () {
 
         jumps_capacity  = 2,
         jumps_remaining = 2,
+
+        is_facing_left = true,
     };
     base_color   := Vector4.{1, 1, 1, 1};
     player_color, tile_color := base_color; 
@@ -171,16 +175,17 @@ main :: () {
         // Update
         //
         if !paused {
-            print("jumps: %\n", player.jumps_remaining);
             // I think since we are always going to be controlling the player velocity directly, we can just reset
             // the velocity like this for now. Although, this will have to change if we ever want momentum.
             player.vel.x = 0;
 
             if move_player_left {
                 player.vel.x -= PLAYER_MOVE_SPEED;
+                player.is_facing_left = true;
             }
             if move_player_right {
                 player.vel.x += PLAYER_MOVE_SPEED;
+                player.is_facing_left = false;
             }
 
             if try_to_jump && can_jump(player) {
@@ -235,7 +240,7 @@ main :: () {
 
             // Draw player
             {
-                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 25}, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 0, 0, 0});
+                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 25}, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 0, 0, 0}, !player.is_facing_left);
 
                 left   := cast(float)player.rect.x;
                 right  := cast(float)player.rect.x + player.rect.width;
@@ -271,19 +276,19 @@ make_texture :: (name: string) -> Texture, bool {
 }
 
 init_textures :: () {
-    player_map = make_texture("Player_Default_Green.png");
-    dirt_map   = make_texture("Tiles_0_Red.png");
+    player_map = make_texture("Player_Default.png");
+    dirt_map   = make_texture("Tiles_0.png");
 }
 
 // Transparency margin texels is Vector4.{ bottom, right, top, left }.
-get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_texel_width: s32, tile_texel_height: s32, transparency_margin_texels: Vector4) -> Vector2, Vector2, Vector2, Vector2 {
+get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_texel_width: s32, tile_texel_height: s32, transparency_margin_texels: Vector4, flip: bool = false) -> Vector2, Vector2, Vector2, Vector2 {
     tile_uv_width  := cast(float)tile_texel_width  / map.width;
     tile_uv_height := cast(float)tile_texel_height / map.height;
 
-    left   := (tile_uv_width  * (tile_id.x + 0)) + (transparency_margin_texels.w / map.width );
-    right  := (tile_uv_width  * (tile_id.x + 1)) - (transparency_margin_texels.y / map.width );
-    bottom := (tile_uv_height * (tile_id.y + 0)) + (transparency_margin_texels.x / map.height);
-    top    := (tile_uv_height * (tile_id.y + 1)) - (transparency_margin_texels.z / map.height);
+    left   := (tile_uv_width  * (ifx flip then tile_id.x + 1 else tile_id.x + 0 )) + (transparency_margin_texels.w / map.width );
+    right  := (tile_uv_width  * (ifx flip then tile_id.x + 0 else tile_id.x + 1 )) - (transparency_margin_texels.y / map.width );
+    bottom := (tile_uv_height * (ifx flip then tile_id.y + 0 else tile_id.y + 0 )) + (transparency_margin_texels.x / map.height);
+    top    := (tile_uv_height * (ifx flip then tile_id.y + 1 else tile_id.y + 1 )) - (transparency_margin_texels.z / map.height);
 
     uv0 := Vector2.{ left,  bottom };
     uv1 := Vector2.{ right, bottom };
@@ -323,7 +328,7 @@ round :: (f: float) -> int {
     return ifx decimal_part >= 0.5 then i + 1 else i;
 }
 
-// Returns whether or not the entity collided with something in each dimension
+// @TODO: maybe dry up these move functions
 try_to_move_x :: (entity: *Entity, distance: float, collidables: []Entity) {
     x_remainder := distance;
     move := round(distance);
