@@ -34,7 +34,7 @@ dirt_map   : Texture;
 
 PLAYER_MAP_COLS :: 1;
 PLAYER_MAP_ROWS :: 26;
-PLAYER_MAP_TILE_WIDTH    :: 38;
+PLAYER_MAP_TILE_WIDTH    :: 36  ;
 PLAYER_MAP_TILE_HEIGHT   :: 48;
 PLAYER_TILE_WORLD_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * 2;
 PLAYER_TILE_WORLD_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * 2;
@@ -69,15 +69,19 @@ Entity :: struct {
     is_facing_left : bool;
 }
 
-Player :: struct {
-    using #as entity: Entity;
+Animation :: struct {
+    active            : bool;
+    frame_one_coords  : Vector2;
+    frame_count       : u32;
+    frame_duration_ms : u32;
+    timer_ms          : u32;
+}
 
-    // @TODO: probably extract this
-    anim_walking_active           : bool;
-    anim_walking_frame_one_coords : Vector2;
-    anim_walking_frame_count      : int;
-    anim_walking_frame_ms         : int;
-    anim_walking_current_ms       : int;
+Player :: struct {
+    using #as entity : Entity;
+
+    idle_animation   : Animation;
+    walk_animation   : Animation;
 }
 
 Keybinds :: struct {
@@ -114,13 +118,26 @@ main :: () {
 
         is_facing_left = true,
 
-        anim_walking_active           = false,
-        anim_walking_frame_one_coords = Vector2.{ 1, 0 }, 
-        anim_walking_frame_count      = 15,
-        anim_walking_frame_ms         = 100,
-        anim_walking_current_ms       = 0,
+        // @TODO: kinda a dumb way to implement idling.
+        idle_animation = Animation.{
+            active            = true,
+            frame_one_coords  = Vector2.{ 0, 0 }, 
+            frame_count       = 1,
+            frame_duration_ms = 100,
+            timer_ms          = 0,
+        },
+
+        walk_animation = Animation.{
+            active            = false,
+            frame_one_coords  = Vector2.{ 1, 0 }, 
+            frame_count       = 15,
+            frame_duration_ms = 100,
+            timer_ms          = 0,
+        },
     };
+
     base_color   := Vector4.{1, 1, 1, 1};
+    // @TODO: probably put this in the entity struct
     player_color, tile_color := base_color; 
 
     dirt_blocks: [50]Entity;
@@ -144,6 +161,7 @@ main :: () {
     while !should_quit_game {
         reset_temporary_storage();
 
+        // Reset controls that need to be.
         try_to_jump = false;
 
         //
@@ -236,29 +254,13 @@ main :: () {
             {
                 using player;
 
-                new_walking_active := false;
+                active_animation := ifx idle_animation.active then idle_animation else walk_animation;
 
-                if move_player_left && move_player_right {
-                    new_walking_active = false;
-                }
-                else if move_player_left || move_player_right {
-                    new_walking_active = true;
-                }
-
-                // Just starting the animation up
-                if !anim_walking_active && new_walking_active {
-                    anim_walking_current_ms := 0;
-                }
-                // Continuing animation
-                else if new_walking_active {
-                    anim_walking_current_ms += xx (current_dt * 1000);
-                }
-                // Ending animation
-                else {
-                    anim_walking_current_ms := 0;
-                }
-
-                anim_walking_active = new_walking_active;
+                idle_animation.active = move_player_left == move_player_right;
+                walk_animation.active = move_player_left != move_player_right;
+                
+                if idle_animation.active then { idle_animation.timer_ms += xx (current_dt * 1000); } else { idle_animation.timer_ms = 0; }; 
+                if walk_animation.active then { walk_animation.timer_ms += xx (current_dt * 1000); } else { walk_animation.timer_ms = 0; }; 
             }
         }
 
@@ -303,14 +305,17 @@ main :: () {
             {
                 using player;
 
-                frame := (anim_walking_current_ms / anim_walking_frame_ms) % anim_walking_frame_count;
-                tile := Vector2.{ frame + anim_walking_frame_one_coords.x, anim_walking_frame_one_coords.y };
-                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(tile, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 2, 0, 0}, !player.is_facing_left);
+                active_animation : Animation = ifx idle_animation.active then idle_animation else walk_animation; 
 
-                left   := cast(float)player.rect.x;
-                right  := cast(float)player.rect.x + player.rect.width;
-                top    := cast(float)player.rect.y + player.rect.height;
-                bottom := cast(float)player.rect.y;
+                frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
+
+                tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
+                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(tile, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 0, 0, 0}, !player.is_facing_left);
+
+                left   : float = xx (player.rect.x);
+                right  : float = xx (player.rect.x + player.rect.width);
+                top    : float = xx (player.rect.y + player.rect.height);
+                bottom : float = xx (player.rect.y);
 
                 Simp.set_shader_for_images(*player_map);
                 Simp.immediate_quad(
@@ -334,6 +339,13 @@ main :: () {
             Simp.swap_buffers(window);
         }
     }
+}
+
+// @TODO: I wonder if I should factor these into a passable struct instead of globals
+reset_controls :: () {
+    move_player_left  = false;
+    // move_player_right = false;
+    try_to_jump       = false;
 }
 
 make_texture :: (name: string) -> Texture, bool {
