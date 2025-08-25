@@ -34,18 +34,18 @@ dirt_map   : Texture;
 
 PLAYER_MAP_COLS :: 1;
 PLAYER_MAP_ROWS :: 26;
-PLAYER_MAP_TILE_WIDTH  :: 40;
-PLAYER_MAP_TILE_HEIGHT :: 56;
-PLAYER_TILE_WORLD_WIDTH  :: 40 * 2;
-PLAYER_TILE_WORLD_HEIGHT :: 56 * 2;
+PLAYER_MAP_TILE_WIDTH    :: 38;
+PLAYER_MAP_TILE_HEIGHT   :: 48;
+PLAYER_TILE_WORLD_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * 2;
+PLAYER_TILE_WORLD_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * 2;
 // @TODO: Probably want to tie these to the window size or something
 PLAYER_MOVE_SPEED :: PLAYER_TILE_WORLD_WIDTH * 5; // px / s
 PLAYER_JUMP_SPEED :: PLAYER_TILE_WORLD_HEIGHT * 5; // px / s
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
-DIRT_TILE_TEXEL_WIDTH  :: 18;
-DIRT_TILE_TEXEL_HEIGHT :: 18;
+DIRT_TILE_WIDTH  :: 18;
+DIRT_TILE_HEIGHT :: 18;
 
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
@@ -67,6 +67,17 @@ Entity :: struct {
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     is_facing_left : bool;
+}
+
+Player :: struct {
+    using #as entity: Entity;
+
+    // @TODO: probably extract this
+    anim_walking_active           : bool;
+    anim_walking_frame_one_coords : Vector2;
+    anim_walking_frame_count      : int;
+    anim_walking_frame_ms         : int;
+    anim_walking_current_ms       : int;
 }
 
 Keybinds :: struct {
@@ -94,7 +105,7 @@ main :: () {
 
     init_textures();
     
-    player := Entity.{
+    player := Player.{
         rect = Rectangle.{100, 100, 65, 100},
         vel  = Vector2.{0, 0},
 
@@ -102,6 +113,12 @@ main :: () {
         jumps_remaining = 2,
 
         is_facing_left = true,
+
+        anim_walking_active           = false,
+        anim_walking_frame_one_coords = Vector2.{ 1, 0 }, 
+        anim_walking_frame_count      = 15,
+        anim_walking_frame_ms         = 100,
+        anim_walking_current_ms       = 0,
     };
     base_color   := Vector4.{1, 1, 1, 1};
     player_color, tile_color := base_color; 
@@ -214,6 +231,35 @@ main :: () {
                 player.jumps_remaining = player.jumps_capacity;
                 player.vel.y = 0;
             }
+
+            // Update animation state
+            {
+                using player;
+
+                new_walking_active := false;
+
+                if move_player_left && move_player_right {
+                    new_walking_active = false;
+                }
+                else if move_player_left || move_player_right {
+                    new_walking_active = true;
+                }
+
+                // Just starting the animation up
+                if !anim_walking_active && new_walking_active {
+                    anim_walking_current_ms := 0;
+                }
+                // Continuing animation
+                else if new_walking_active {
+                    anim_walking_current_ms += xx (current_dt * 1000);
+                }
+                // Ending animation
+                else {
+                    anim_walking_current_ms := 0;
+                }
+
+                anim_walking_active = new_walking_active;
+            }
         }
 
         //
@@ -229,7 +275,7 @@ main :: () {
                 for dirt_blocks {
                     Simp.set_shader_for_images(*dirt_map);
                     
-                    uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 3}, *dirt_map, DIRT_TILE_TEXEL_WIDTH, DIRT_TILE_TEXEL_HEIGHT, Vector4.{2, 2, 0, 0});
+                    uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 3}, *dirt_map, DIRT_TILE_WIDTH, DIRT_TILE_HEIGHT, Vector4.{2, 2, 0, 0});
 
                     // @TODO: function for this?
                     left   := cast(float)it.rect.x;
@@ -255,7 +301,11 @@ main :: () {
 
             // Draw player
             {
-                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 25}, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 0, 0, 0}, !player.is_facing_left);
+                using player;
+
+                frame := (anim_walking_current_ms / anim_walking_frame_ms) % anim_walking_frame_count;
+                tile := Vector2.{ frame + anim_walking_frame_one_coords.x, anim_walking_frame_one_coords.y };
+                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(tile, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 2, 0, 0}, !player.is_facing_left);
 
                 left   := cast(float)player.rect.x;
                 right  := cast(float)player.rect.x + player.rect.width;
@@ -274,7 +324,7 @@ main :: () {
 
                 if debug_mode {
                     using player.rect;
-                    draw_rect_outline(xx x, xx y, xx width, xx height, color = Vector4.{0,1,0,1});
+                    draw_rect_outline(xx x, xx y, xx width, xx height, color = Vector4.{0,1,0,1}, thickness = 2);
                 }
             }
 
@@ -296,19 +346,19 @@ make_texture :: (name: string) -> Texture, bool {
 }
 
 init_textures :: () {
-    player_map = make_texture("Player_Default.png");
+    player_map = make_texture("Player_Cropped.png");
     dirt_map   = make_texture("Tiles_0.png");
 }
 
-// Transparency margin texels is Vector4.{ bottom, right, top, left }.
-get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_texel_width: s32, tile_texel_height: s32, transparency_margin_texels: Vector4, flip: bool = false) -> Vector2, Vector2, Vector2, Vector2 {
-    tile_uv_width  := cast(float)tile_texel_width  / map.width;
-    tile_uv_height := cast(float)tile_texel_height / map.height;
+// Transparency margin pixels is Vector4.{ bottom, right, top, left }.
+get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_width: s32, tile_height: s32, transparency_margin_pixels: Vector4, flip: bool = false) -> Vector2, Vector2, Vector2, Vector2 {
+    tile_uv_width  := cast(float)tile_width  / map.width;
+    tile_uv_height := cast(float)tile_height / map.height;
 
-    left   := (tile_uv_width  * (ifx flip then tile_id.x + 1 else tile_id.x + 0 )) + (transparency_margin_texels.w / map.width );
-    right  := (tile_uv_width  * (ifx flip then tile_id.x + 0 else tile_id.x + 1 )) - (transparency_margin_texels.y / map.width );
-    bottom := (tile_uv_height * (ifx flip then tile_id.y + 0 else tile_id.y + 0 )) + (transparency_margin_texels.x / map.height);
-    top    := (tile_uv_height * (ifx flip then tile_id.y + 1 else tile_id.y + 1 )) - (transparency_margin_texels.z / map.height);
+    left   := (tile_uv_width  * (ifx flip then tile_id.x + 1 else tile_id.x + 0 )) + (transparency_margin_pixels.w / map.width );
+    right  := (tile_uv_width  * (ifx flip then tile_id.x + 0 else tile_id.x + 1 )) - (transparency_margin_pixels.y / map.width );
+    bottom := (tile_uv_height * (ifx flip then tile_id.y + 0 else tile_id.y + 0 )) + (transparency_margin_pixels.x / map.height);
+    top    := (tile_uv_height * (ifx flip then tile_id.y + 1 else tile_id.y + 1 )) - (transparency_margin_pixels.z / map.height);
 
     uv0 := Vector2.{ left,  bottom };
     uv1 := Vector2.{ right, bottom };
@@ -424,7 +474,7 @@ is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
     return false;
 }
 
-draw_rect_outline :: (x: float, y: float, w: float, h: float, color := Vector4.{1,1,1,1}, thickness: float = 1.0) {
+draw_rect_frame :: (x: float, y: float, w: float, h: float, color := Vector4.{1,1,1,1}, thickness: float = 1.0) {
     p0 := Vector2.{ x-thickness/2     , y-thickness/2     };  // tl
     p1 := Vector2.{ x+thickness/2 + w , y-thickness/2     };  // tr
     p2 := Vector2.{ x-thickness/2     , y+thickness/2 + h };  // bl
@@ -434,6 +484,20 @@ draw_rect_outline :: (x: float, y: float, w: float, h: float, color := Vector4.{
     
     Simp.immediate_line(p0-.{thickness/2, 0}, p1+.{thickness/2, 0}, thickness, color);  // top
     Simp.immediate_line(p2-.{thickness/2, 0}, p3+.{thickness/2, 0}, thickness, color);  // bottom
+    Simp.immediate_line(p1, p3, thickness, color);  // right
+    Simp.immediate_line(p2, p0, thickness, color);  // left
+}
+
+draw_rect_outline :: (x: float, y: float, w: float, h: float, color := Vector4.{1,1,1,1}, thickness: float = 1.0) {
+    p0 := Vector2.{ x     , y     };  // tl
+    p1 := Vector2.{ x + w , y     };  // tr
+    p2 := Vector2.{ x     , y + h };  // bl
+    p3 := Vector2.{ x + w , y + h };  // br
+    
+    Simp.set_shader_for_color(true);
+    
+    Simp.immediate_line(p0, p1, thickness, color);  // top
+    Simp.immediate_line(p2, p3, thickness, color);  // bottom
     Simp.immediate_line(p1, p3, thickness, color);  // right
     Simp.immediate_line(p2, p0, thickness, color);  // left
 }
