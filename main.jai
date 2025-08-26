@@ -41,8 +41,12 @@ DIRT_MAP_ROWS :: 15;
 DIRT_TILE_WIDTH  :: 18;
 DIRT_TILE_HEIGHT :: 18;
 
+WORLD_WIDTH  :: 5000;
+WORLD_HEIGHT :: 5000;
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
+WORLD_GRID_COLS :: 100;
+WORLD_GRID_ROWS :: 100;
 
 Entity :: struct {
     rect : Rectangle; // Used for collision
@@ -52,6 +56,7 @@ Entity :: struct {
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     is_facing_left : bool;
+    is_visible
 }
 
 Animation :: struct {
@@ -81,7 +86,7 @@ main :: () {
     //
     // Window setup
     //
-    InitWindow(800, 450, "raylib example");
+    InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
     SetTargetFPS(60);
 
@@ -120,16 +125,11 @@ main :: () {
         },
     };
 
-    base_color   := Vector4.{1, 1, 1, 1};
-    // @TODO: probably put this in the entity struct
-    player_color, tile_color := base_color; 
-
-    dirt_blocks: [50]Entity;
-    for i: 0..49 {
-        using dirt_blocks[i];
-
-        rect = Rectangle.{
-            x      = xx (i * WORLD_TILE_WIDTH),
+    DIRT_BLOCK_COUNT :: 100;
+    dirt_blocks: [DIRT_BLOCK_COUNT]Entity;
+    for i: 0..DIRT_BLOCK_COUNT-1 {
+        dirt_blocks[i].rect = Rectangle.{
+            x      = (i * WORLD_TILE_WIDTH) - WORLD_WIDTH/2.0,
             y      = xx (GetScreenHeight() - WORLD_TILE_HEIGHT),
             width  = xx (WORLD_TILE_WIDTH),
             height = xx (WORLD_TILE_HEIGHT),
@@ -189,7 +189,7 @@ main :: () {
 
                 if try_to_jump && can_jump(player) {
                     player.vel.y = -PLAYER_JUMP_SPEED;
-                    player.jumps_remaining += 1;
+                    player.jumps_remaining -= 1;
                 }
 
                 // Apply gravity
@@ -219,7 +219,13 @@ main :: () {
 
             // Update camera
             {
-                update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
+                camera.zoom += (cast(float)GetMouseWheelMove()*0.05);
+
+                if camera.zoom > 3.0 camera.zoom = 3.0;
+                else if camera.zoom < 0.25 camera.zoom = 0.25;
+
+                update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
+                // update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
             }
         }
 
@@ -232,46 +238,86 @@ main :: () {
 
             ClearBackground(SKYBLUE);
 
-            // Draw tiles
+            // Draw world
             {
-                for dirt_blocks {
-                    source := Rectangle.{0, 0, DIRT_TILE_WIDTH, DIRT_TILE_WIDTH};
+                BeginMode2D(camera);
+                defer EndMode2D();
+            
+                mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
-                    DrawTexturePro(dirt_map, source, it.rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                if debug_mode {
+                    // @TODO: move somewhere else?
+                    WORLD_COL_WIDTH  :: WORLD_WIDTH  / WORLD_GRID_COLS;
+                    WORLD_COL_HEIGHT :: WORLD_HEIGHT / WORLD_GRID_ROWS;
+
+                    for c: 0..WORLD_GRID_COLS {
+                        col := (c * WORLD_COL_WIDTH) - WORLD_WIDTH/2.0;
+                        DrawLineEx(Vector2.{ col, xx -WORLD_HEIGHT }, Vector2.{ col, xx WORLD_HEIGHT }, 1.0, WHITE);
+                    }
+
+                    for r: 0..WORLD_GRID_ROWS {
+                        row := (r * WORLD_COL_HEIGHT) - WORLD_HEIGHT/2.0;
+                        DrawLineEx(Vector2.{ xx -WORLD_WIDTH, row }, Vector2.{ xx WORLD_WIDTH, row }, 1.0, WHITE);
+                    }
+
+                    // for row: -WORLD_GRID_ROWS..0 {
+                    //     DrawLineV(Vector2.{ xx WORLD_WIDTH, xx -row }, Vector2.{ xx WORLD_WIDTH, xx row }, WHITE);
+                    // }
+
+                    // for row: 0..WORLD_GRID_ROWS {
+                    //     DrawLineV(Vector2.{ xx WORLD_WIDTH, xx -row }, Vector2.{ xx WORLD_WIDTH, xx row }, WHITE);
+                    // }
+                }
+
+                // Draw dirt
+                {
+                    for dirt_blocks {
+                        DIRT_TILE_PADDING :: 2;
+                        source := Rectangle.{0, 5 * DIRT_TILE_HEIGHT, DIRT_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_TILE_HEIGHT - DIRT_TILE_PADDING};
+
+                        DrawTexturePro(dirt_map, source, it.rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+
+                        if CheckCollisionPointRec(mouse_pos_in_world, it.rect) {
+                            TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
+                            DrawRectangleRec(it.rect, TRANSPARENT_WHITE);
+                        }
+
+                        if debug_mode {
+                            DrawRectangleLinesEx(it.rect, 1.0, LIME);
+                        }
+                    }
+                }
+
+                // Draw player
+                {
+                    using player;
+
+                    active_animation : Animation = ifx idle_animation.active then idle_animation else run_animation; 
+
+                    frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
+
+                    tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
+
+                    source_width : float = xx ifx is_facing_left then PLAYER_MAP_TILE_WIDTH else -PLAYER_MAP_TILE_WIDTH;
+                    source := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
+                    DrawTexturePro(player_map, source, rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
                     if debug_mode {
-                        DrawRectangleLinesEx(it.rect, 1.0, LIME);
+                        DrawRectangleLinesEx(player.rect, 1.0, LIME);
                     }
                 }
             }
 
-            // Draw player
-            {
-                using player;
-
-                active_animation : Animation = ifx idle_animation.active then idle_animation else run_animation; 
-
-                frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
-
-                tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
-
-                source_width : float = xx ifx is_facing_left then PLAYER_MAP_TILE_WIDTH else -PLAYER_MAP_TILE_WIDTH;
-                source := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
-                DrawTexturePro(player_map, source, rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
-
-                if debug_mode {
-                    DrawRectangleLinesEx(player.rect, 1.0, LIME);
-                }
-            }
-
             // Draw UI
-            // @TODO: Draw "paused"
-            if debug_mode {
-                DrawFPS(10, 10);
-            }
+            {
+                // @TODO: Draw "paused"
+                if debug_mode {
+                    DrawFPS(10, 10);
+                }
 
-            if paused {
+                if paused {
 
+                }
             }
         }
     }
@@ -364,7 +410,7 @@ can_jump :: (entity: Entity) -> bool {
 
 is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
     entity_rect_if_move := entity.rect;
-    entity_rect_if_move.y -= 1;
+    entity_rect_if_move.y += 1;
 
     for collidables {
         if CheckCollisionRecs(it.rect, entity_rect_if_move) return true;
@@ -373,10 +419,15 @@ is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
     return false;
 }
 
+update_camera_center :: (camera: *Camera2D, player: *Player, width: s32, height: s32) {
+    camera.offset = Vector2.{ width/2.0 - player.rect.width/2.0, height/2.0 - player.rect.height/2.0 };
+    camera.target = entity_pos(player);
+}
+
 update_camera_center_smooth_follow :: (camera: *Camera2D, player: *Player, delta: float, width: s32, height: s32) {
-    minSpeed: float = 30;
-    minEffectLength: float = 10;
-    fractionSpeed: float = 0.8;
+    minSpeed: float = 100;
+    minEffectLength: float = 1;
+    fractionSpeed: float = 1.5;
 
     camera.offset = Vector2.{ width/2.0, height/2.0 };
     diff: Vector2 = Vector2Subtract(Vector2.{player.rect.x,player.rect.y}, camera.target);
@@ -386,4 +437,8 @@ update_camera_center_smooth_follow :: (camera: *Camera2D, player: *Player, delta
         speed: float = max(fractionSpeed*length, minSpeed);
         camera.target = Vector2Add(camera.target, Vector2Scale(diff, speed*delta/length));
     }
+}
+
+entity_pos :: (e: Entity) -> Vector2 {
+    return Vector2.{ e.rect.x, e.rect.y };
 }

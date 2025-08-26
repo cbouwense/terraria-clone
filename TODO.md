@@ -1,0 +1,7 @@
+- block removal / placement
+- animation for jumping
+- animation for hitting the ground
+- Celeste movement juice
+- world gen
+- hot reloading
+- fix animation clipping next frame over when running left
