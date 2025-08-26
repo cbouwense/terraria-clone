@@ -46,7 +46,7 @@ DIRT_TILE_HEIGHT :: 18;
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
 
-ACCEL_DUE_TO_GRAVITY :: 10; // px^2 / s
+ACCEL_DUE_TO_GRAVITY :: 20; // px^2 / s
 
 Entity :: struct {
     rect : Rectangle; // Used for collision
@@ -241,15 +241,15 @@ main :: () {
             {
                 using player;
 
-                // active_animation : Animation = ifx idle_animation.active then idle_animation else walk_animation; 
+                active_animation : Animation = ifx idle_animation.active then idle_animation else walk_animation; 
 
-                // frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
+                frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
 
-                // tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
+                tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
 
-                source := Rectangle.{0, 0, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT};
+                source_width : float = xx ifx is_facing_left then PLAYER_MAP_TILE_WIDTH else -PLAYER_MAP_TILE_WIDTH;
+                source := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
                 DrawTexturePro(player_map, source, rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
-
 
                 if debug_mode {
                     DrawRectangleLinesEx(player.rect, 1.0, LIME);
