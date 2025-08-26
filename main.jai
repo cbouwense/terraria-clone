@@ -15,10 +15,6 @@ should_quit_game := false;
 paused           := false;
 debug_mode       := true;
 
-current_dt : float = 0.016667;
-last_time  : float64;
-DT_MAX     : float : 0.15;
-
 // Controls
 move_player_left  : bool;
 move_player_right : bool;
@@ -38,6 +34,8 @@ PLAYER_TILE_WORLD_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * 2;
 PLAYER_MOVE_SPEED :: PLAYER_TILE_WORLD_WIDTH * 5; // px / s
 PLAYER_JUMP_SPEED :: PLAYER_TILE_WORLD_HEIGHT * 5; // px / s
 
+ACCEL_DUE_TO_GRAVITY :: 20; // px^2 / s
+
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
 DIRT_TILE_WIDTH  :: 18;
@@ -45,8 +43,6 @@ DIRT_TILE_HEIGHT :: 18;
 
 WORLD_TILE_WIDTH  :: 50;
 WORLD_TILE_HEIGHT :: 50;
-
-ACCEL_DUE_TO_GRAVITY :: 20; // px^2 / s
 
 Entity :: struct {
     rect : Rectangle; // Used for collision
@@ -70,7 +66,7 @@ Player :: struct {
     using #as entity : Entity;
 
     idle_animation   : Animation;
-    walk_animation   : Animation;
+    run_animation   : Animation;
 }
 
 Keybinds :: struct {
@@ -95,8 +91,6 @@ main :: () {
     base_path := path_strip_filename(get_path_of_running_executable());
     data_folder = join(base_path, "data");
 
-    last_time = seconds_since_init();
-
     init_textures();
     
     player := Player.{
@@ -117,11 +111,11 @@ main :: () {
             timer_ms          = 0,
         },
 
-        walk_animation = Animation.{
+        run_animation = Animation.{
             active            = false,
-            frame_one_coords  = Vector2.{ 1, 0 }, 
-            frame_count       = 15,
-            frame_duration_ms = 100,
+            frame_one_coords  = Vector2.{ 2, 0 }, 
+            frame_count       = 14,
+            frame_duration_ms = 33,
             timer_ms          = 0,
         },
     };
@@ -142,6 +136,12 @@ main :: () {
         };
     }
 
+    camera: Camera2D;
+    camera.target = Vector2.{ player.rect.x, player.rect.y };
+    camera.offset = Vector2.{ GetScreenWidth()/2.0, GetScreenHeight()/2.0 };
+    camera.rotation = 0.0;
+    camera.zoom = 1.0;
+
     keybinds : Keybinds;
     
     keybinds.move_player_left  = .[.KEY_LEFT , .KEY_A];
@@ -151,6 +151,8 @@ main :: () {
     while !WindowShouldClose() {
         reset_temporary_storage();
 
+        dt := GetFrameTime();
+
         // Reset controls that need to be.
         try_to_jump = false;
 
@@ -158,8 +160,6 @@ main :: () {
         // Input
         //
         {
-            dt := GetFrameTime();
-
             if IsKeyPressed(.KEY_P)  paused = !paused;
             if IsKeyPressed(.KEY_F1) debug_mode = !debug_mode;
 
@@ -172,46 +172,54 @@ main :: () {
         // Update
         //
         if !paused {
-            // I think since we are always going to be controlling the player velocity directly, we can just reset
-            // the velocity like this for now. Although, this will have to change if we ever want momentum.
-            player.vel.x = 0;
-
-            if move_player_left {
-                player.vel.x -= PLAYER_MOVE_SPEED;
-                player.is_facing_left = true;
-            }
-            if move_player_right {
-                player.vel.x += PLAYER_MOVE_SPEED;
-                player.is_facing_left = false;
-            }
-
-            if try_to_jump && can_jump(player) {
-                player.vel.y = -PLAYER_JUMP_SPEED;
-                player.jumps_remaining += 1;
-            }
-
-            // Apply gravity
-            player.vel.y += ACCEL_DUE_TO_GRAVITY;
-
-            delta_pos := player.vel * current_dt;
-
-            try_to_move_x(*player, delta_pos.x, dirt_blocks);
-            try_to_move_y(*player, delta_pos.y, dirt_blocks);
-
-            if is_grounded(player, dirt_blocks) {
-                player.jumps_remaining = player.jumps_capacity;
-                player.vel.y = 0;
-            }
-
-            // Update animation state
+            // Update player
             {
-                using player;
+                // I think since we are always going to be controlling the player velocity directly, we can just reset
+                // the velocity like this for now. Although, this will have to change if we ever want momentum.
+                player.vel.x = 0;
 
-                idle_animation.active = move_player_left == move_player_right;
-                walk_animation.active = move_player_left != move_player_right;
-                
-                if idle_animation.active { idle_animation.timer_ms += xx (current_dt * 1000); } else { idle_animation.timer_ms = 0; }; 
-                if walk_animation.active { walk_animation.timer_ms += xx (current_dt * 1000); } else { walk_animation.timer_ms = 0; }; 
+                if move_player_left {
+                    player.vel.x -= PLAYER_MOVE_SPEED;
+                    player.is_facing_left = true;
+                }
+                if move_player_right {
+                    player.vel.x += PLAYER_MOVE_SPEED;
+                    player.is_facing_left = false;
+                }
+
+                if try_to_jump && can_jump(player) {
+                    player.vel.y = -PLAYER_JUMP_SPEED;
+                    player.jumps_remaining += 1;
+                }
+
+                // Apply gravity
+                player.vel.y += ACCEL_DUE_TO_GRAVITY;
+
+                delta_pos := player.vel * dt;
+
+                try_to_move_x(*player, delta_pos.x, dirt_blocks);
+                try_to_move_y(*player, delta_pos.y, dirt_blocks);
+
+                if is_grounded(player, dirt_blocks) {
+                    player.jumps_remaining = player.jumps_capacity;
+                    player.vel.y = 0;
+                }
+
+                // Update animation state
+                {
+                    using player;
+
+                    idle_animation.active = move_player_left == move_player_right;
+                    run_animation.active = move_player_left != move_player_right;
+                    
+                    if idle_animation.active { idle_animation.timer_ms += xx (dt * 1000); } else { idle_animation.timer_ms = 0; }; 
+                    if run_animation.active { run_animation.timer_ms += xx (dt * 1000); } else { run_animation.timer_ms = 0; }; 
+                }
+            }
+
+            // Update camera
+            {
+                update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
             }
         }
 
@@ -241,7 +249,7 @@ main :: () {
             {
                 using player;
 
-                active_animation : Animation = ifx idle_animation.active then idle_animation else walk_animation; 
+                active_animation : Animation = ifx idle_animation.active then idle_animation else run_animation; 
 
                 frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
 
@@ -258,6 +266,13 @@ main :: () {
 
             // Draw UI
             // @TODO: Draw "paused"
+            if debug_mode {
+                DrawFPS(10, 10);
+            }
+
+            if paused {
+
+            }
         }
     }
 }
@@ -356,4 +371,19 @@ is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
     }
 
     return false;
+}
+
+update_camera_center_smooth_follow :: (camera: *Camera2D, player: *Player, delta: float, width: s32, height: s32) {
+    minSpeed: float = 30;
+    minEffectLength: float = 10;
+    fractionSpeed: float = 0.8;
+
+    camera.offset = Vector2.{ width/2.0, height/2.0 };
+    diff: Vector2 = Vector2Subtract(Vector2.{player.rect.x,player.rect.y}, camera.target);
+    length: float = Vector2Length(diff);
+
+    if (length > minEffectLength) {
+        speed: float = max(fractionSpeed*length, minSpeed);
+        camera.target = Vector2Add(camera.target, Vector2Scale(diff, speed*delta/length));
+    }
 }
