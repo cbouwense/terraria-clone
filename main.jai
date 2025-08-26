@@ -1,14 +1,11 @@
 #import "Basic";
 #import "Input";
 #import "Math";
-#import "Sloppy_Math";
+#import "Print_Vars";
 #import "String";
 #import "System";
-#import "Window_Creation";
-#import "GL";
 
-Simp    :: #import "Simp"; 
-Texture :: Simp.Texture;
+#import "raylib";
 
 window_width  := 1600;
 window_height := 800;
@@ -21,7 +18,6 @@ debug_mode       := true;
 current_dt : float = 0.016667;
 last_time  : float64;
 DT_MAX     : float : 0.15;
-EPSILON   :: 0.0001;
 
 // Controls
 move_player_left  : bool;
@@ -52,13 +48,6 @@ WORLD_TILE_HEIGHT :: 50;
 
 ACCEL_DUE_TO_GRAVITY :: 10; // px^2 / s
 
-Rectangle :: struct {
-    x      : int; // bottom-left corner position x 
-    y      : int; // bottom-left corner position y 
-    width  : int;
-    height : int;
-}
-
 Entity :: struct {
     rect : Rectangle; // Used for collision
     vel  : Vector2;
@@ -85,9 +74,9 @@ Player :: struct {
 }
 
 Keybinds :: struct {
-    move_player_left  : [2] Key_Code;
-    move_player_right : [2] Key_Code;
-    jump              : [2] Key_Code;
+    move_player_left  : [2] KeyboardKey;
+    move_player_right : [2] KeyboardKey;
+    jump              : [2] KeyboardKey;
 }
 
 data_folder: string; 
@@ -96,8 +85,9 @@ main :: () {
     //
     // Window setup
     //
-    window := create_window(window_name="Terraria Clone", width=window_width, height=window_height);
-    Simp.set_render_target(window);
+    InitWindow(800, 450, "raylib example");
+    defer CloseWindow();
+    SetTargetFPS(60);
 
     //
     // Initialization
@@ -145,20 +135,20 @@ main :: () {
         using dirt_blocks[i];
 
         rect = Rectangle.{
-            x      = i * WORLD_TILE_WIDTH,
-            y      = 0,
-            width  = WORLD_TILE_WIDTH,
-            height = WORLD_TILE_HEIGHT,
+            x      = xx (i * WORLD_TILE_WIDTH),
+            y      = xx (GetScreenHeight() - WORLD_TILE_HEIGHT),
+            width  = xx (WORLD_TILE_WIDTH),
+            height = xx (WORLD_TILE_HEIGHT),
         };
     }
 
     keybinds : Keybinds;
     
-    keybinds.move_player_left  = .[.ARROW_LEFT , #char "A"];
-    keybinds.move_player_right = .[.ARROW_RIGHT, #char "D"];
-    keybinds.jump              = .[.SPACEBAR   , .SPACEBAR]; // @TODO: can I pass null here or something? or even better, arbitrarily sized arrays
+    keybinds.move_player_left  = .[.KEY_LEFT , .KEY_A];
+    keybinds.move_player_right = .[.KEY_RIGHT, .KEY_D];
+    keybinds.jump              = .[.KEY_SPACE, .KEY_SPACE]; // @TODO: can I pass null here or something? or even better, arbitrarily sized arrays
 
-    while !should_quit_game {
+    while !WindowShouldClose() {
         reset_temporary_storage();
 
         // Reset controls that need to be.
@@ -168,51 +158,14 @@ main :: () {
         // Input
         //
         {
-            update_window_events();
-            for get_window_resizes() {
-                Simp.update_window(it.window);
+            dt := GetFrameTime();
 
-                if it.window == window {
-                    window_width  = it.width;
-                    window_height = it.height;
-                }
-            }
+            if IsKeyPressed(.KEY_P)  paused = !paused;
+            if IsKeyPressed(.KEY_F1) debug_mode = !debug_mode;
 
-            now := seconds_since_init();
-            delta : float64 = now - last_time;
-            current_dt = cast(float) delta;
-
-            if current_dt > DT_MAX current_dt = DT_MAX;
-            last_time = now;
-
-            for event : events_this_frame {
-                if event.type == .QUIT {
-                    should_quit_game = true;
-                    break;
-                }
-
-                if event.key_code == .ESCAPE && event.key_pressed {
-                    should_quit_game = true;
-                    break;
-                }
-
-                if event.key_code == #char "P" && event.key_pressed {
-                    paused = !paused;
-                }
-
-                if event.key_code == .F1 && event.key_pressed {
-                    debug_mode = !debug_mode;
-                }
-
-                if event.type == .KEYBOARD {
-                    key := event.key_code;
-
-                    // @TODO: metaprogram this?
-                    if keycode_array_contains(keybinds.move_player_left, key)  move_player_left  = event.key_pressed > 0;
-                    if keycode_array_contains(keybinds.move_player_right, key) move_player_right = event.key_pressed > 0;
-                    if keycode_array_contains(keybinds.jump, key)              try_to_jump       = event.key_pressed > 0;
-                }
-            }
+            move_player_left  = keybind_down(keybinds.move_player_left);
+            move_player_right = keybind_down(keybinds.move_player_right);
+            try_to_jump       = keybind_pressed(keybinds.jump);
         }
 
         //
@@ -233,12 +186,12 @@ main :: () {
             }
 
             if try_to_jump && can_jump(player) {
-                player.vel.y = PLAYER_JUMP_SPEED;
-                player.jumps_remaining -= 1;
+                player.vel.y = -PLAYER_JUMP_SPEED;
+                player.jumps_remaining += 1;
             }
 
             // Apply gravity
-            player.vel.y -= ACCEL_DUE_TO_GRAVITY;
+            player.vel.y += ACCEL_DUE_TO_GRAVITY;
 
             delta_pos := player.vel * current_dt;
 
@@ -254,13 +207,11 @@ main :: () {
             {
                 using player;
 
-                active_animation := ifx idle_animation.active then idle_animation else walk_animation;
-
                 idle_animation.active = move_player_left == move_player_right;
                 walk_animation.active = move_player_left != move_player_right;
                 
-                if idle_animation.active then { idle_animation.timer_ms += xx (current_dt * 1000); } else { idle_animation.timer_ms = 0; }; 
-                if walk_animation.active then { walk_animation.timer_ms += xx (current_dt * 1000); } else { walk_animation.timer_ms = 0; }; 
+                if idle_animation.active { idle_animation.timer_ms += xx (current_dt * 1000); } else { idle_animation.timer_ms = 0; }; 
+                if walk_animation.active { walk_animation.timer_ms += xx (current_dt * 1000); } else { walk_animation.timer_ms = 0; }; 
             }
         }
 
@@ -268,35 +219,20 @@ main :: () {
         // Draw
         //
         {
-            Simp.clear_render_target(.2, .3, .3, 1);
+            BeginDrawing();
+            defer EndDrawing();
+
+            ClearBackground(SKYBLUE);
 
             // Draw tiles
             {
-
-                // Dirt 
                 for dirt_blocks {
-                    Simp.set_shader_for_images(*dirt_map);
-                    
-                    uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(Vector2.{0, 3}, *dirt_map, DIRT_TILE_WIDTH, DIRT_TILE_HEIGHT, Vector4.{2, 2, 0, 0});
+                    source := Rectangle.{0, 0, DIRT_TILE_WIDTH, DIRT_TILE_WIDTH};
 
-                    // @TODO: function for this?
-                    left   := cast(float)it.rect.x;
-                    right  := cast(float)it.rect.x + it.rect.width;
-                    top    := cast(float)it.rect.y + it.rect.height;
-                    bottom := cast(float)it.rect.y + 0;
-
-                    Simp.immediate_quad(
-                        p0 = Vector2.{ left,  bottom },
-                        p1 = Vector2.{ right, bottom },
-                        p2 = Vector2.{ right, top    },
-                        p3 = Vector2.{ left,  top    },
-                        color = Vector4.{ 1, 1, 1, 1 },
-                        uv0, uv1, uv2, uv3,
-                    );
+                    DrawTexturePro(dirt_map, source, it.rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
                     if debug_mode {
-                        using it.rect;
-                        draw_rect_outline(xx x, xx y, xx width, xx height, color = Vector4.{0,1,0,1});
+                        DrawRectangleLinesEx(it.rect, 1.0, LIME);
                     }
                 }
             }
@@ -305,103 +241,41 @@ main :: () {
             {
                 using player;
 
-                active_animation : Animation = ifx idle_animation.active then idle_animation else walk_animation; 
+                // active_animation : Animation = ifx idle_animation.active then idle_animation else walk_animation; 
 
-                frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
+                // frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
 
-                tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
-                uv0, uv1, uv2, uv3 := get_tile_uv_coords_by_id(tile, *player_map, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT, Vector4.{0, 0, 0, 0}, !player.is_facing_left);
+                // tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
 
-                left   : float = xx (player.rect.x);
-                right  : float = xx (player.rect.x + player.rect.width);
-                top    : float = xx (player.rect.y + player.rect.height);
-                bottom : float = xx (player.rect.y);
+                source := Rectangle.{0, 0, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT};
+                DrawTexturePro(player_map, source, rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
-                Simp.set_shader_for_images(*player_map);
-                Simp.immediate_quad(
-                    p0 = Vector2.{ left,  bottom },
-                    p1 = Vector2.{ right, bottom },
-                    p2 = Vector2.{ right, top    },
-                    p3 = Vector2.{ left,  top    },
-                    color = Vector4.{ 1, 1, 1, 1 },
-                    uv0, uv1, uv2, uv3,
-                );
 
                 if debug_mode {
-                    using player.rect;
-                    draw_rect_outline(xx x, xx y, xx width, xx height, color = Vector4.{0,1,0,1}, thickness = 2);
+                    DrawRectangleLinesEx(player.rect, 1.0, LIME);
                 }
             }
 
             // Draw UI
             // @TODO: Draw "paused"
-
-            Simp.swap_buffers(window);
         }
     }
 }
 
-// @TODO: I wonder if I should factor these into a passable struct instead of globals
-reset_controls :: () {
-    move_player_left  = false;
-    // move_player_right = false;
-    try_to_jump       = false;
-}
-
-make_texture :: (name: string) -> Texture, bool {
-    filename := tprint("%/%", data_folder, name);
-
-    result: Texture;
-    success := Simp.texture_load_from_file(*result, filename);
-
-    return result, success;
-}
-
 init_textures :: () {
-    player_map = make_texture("Player_Cropped.png");
-    dirt_map   = make_texture("Tiles_0.png");
+    // @TODO: factor out data path?
+    player_map = LoadTexture("data/Player_Cropped.png");
+    dirt_map   = LoadTexture("data/Tiles_0.png");
 }
 
-// Transparency margin pixels is Vector4.{ bottom, right, top, left }.
-get_tile_uv_coords_by_id :: (tile_id: Vector2, map: *Texture, tile_width: s32, tile_height: s32, transparency_margin_pixels: Vector4, flip: bool = false) -> Vector2, Vector2, Vector2, Vector2 {
-    tile_uv_width  := cast(float)tile_width  / map.width;
-    tile_uv_height := cast(float)tile_height / map.height;
-
-    left   := (tile_uv_width  * (ifx flip then tile_id.x + 1 else tile_id.x + 0 )) + (transparency_margin_pixels.w / map.width );
-    right  := (tile_uv_width  * (ifx flip then tile_id.x + 0 else tile_id.x + 1 )) - (transparency_margin_pixels.y / map.width );
-    bottom := (tile_uv_height * (ifx flip then tile_id.y + 0 else tile_id.y + 0 )) + (transparency_margin_pixels.x / map.height);
-    top    := (tile_uv_height * (ifx flip then tile_id.y + 1 else tile_id.y + 1 )) - (transparency_margin_pixels.z / map.height);
-
-    uv0 := Vector2.{ left,  bottom };
-    uv1 := Vector2.{ right, bottom };
-    uv2 := Vector2.{ right, top    };
-    uv3 := Vector2.{ left,  top    };
-
-    return uv0, uv1, uv2, uv3;
-}
-
-// @TODO: probably use generics here.
-keycode_array_contains :: (haystack: [] Key_Code, needle: Key_Code) -> bool {
-    for haystack {
-        if it == needle return true;
-    }
+keybind_down :: (haystack: [] KeyboardKey) -> bool {
+    for haystack if IsKeyDown(it) return true;
     return false;
 }
 
-check_collisions_rects :: (rect1: Rectangle, rect2: Rectangle) -> bool {
-    collision := false;
-
-    if ((rect1.x < (rect2.x + rect2.width) && (rect1.x + rect1.width) > rect2.x) &&
-        (rect1.y < (rect2.y + rect2.height) && (rect1.y + rect1.height) > rect2.y)) collision = true;
-
-    return collision;
-}
-
-// @TODO: generics?
-sign :: (n: float) -> float {
-    if (n > 0) return 1;
-    if (n < 0) return -1;
-    return 0;
+keybind_pressed :: (haystack: [] KeyboardKey) -> bool {
+    for haystack if IsKeyPressed(it) return true;
+    return false;
 }
 
 round :: (f: float) -> int {
@@ -425,7 +299,7 @@ try_to_move_x :: (entity: *Entity, distance: float, collidables: []Entity) {
         
         // @TODO: extract?
         for collidables {
-            if check_collisions_rects(it.rect, new_entity_rect) {
+            if CheckCollisionRecs(it.rect, new_entity_rect) {
                 collided = true;
                 break;
             }
@@ -454,7 +328,7 @@ try_to_move_y :: (entity: *Entity, distance: float, collidables: []Entity) {
         
         // @TODO: extract?
         for collidables {
-            if check_collisions_rects(it.rect, new_entity_rect) {
+            if CheckCollisionRecs(it.rect, new_entity_rect) {
                 collided = true;
                 break;
             }
@@ -478,38 +352,8 @@ is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
     entity_rect_if_move.y -= 1;
 
     for collidables {
-        if check_collisions_rects(it.rect, entity_rect_if_move) {
-            return true;
-        }
+        if CheckCollisionRecs(it.rect, entity_rect_if_move) return true;
     }
 
     return false;
-}
-
-draw_rect_frame :: (x: float, y: float, w: float, h: float, color := Vector4.{1,1,1,1}, thickness: float = 1.0) {
-    p0 := Vector2.{ x-thickness/2     , y-thickness/2     };  // tl
-    p1 := Vector2.{ x+thickness/2 + w , y-thickness/2     };  // tr
-    p2 := Vector2.{ x-thickness/2     , y+thickness/2 + h };  // bl
-    p3 := Vector2.{ x+thickness/2 + w , y+thickness/2 + h };  // br
-    
-    Simp.set_shader_for_color(true);
-    
-    Simp.immediate_line(p0-.{thickness/2, 0}, p1+.{thickness/2, 0}, thickness, color);  // top
-    Simp.immediate_line(p2-.{thickness/2, 0}, p3+.{thickness/2, 0}, thickness, color);  // bottom
-    Simp.immediate_line(p1, p3, thickness, color);  // right
-    Simp.immediate_line(p2, p0, thickness, color);  // left
-}
-
-draw_rect_outline :: (x: float, y: float, w: float, h: float, color := Vector4.{1,1,1,1}, thickness: float = 1.0) {
-    p0 := Vector2.{ x     , y     };  // tl
-    p1 := Vector2.{ x + w , y     };  // tr
-    p2 := Vector2.{ x     , y + h };  // bl
-    p3 := Vector2.{ x + w , y + h };  // br
-    
-    Simp.set_shader_for_color(true);
-    
-    Simp.immediate_line(p0, p1, thickness, color);  // top
-    Simp.immediate_line(p2, p3, thickness, color);  // bottom
-    Simp.immediate_line(p1, p3, thickness, color);  // right
-    Simp.immediate_line(p2, p0, thickness, color);  // left
 }
