@@ -19,6 +19,7 @@ debug_mode       := true;
 move_player_left  : bool;
 move_player_right : bool;
 try_to_jump       : bool;
+try_to_attack     : bool;
 
 // Texture maps
 player_map : Texture;
@@ -49,6 +50,8 @@ WORLD_GRID_COLS :: 100;
 WORLD_GRID_ROWS :: 100;
 
 Entity :: struct {
+    id : u32;
+
     rect : Rectangle; // Used for collision
     vel  : Vector2;
 
@@ -56,7 +59,6 @@ Entity :: struct {
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     is_facing_left : bool;
-    is_visible
 }
 
 Animation :: struct {
@@ -74,10 +76,16 @@ Player :: struct {
     run_animation   : Animation;
 }
 
-Keybinds :: struct {
-    move_player_left  : [2] KeyboardKey;
-    move_player_right : [2] KeyboardKey;
-    jump              : [2] KeyboardKey;
+Control :: struct {
+    type:  Type;
+    value: s32; // KeyboardKey | MouseButton;
+}
+
+Controls :: struct {
+    move_player_left  : [3] Control;
+    move_player_right : [3] Control;
+    jump              : [3] Control;
+    attack            : [3] Control;
 }
 
 data_folder: string; 
@@ -97,8 +105,13 @@ main :: () {
     data_folder = join(base_path, "data");
 
     init_textures();
+
+    // @TODO: is this a good idea?
+    global_id_counter : u32 = 0;
     
     player := Player.{
+        id = global_id_counter,
+
         rect = Rectangle.{100, 100, 65, 100},
         vel  = Vector2.{0, 0},
 
@@ -124,16 +137,22 @@ main :: () {
             timer_ms          = 0,
         },
     };
+    global_id_counter += 1;
 
-    DIRT_BLOCK_COUNT :: 100;
-    dirt_blocks: [DIRT_BLOCK_COUNT]Entity;
-    for i: 0..DIRT_BLOCK_COUNT-1 {
-        dirt_blocks[i].rect = Rectangle.{
-            x      = (i * WORLD_TILE_WIDTH) - WORLD_WIDTH/2.0,
-            y      = xx (GetScreenHeight() - WORLD_TILE_HEIGHT),
-            width  = xx (WORLD_TILE_WIDTH),
-            height = xx (WORLD_TILE_HEIGHT),
-        };
+    INITIAL_DIRT_BLOCK_COUNT :: 100;
+    dirt_blocks: [..]Entity;
+    for i: 0..INITIAL_DIRT_BLOCK_COUNT-1 {
+        array_add(*dirt_blocks, Entity.{
+            id = global_id_counter,
+
+            rect = Rectangle.{
+                x      = (i * WORLD_TILE_WIDTH) - WORLD_WIDTH/2.0,
+                y      = xx (GetScreenHeight() - WORLD_TILE_HEIGHT),
+                width  = xx (WORLD_TILE_WIDTH),
+                height = xx (WORLD_TILE_HEIGHT),
+            },
+        });
+        global_id_counter += 1;
     }
 
     camera: Camera2D;
@@ -142,19 +161,24 @@ main :: () {
     camera.rotation = 0.0;
     camera.zoom = 1.0;
 
-    keybinds : Keybinds;
-    
-    keybinds.move_player_left  = .[.KEY_LEFT , .KEY_A];
-    keybinds.move_player_right = .[.KEY_RIGHT, .KEY_D];
-    keybinds.jump              = .[.KEY_SPACE, .KEY_SPACE]; // @TODO: can I pass null here or something? or even better, arbitrarily sized arrays
+    // @TODO: would a different data structure work better here for perf?
+    controls : Controls;
+    controls.move_player_left[0]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_LEFT)  };
+    controls.move_player_left[1]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_A)     };
+    controls.move_player_right[0] = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_RIGHT) };
+    controls.move_player_right[1] = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_D)     };
+    controls.jump[0]              = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_SPACE) };
+    controls.attack[0]            = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_LEFT) };
 
     while !WindowShouldClose() {
         reset_temporary_storage();
 
         dt := GetFrameTime();
+        mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
         // Reset controls that need to be.
-        try_to_jump = false;
+        try_to_jump   = false;
+        try_to_attack = false;
 
         //
         // Input
@@ -163,9 +187,10 @@ main :: () {
             if IsKeyPressed(.KEY_P)  paused = !paused;
             if IsKeyPressed(.KEY_F1) debug_mode = !debug_mode;
 
-            move_player_left  = keybind_down(keybinds.move_player_left);
-            move_player_right = keybind_down(keybinds.move_player_right);
-            try_to_jump       = keybind_pressed(keybinds.jump);
+            move_player_left  = control_down(controls.move_player_left);
+            move_player_right = control_down(controls.move_player_right);
+            try_to_jump       = control_pressed(controls.jump);
+            try_to_attack     = control_pressed(controls.attack);
         }
 
         //
@@ -191,6 +216,11 @@ main :: () {
                     player.vel.y = -PLAYER_JUMP_SPEED;
                     player.jumps_remaining -= 1;
                 }
+
+                // @TODO: we'll want this to be on the player to actually be like terraria 
+                // if try_to_attack && can_attack(player) {
+
+                // }
 
                 // Apply gravity
                 player.vel.y += ACCEL_DUE_TO_GRAVITY;
@@ -227,6 +257,17 @@ main :: () {
                 update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
                 // update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
             }
+
+            // Update god mode
+            {
+                if try_to_attack {
+                    for dirt_blocks {
+                        if CheckCollisionPointRec(mouse_pos_in_world, it.rect) {
+                            array_unordered_remove_by_index(*dirt_blocks, it_index);
+                        }
+                    }
+                }
+            }
         }
 
         //
@@ -242,11 +283,8 @@ main :: () {
             {
                 BeginMode2D(camera);
                 defer EndMode2D();
-            
-                mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
                 if debug_mode {
-                    // @TODO: move somewhere else?
                     WORLD_COL_WIDTH  :: WORLD_WIDTH  / WORLD_GRID_COLS;
                     WORLD_COL_HEIGHT :: WORLD_HEIGHT / WORLD_GRID_ROWS;
 
@@ -259,14 +297,6 @@ main :: () {
                         row := (r * WORLD_COL_HEIGHT) - WORLD_HEIGHT/2.0;
                         DrawLineEx(Vector2.{ xx -WORLD_WIDTH, row }, Vector2.{ xx WORLD_WIDTH, row }, 1.0, WHITE);
                     }
-
-                    // for row: -WORLD_GRID_ROWS..0 {
-                    //     DrawLineV(Vector2.{ xx WORLD_WIDTH, xx -row }, Vector2.{ xx WORLD_WIDTH, xx row }, WHITE);
-                    // }
-
-                    // for row: 0..WORLD_GRID_ROWS {
-                    //     DrawLineV(Vector2.{ xx WORLD_WIDTH, xx -row }, Vector2.{ xx WORLD_WIDTH, xx row }, WHITE);
-                    // }
                 }
 
                 // Draw dirt
@@ -329,13 +359,21 @@ init_textures :: () {
     dirt_map   = LoadTexture("data/Tiles_0.png");
 }
 
-keybind_down :: (haystack: [] KeyboardKey) -> bool {
-    for haystack if IsKeyDown(it) return true;
+control_down :: (haystack: [] Control) -> bool {
+    for haystack {
+        if it.type == KeyboardKey && IsKeyDown(xx it.value) return true;
+        if it.type == MouseButton && IsMouseButtonDown(xx it.value) return true;
+    }
+
     return false;
 }
 
-keybind_pressed :: (haystack: [] KeyboardKey) -> bool {
-    for haystack if IsKeyPressed(it) return true;
+control_pressed :: (haystack: [] Control) -> bool {
+    for haystack {
+        if it.type == KeyboardKey && IsKeyPressed(xx it.value) return true;
+        if it.type == MouseButton && IsMouseButtonPressed(xx it.value) return true;
+    }
+
     return false;
 }
 
