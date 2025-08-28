@@ -37,6 +37,8 @@ PLAYER_WORLD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE;
 PLAYER_WORLD_BOUNDING_WIDTH  :: PLAYER_WORLD_SPRITE_WIDTH  - 40;
 PLAYER_WORLD_BOUNDING_HEIGHT :: PLAYER_WORLD_SPRITE_HEIGHT - 20;
 
+PLAYER_REACH_DISTANCE :: 300.0;
+
 PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
 PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
 
@@ -275,6 +277,16 @@ main :: () {
                     player.vel.y = 0;
                 }
 
+                if try_to_attack {
+                    if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
+                        for dirt_blocks {
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                array_unordered_remove_by_index(*dirt_blocks, it_index);
+                            }
+                        }
+                    }
+                }
+
                 // Update animation state
                 {
                     using player;
@@ -300,14 +312,6 @@ main :: () {
 
             // Update god mode
             {
-                if try_to_attack {
-                    for dirt_blocks {
-                        if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                            array_unordered_remove_by_index(*dirt_blocks, it_index);
-                        }
-                    }
-                }
-
                 // For now this just places down dirt blocks
                 if try_to_interact {
                     defer global_id_counter += 1;
@@ -363,9 +367,11 @@ main :: () {
 
                         DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
-                        if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                            TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
-                            DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
+                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                            }
                         }
 
                         if debug_mode {
@@ -551,6 +557,5 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
         width  = xx tile_width,
         height = xx tile_height,
     };
-    print_vars(new_rect, pos);
     return new_rect;
 }
