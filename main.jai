@@ -33,7 +33,7 @@ PLAYER_MAP_ROWS :: 26;
 PLAYER_MAP_TILE_WIDTH  :: 36;
 PLAYER_MAP_TILE_HEIGHT :: 48;
 PLAYER_WORLD_SPRITE_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * SCALE;
-PLAYER_WORLD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE;
+PLAYER_WORLD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE - 5;
 PLAYER_WORLD_BOUNDING_WIDTH  :: PLAYER_WORLD_SPRITE_WIDTH  - 40;
 PLAYER_WORLD_BOUNDING_HEIGHT :: PLAYER_WORLD_SPRITE_HEIGHT - 20;
 
@@ -130,7 +130,7 @@ main :: () {
         // @TODO: can I reference a field on a struct during a literal declaration.
         bounding_rect = Rectangle.{
             pos.x - floor(PLAYER_WORLD_BOUNDING_WIDTH / 2.0),
-            pos.y - floor(PLAYER_WORLD_BOUNDING_HEIGHT / 2.0),
+            pos.y - floor(PLAYER_WORLD_BOUNDING_HEIGHT / 2.0) + 5,
             xx PLAYER_WORLD_BOUNDING_WIDTH,
             xx PLAYER_WORLD_BOUNDING_HEIGHT
         },
@@ -278,7 +278,8 @@ main :: () {
                 }
 
                 if try_to_attack {
-                    if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
+                    if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
+                        // @TODO: there's a function to extract here
                         for dirt_blocks {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 array_unordered_remove_by_index(*dirt_blocks, it_index);
@@ -287,15 +288,51 @@ main :: () {
                     }
                 }
 
+                // For now this just places down dirt blocks
+                if try_to_interact {
+                    is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+                    would_be_on_existing_entity := false;
+
+                    for dirt_blocks {
+                        if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                            would_be_on_existing_entity = true;
+                            break;
+                        }
+                    }
+
+                    can_place_block := is_within_reach && !would_be_on_existing_entity;
+
+                    if can_place_block { 
+                        defer global_id_counter += 1;
+
+                        new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
+
+                        new_dirt_block := Entity.{
+                            id            = global_id_counter,
+                            bounding_rect = new_rect,
+                            sprite_rect   = new_rect,
+                        };
+                        
+                        array_add(*dirt_blocks, new_dirt_block);
+                    }
+                }
+
                 // Update animation state
                 {
-                    using player;
-
-                    idle_animation.active = move_player_left == move_player_right;
-                    run_animation.active = move_player_left != move_player_right;
+                    player.idle_animation.active = move_player_left == move_player_right;
+                    player.run_animation.active  = move_player_left != move_player_right;
                     
-                    if idle_animation.active { idle_animation.timer_ms += xx (dt * 1000); } else { idle_animation.timer_ms = 0; }; 
-                    if run_animation.active { run_animation.timer_ms += xx (dt * 1000); } else { run_animation.timer_ms = 0; }; 
+                    if player.idle_animation.active {
+                        player.idle_animation.timer_ms += xx (dt * 1000);
+                    } else {
+                        player.idle_animation.timer_ms = 0;
+                    };
+
+                    if player.run_animation.active {
+                        player.run_animation.timer_ms += xx (dt * 1000);
+                    } else {
+                        player.run_animation.timer_ms = 0;
+                    }; 
                 }
             }
 
@@ -308,24 +345,6 @@ main :: () {
 
                 update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
                 // update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
-            }
-
-            // Update god mode
-            {
-                // For now this just places down dirt blocks
-                if try_to_interact {
-                    defer global_id_counter += 1;
-
-                    new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
-
-                    new_dirt_block := Entity.{
-                        id            = global_id_counter,
-                        bounding_rect = new_rect,
-                        sprite_rect   = new_rect,
-                    };
-                    
-                    array_add(*dirt_blocks, new_dirt_block);
-                }
             }
         }
 
@@ -558,4 +577,15 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
         height = xx tile_height,
     };
     return new_rect;
+}
+
+// Copied from "What is Perlin Noise?" by Suboptimal Engineer (https://www.youtube.com/watch?v=7fd331zsie0).
+random_vector :: (grid_corner: Vector2) -> Vector2 {
+    x := Vector2DotProduct(grid_corner, Vector2.{ 123.4, 234.5 });
+    y := Vector2DotProduct(grid_corner, Vector2.{ 234.5, 345.6 });
+    gradient := Vector2.{ x, y };
+    gradient = Vector2.{ sin(gradient.x), sin(gradient.y) };
+    gradient = Vector2Scale(gradient, 143758.0);
+    gradient = Vector2.{ sin(gradient.x + cast(float32)GetTime()), sin(gradient.y + cast(float32)GetTime()) };
+    return gradient;
 }
