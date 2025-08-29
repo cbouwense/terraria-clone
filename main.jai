@@ -14,6 +14,7 @@ window_height := 800;
 should_quit_game := false;
 paused           := false;
 debug_mode       := true;
+free_cam_pos     := Vector2.{ 0, 0 };
 
 // Controls
 move_player_left  : bool;
@@ -21,6 +22,7 @@ move_player_right : bool;
 try_to_jump       : bool;
 try_to_attack     : bool;
 try_to_interact   : bool;
+drag_cam   : bool;
 
 // Texture maps
 player_map : Texture;
@@ -55,6 +57,8 @@ WORLD_WIDTH  :: 5000;
 WORLD_HEIGHT :: 5000;
 WORLD_GRID_COLS :: 100;
 WORLD_GRID_ROWS :: 100;
+
+DEBUG_CAM_SPEED :: 4;
 
 Entity :: struct {
     id : u32;
@@ -97,6 +101,7 @@ Controls :: struct {
     jump              : [3] Control;
     attack            : [3] Control;
     interact          : [3] Control;
+    drag_cam          : [3] Control;
 }
 
 data_folder: string; 
@@ -165,27 +170,27 @@ main :: () {
     };
     global_id_counter += 1;
 
-    INITIAL_DIRT_BLOCK_COUNT :: 1000;
+    INITIAL_DIRT_BLOCK_COLS :: 100;
+    INITIAL_DIRT_BLOCK_ROWS :: 100;
     dirt_blocks: [..]Entity;
-    for i: 0..INITIAL_DIRT_BLOCK_COUNT-1 {
-        array_add(*dirt_blocks, Entity.{
-            // @TODO: post incrememnt macro or something?
-            id = global_id_counter,
+    for c: 0..INITIAL_DIRT_BLOCK_COLS {
+        for r: 0..INITIAL_DIRT_BLOCK_ROWS {
+            global_id_counter += 1;
 
-            bounding_rect = Rectangle.{
-                x      = (i * DIRT_WORLD_TILE_WIDTH) - WORLD_WIDTH/2.0,
-                y      = xx (GetScreenHeight() - DIRT_WORLD_TILE_HEIGHT),
+            rect := Rectangle.{
+                x      = ((c - INITIAL_DIRT_BLOCK_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
+                y      = r * DIRT_WORLD_TILE_HEIGHT + GetScreenHeight() + 100.0,
                 width  = xx (DIRT_WORLD_TILE_WIDTH),
                 height = xx (DIRT_WORLD_TILE_HEIGHT),
-            },
-            sprite_rect = Rectangle.{
-                x      = (i * DIRT_WORLD_TILE_WIDTH) - WORLD_WIDTH/2.0,
-                y      = xx (GetScreenHeight() - DIRT_WORLD_TILE_HEIGHT),
-                width  = xx (DIRT_WORLD_TILE_WIDTH),
-                height = xx (DIRT_WORLD_TILE_HEIGHT),
-            }
-        });
-        global_id_counter += 1;
+            };
+
+            array_add(*dirt_blocks, Entity.{
+                // @TODO: post incrememnt macro or something?
+                id = global_id_counter,
+                bounding_rect = rect,
+                sprite_rect   = rect,
+            });
+        }
     }
 
     camera: Camera2D;
@@ -203,6 +208,7 @@ main :: () {
     controls.jump[0]              = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_SPACE) };
     controls.attack[0]            = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_LEFT) };
     controls.interact[0]          = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_RIGHT) };
+    controls.drag_cam[0]          = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE) };
 
     frame := 0;
 
@@ -232,6 +238,7 @@ main :: () {
             try_to_jump       = control_pressed(controls.jump);
             try_to_attack     = control_pressed(controls.attack);
             try_to_interact   = control_pressed(controls.interact); // place blocks, open doors, etc.
+            drag_cam          = control_down(controls.drag_cam);
         }
 
         //
@@ -338,12 +345,22 @@ main :: () {
 
             // Update camera
             {
+                if drag_cam {
+                    free_cam_pos = Vector2Add(free_cam_pos, Vector2Scale(GetMouseDelta(), -1.0 * DEBUG_CAM_SPEED));
+                }
+
                 camera.zoom += (cast(float)GetMouseWheelMove()*0.05);
 
                 if camera.zoom > 3.0 camera.zoom = 3.0;
-                else if camera.zoom < 0.25 camera.zoom = 0.25;
+                else if camera.zoom < 0.10 camera.zoom = 0.10;
 
-                update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
+                if debug_mode {
+                    camera.offset = Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
+                    camera.target = free_cam_pos;
+                } else {
+                    update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
+                    free_cam_pos = player.pos;
+                }
                 // update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
             }
         }
