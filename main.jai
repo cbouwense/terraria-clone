@@ -2,6 +2,7 @@
 #import "Input";
 #import "Math";
 #import "Print_Vars";
+#import "Random";
 #import "String";
 #import "System";
 
@@ -52,13 +53,15 @@ DIRT_MAP_TILE_WIDTH  :: 18;
 DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
+INITIAL_DIRT_BLOCK_COLS :: 150;
+INITIAL_DIRT_BLOCK_ROWS :: 100;
 
 WORLD_WIDTH  :: 5000;
 WORLD_HEIGHT :: 5000;
 WORLD_GRID_COLS :: 100;
 WORLD_GRID_ROWS :: 100;
 
-DEBUG_CAM_SPEED :: 4;
+DEBUG_CAM_SPEED :: 5;
 
 Entity :: struct {
     id : u32;
@@ -73,6 +76,8 @@ Entity :: struct {
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     is_facing_left : bool;
+
+    perlin : float;
 }
 
 Animation :: struct {
@@ -170,27 +175,60 @@ main :: () {
     };
     global_id_counter += 1;
 
-    INITIAL_DIRT_BLOCK_COLS :: 100;
-    INITIAL_DIRT_BLOCK_ROWS :: 100;
     dirt_blocks: [..]Entity;
-    for c: 0..INITIAL_DIRT_BLOCK_COLS {
-        for r: 0..INITIAL_DIRT_BLOCK_ROWS {
-            global_id_counter += 1;
 
-            rect := Rectangle.{
-                x      = ((c - INITIAL_DIRT_BLOCK_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-                y      = r * DIRT_WORLD_TILE_HEIGHT + GetScreenHeight() + 100.0,
-                width  = xx (DIRT_WORLD_TILE_WIDTH),
-                height = xx (DIRT_WORLD_TILE_HEIGHT),
-            };
+    grid_rect := Rectangle.{
+        x = 0,
+        y = 0,
+        width  = INITIAL_DIRT_BLOCK_COLS,
+        height = INITIAL_DIRT_BLOCK_ROWS,
+    };
 
-            array_add(*dirt_blocks, Entity.{
-                // @TODO: post incrememnt macro or something?
-                id = global_id_counter,
-                bounding_rect = rect,
-                sprite_rect   = rect,
-            });
-        }
+    // @TODO: make function for perlin noise
+    random_grid_scalars: [100]float;
+    for i: 0..random_grid_scalars.count-1 {
+        random_grid_scalars[i] = random_get_within_range(-1.0, 1.0);
+    }
+
+    perlin_values: [1000]float;
+    ratio := 1000 / 100;
+    // @TODO: off by one error here
+    for i: 0..989 {
+        // Get distance from current tile to each grid corner
+        f := floor(cast(float) i / ratio);
+        delta_l := (i - ratio * f);
+        delta_r := (ratio * (f + 1) - i);
+
+        // Get dot products of grid corner vectors and distances
+        l_scalar := random_grid_scalars[cast(int) (f)];
+        r_scalar := random_grid_scalars[cast(int) (f + 1)];
+
+        l_dot := l_scalar * delta_l;
+        r_dot := r_scalar * delta_r;
+
+        l := lerp(l_dot, r_dot, delta_l);
+        r := lerp(r_dot, l_dot, delta_r);
+        perlin := lerp(l, r, 0.5);
+        perlin_values[i] = ifx perlin < 0 then perlin * -1 else perlin;
+    }
+
+    for 0..989 {
+        rect := Rectangle.{
+            x      = ((it - INITIAL_DIRT_BLOCK_COLS / 2.0) * 2 * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
+            y      = GetScreenHeight() + 100.0,
+            width  = DIRT_WORLD_TILE_WIDTH,
+            height = perlin_values[it] * 5,
+        };
+
+        // @TODO: post incrememnt macro or something?
+        defer global_id_counter += 1;
+        array_add(*dirt_blocks, Entity.{
+            id = global_id_counter,
+            pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
+            bounding_rect = rect,
+            sprite_rect   = rect,
+            perlin        = perlin_values[it],
+        });
     }
 
     camera: Camera2D;
@@ -213,7 +251,7 @@ main :: () {
     frame := 0;
 
     while !WindowShouldClose() {
-        reset_temporary_storage();
+        defer reset_temporary_storage();
 
         time := GetTime(); 
         frame += 1;
@@ -349,7 +387,7 @@ main :: () {
                     free_cam_pos = Vector2Add(free_cam_pos, Vector2Scale(GetMouseDelta(), -1.0 * DEBUG_CAM_SPEED));
                 }
 
-                camera.zoom += (cast(float)GetMouseWheelMove()*0.05);
+                camera.zoom += GetMouseWheelMove() * 0.05;
 
                 if camera.zoom > 3.0 camera.zoom = 3.0;
                 else if camera.zoom < 0.10 camera.zoom = 0.10;
@@ -361,7 +399,6 @@ main :: () {
                     update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
                     free_cam_pos = player.pos;
                 }
-                // update_camera_center_smooth_follow(*camera, *player, dt, GetScreenWidth(), GetScreenHeight());
             }
         }
 
@@ -411,7 +448,7 @@ main :: () {
                         }
 
                         if debug_mode {
-                            DrawRectangleLinesEx(it.sprite_rect, 1.0, LIME);
+                            DrawText(temp_c_string(tprint("%", it.perlin)), xx it.pos.x, xx it.pos.y, 12, WHITE);
                         }
                     }
                 }
@@ -603,6 +640,14 @@ random_vector :: (grid_corner: Vector2) -> Vector2 {
     gradient := Vector2.{ x, y };
     gradient = Vector2.{ sin(gradient.x), sin(gradient.y) };
     gradient = Vector2Scale(gradient, 143758.0);
-    gradient = Vector2.{ sin(gradient.x + cast(float32)GetTime()), sin(gradient.y + cast(float32)GetTime()) };
+    gradient = Vector2.{ sin(gradient.x), sin(gradient.y) };
+    // Update noise over time
+    // gradient = Vector2.{ sin(gradient.x + cast(float32)GetTime()), sin(gradient.y + cast(float32)GetTime()) };
     return gradient;
+}
+
+smoothstep :: (x: float) -> float {
+    if x <= 0.0 return 0.0;
+    if x >= 1.0 return 1.0;
+    return (3 * pow(x, 2.0)) - (2 * pow(x, 3.0)); 
 }
