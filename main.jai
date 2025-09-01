@@ -53,13 +53,10 @@ DIRT_MAP_TILE_WIDTH  :: 18;
 DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
-INITIAL_DIRT_BLOCK_COLS :: 150;
-INITIAL_DIRT_BLOCK_ROWS :: 100;
 
 WORLD_WIDTH  :: 5000;
 WORLD_HEIGHT :: 5000;
 WORLD_GRID_COLS :: 100;
-WORLD_GRID_ROWS :: 100;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -76,8 +73,6 @@ Entity :: struct {
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     is_facing_left : bool;
-
-    perlin : float;
 }
 
 Animation :: struct {
@@ -177,27 +172,24 @@ main :: () {
 
     dirt_blocks: [..]Entity;
 
-    grid_rect := Rectangle.{
-        x = 0,
-        y = 0,
-        width  = INITIAL_DIRT_BLOCK_COLS,
-        height = INITIAL_DIRT_BLOCK_ROWS,
-    };
+    DESIRED_MAP_SECTIONS :: 10;
+    RATIO :: WORLD_GRID_COLS / DESIRED_MAP_SECTIONS;
 
     // @TODO: make function for perlin noise
-    random_grid_scalars: [100]float;
+    random_grid_scalars: [DESIRED_MAP_SECTIONS]float;
     for i: 0..random_grid_scalars.count-1 {
         random_grid_scalars[i] = random_get_within_range(-1.0, 1.0);
     }
 
-    perlin_values: [1000]float;
-    ratio := 1000 / 100;
-    // @TODO: off by one error here
-    for i: 0..989 {
+    perlin_values: [WORLD_GRID_COLS]float;
+    // @TODO: off by one error here?
+    for i: 0..(WORLD_GRID_COLS - 11) {
         // Get distance from current tile to each grid corner
-        f := floor(cast(float) i / ratio);
-        delta_l := (i - ratio * f);
-        delta_r := (ratio * (f + 1) - i);
+        f := floor(cast(float) i / RATIO);
+        delta_l := (i - RATIO * f);
+        delta_r := (RATIO * (f + 1) - i);
+
+        print_vars(i, f, delta_l, delta_r);
 
         // Get dot products of grid corner vectors and distances
         l_scalar := random_grid_scalars[cast(int) (f)];
@@ -212,31 +204,57 @@ main :: () {
         perlin_values[i] = ifx perlin < 0 then perlin * -1 else perlin;
     }
 
-    for 0..989 {
-        rect := Rectangle.{
-            x      = ((it - INITIAL_DIRT_BLOCK_COLS / 2.0) * 2 * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-            y      = GetScreenHeight() + 100.0,
-            width  = DIRT_WORLD_TILE_WIDTH,
-            height = perlin_values[it] * 5,
-        };
+    // Initialize hills
+    for col: 0..(WORLD_GRID_COLS - 2) {
+        blocks_in_col := cast(int) (25 * perlin_values[col] / DIRT_WORLD_TILE_HEIGHT);
+        for height: 0..blocks_in_col {
+            rect := Rectangle.{
+                x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
+                y      = GetScreenHeight() - cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
+                width  = DIRT_WORLD_TILE_WIDTH,
+                height = DIRT_WORLD_TILE_HEIGHT,
+            };
 
-        // @TODO: post incrememnt macro or something?
-        defer global_id_counter += 1;
-        array_add(*dirt_blocks, Entity.{
-            id = global_id_counter,
-            pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
-            bounding_rect = rect,
-            sprite_rect   = rect,
-            perlin        = perlin_values[it],
-        });
+            // @TODO: post incrememnt macro or something?
+            defer global_id_counter += 1;
+            array_add(*dirt_blocks, Entity.{
+                id = global_id_counter,
+                pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
+                bounding_rect = rect,
+                sprite_rect   = rect,
+            });
+        }
     }
 
+    // Initialize underground
+    for col: 0..(WORLD_GRID_COLS - 2) {
+        for height: 0..99 {
+            rect := Rectangle.{
+                x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
+                y      = GetScreenHeight() + cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
+                width  = DIRT_WORLD_TILE_WIDTH,
+                height = DIRT_WORLD_TILE_HEIGHT,
+            };
+
+            // @TODO: post incrememnt macro or something?
+            defer global_id_counter += 1;
+            array_add(*dirt_blocks, Entity.{
+                id = global_id_counter,
+                pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
+                bounding_rect = rect,
+                sprite_rect   = rect,
+            });
+        }
+    }
+
+    // Initialize camera
     camera: Camera2D;
     camera.target = player.pos;
     camera.offset = Vector2.{ GetScreenWidth()/2.0 + player.bounding_rect.width/2.0, GetScreenHeight()/2.0 + player.bounding_rect.height/2.0 };
     camera.rotation = 0.0;
     camera.zoom = 0.5;
 
+    // Initialize controls
     // @TODO: would a different data structure work better here for perf?
     controls : Controls;
     controls.move_player_left[0]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_LEFT)  };
@@ -416,21 +434,21 @@ main :: () {
                 BeginMode2D(camera);
                 defer EndMode2D();
 
+                // @TODO: fix this
                 // if debug_mode {
-                if false {
-                    WORLD_COL_WIDTH  :: WORLD_WIDTH  / WORLD_GRID_COLS;
-                    WORLD_COL_HEIGHT :: WORLD_HEIGHT / WORLD_GRID_ROWS;
+                //     WORLD_COL_WIDTH  :: WORLD_WIDTH  / WORLD_GRID_COLS;
+                //     WORLD_COL_HEIGHT :: WORLD_HEIGHT / WORLD_GRID_ROWS;
 
-                    for c: 0..WORLD_GRID_COLS {
-                        col := (c * WORLD_COL_WIDTH) - WORLD_WIDTH/2.0;
-                        DrawLineEx(Vector2.{ col, xx -WORLD_HEIGHT }, Vector2.{ col, xx WORLD_HEIGHT }, 1.0, WHITE);
-                    }
+                //     for c: 0..WORLD_GRID_COLS {
+                //         col := (c * WORLD_COL_WIDTH) - WORLD_WIDTH/2.0;
+                //         DrawLineEx(Vector2.{ col, xx -WORLD_HEIGHT }, Vector2.{ col, xx WORLD_HEIGHT }, 1.0, WHITE);
+                //     }
 
-                    for r: 0..WORLD_GRID_ROWS {
-                        row := (r * WORLD_COL_HEIGHT) - WORLD_HEIGHT/2.0;
-                        DrawLineEx(Vector2.{ xx -WORLD_WIDTH, row }, Vector2.{ xx WORLD_WIDTH, row }, 1.0, WHITE);
-                    }
-                }
+                //     for r: 0..WORLD_GRID_ROWS {
+                //         row := (r * WORLD_COL_HEIGHT) - WORLD_HEIGHT/2.0;
+                //         DrawLineEx(Vector2.{ xx -WORLD_WIDTH, row }, Vector2.{ xx WORLD_WIDTH, row }, 1.0, WHITE);
+                //     }
+                // }
 
                 // Draw dirt
                 {
@@ -445,10 +463,6 @@ main :: () {
                                 TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
                             }
-                        }
-
-                        if debug_mode {
-                            DrawText(temp_c_string(tprint("%", it.perlin)), xx it.pos.x, xx it.pos.y, 12, WHITE);
                         }
                     }
                 }
