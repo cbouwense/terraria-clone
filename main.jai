@@ -45,7 +45,7 @@ PLAYER_REACH_DISTANCE :: 300.0;
 PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
 PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
 
-ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 18;
+ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -56,12 +56,17 @@ DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
 WORLD_WIDTH  :: 5000;
 WORLD_HEIGHT :: 5000;
-WORLD_GRID_COLS :: 100;
+WORLD_GRID_COLS :: 1000;
+
+PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
+#assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
+PERLIN_NOISE_AMPLITUDE :: 200;
+PERLIN_NOISE_OCTAVES :: 5;
 
 DEBUG_CAM_SPEED :: 5;
 
 Entity :: struct {
-    id : u32;
+    id : u32; 
 
     pos : Vector2;
     vel : Vector2;
@@ -172,41 +177,43 @@ main :: () {
 
     dirt_blocks: [..]Entity;
 
-    DESIRED_MAP_SECTIONS :: 10;
-    RATIO :: WORLD_GRID_COLS / DESIRED_MAP_SECTIONS;
-
-    // @TODO: make function for perlin noise
-    random_grid_scalars: [DESIRED_MAP_SECTIONS]float;
-    for i: 0..random_grid_scalars.count-1 {
-        random_grid_scalars[i] = random_get_within_range(-1.0, 1.0);
-    }
-
+    // @TODO: extract
+    // Generate perlin noise for heightmap
     perlin_values: [WORLD_GRID_COLS]float;
-    // @TODO: off by one error here?
-    for i: 0..(WORLD_GRID_COLS - 11) {
-        // Get distance from current tile to each grid corner
-        f := floor(cast(float) i / RATIO);
-        delta_l := (i - RATIO * f);
-        delta_r := (RATIO * (f + 1) - i);
+    for o: 0..PERLIN_NOISE_OCTAVES {
+        // @TODO: can I use macros to generate pow?
+        octave_factor := pow(2.0, cast(float) o);
+        amplitude := PERLIN_NOISE_AMPLITUDE / octave_factor;
+        frequency := PERLIN_NOISE_FREQUENCY * octave_factor;
+        ratio := WORLD_GRID_COLS / frequency;
+        blocks_per_section := cast(int) (WORLD_GRID_COLS / frequency);
+    
+        random_grid_scalars: [..]float;
+        for i: 0..(xx frequency-1) {
+            array_add(*random_grid_scalars, random_get_within_range(-1, 1));
+        }
 
-        print_vars(i, f, delta_l, delta_r);
+        for i: 0..(WORLD_GRID_COLS - (blocks_per_section + 1)) {
+            // Get distance from current tile to each grid corner
+            f := floor(cast(float) i / ratio);
+            delta_l := (i - ratio * f) / blocks_per_section;
+            delta_r := (ratio * (f + 1) - i) / blocks_per_section;
 
-        // Get dot products of grid corner vectors and distances
-        l_scalar := random_grid_scalars[cast(int) (f)];
-        r_scalar := random_grid_scalars[cast(int) (f + 1)];
+            // Get dot products of grid corner vectors and distances
+            l_scalar := random_grid_scalars[cast(int) (f)];
+            r_scalar := random_grid_scalars[cast(int) (f + 1)];
+            l_dot : float = l_scalar * delta_l;
+            r_dot : float = r_scalar * delta_r;
 
-        l_dot := l_scalar * delta_l;
-        r_dot := r_scalar * delta_r;
-
-        l := lerp(l_dot, r_dot, delta_l);
-        r := lerp(r_dot, l_dot, delta_r);
-        perlin := lerp(l, r, 0.5);
-        perlin_values[i] = ifx perlin < 0 then perlin * -1 else perlin;
+            perlin := lerp(l_dot, r_dot, smootherstep(delta_l));
+            
+            perlin_values[i] += amplitude * perlin;
+        }
     }
 
     // Initialize hills
-    for col: 0..(WORLD_GRID_COLS - 2) {
-        blocks_in_col := cast(int) (25 * perlin_values[col] / DIRT_WORLD_TILE_HEIGHT);
+    for col: 0..(WORLD_GRID_COLS - 1) {
+        blocks_in_col := cast(int) perlin_values[col];
         for height: 0..blocks_in_col {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
@@ -215,7 +222,7 @@ main :: () {
                 height = DIRT_WORLD_TILE_HEIGHT,
             };
 
-            // @TODO: post incrememnt macro or something?
+            // @TODO: post increment macro or something?
             defer global_id_counter += 1;
             array_add(*dirt_blocks, Entity.{
                 id = global_id_counter,
@@ -226,9 +233,9 @@ main :: () {
         }
     }
 
-    // Initialize underground
+    // Initialize dirt underground
     for col: 0..(WORLD_GRID_COLS - 2) {
-        for height: 0..99 {
+        for height: 0..39 {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
                 y      = GetScreenHeight() + cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
@@ -250,7 +257,7 @@ main :: () {
     // Initialize camera
     camera: Camera2D;
     camera.target = player.pos;
-    camera.offset = Vector2.{ GetScreenWidth()/2.0 + player.bounding_rect.width/2.0, GetScreenHeight()/2.0 + player.bounding_rect.height/2.0 };
+    camera.offset = Vector2.{ GetScreenWidth()/2.0 + player.bounding_rect.width/2.0, GetScreenHeight()/2.0 };
     camera.rotation = 0.0;
     camera.zoom = 0.5;
 
@@ -408,7 +415,7 @@ main :: () {
                 camera.zoom += GetMouseWheelMove() * 0.05;
 
                 if camera.zoom > 3.0 camera.zoom = 3.0;
-                else if camera.zoom < 0.10 camera.zoom = 0.10;
+                else if camera.zoom < 0.01 camera.zoom = 0.01;
 
                 if debug_mode {
                     camera.offset = Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
@@ -613,7 +620,8 @@ is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
 }
 
 update_camera_center :: (camera: *Camera2D, player: *Player, width: s32, height: s32) {
-    camera.offset = Vector2.{ width/2.0 - player.bounding_rect.width/2.0, height/2.0 - player.bounding_rect.height/2.0 };
+    // camera.offset = Vector2.{ width/2.0 - player.bounding_rect.width/2.0, height/2.0 - player.bounding_rect.height/2.0 };
+    camera.offset = Vector2.{ width/2.0 - player.bounding_rect.width/2.0, height/2.0 + 100 };
     camera.target = player.pos;
 }
 
@@ -663,5 +671,11 @@ random_vector :: (grid_corner: Vector2) -> Vector2 {
 smoothstep :: (x: float) -> float {
     if x <= 0.0 return 0.0;
     if x >= 1.0 return 1.0;
-    return (3 * pow(x, 2.0)) - (2 * pow(x, 3.0)); 
+    return (3 * x * x) - (2 * x * x * x); 
+}
+
+smootherstep :: (x: float) -> float {
+    if x <= 0.0 return 0.0;
+    if x >= 1.0 return 1.0;
+    return (6 * x * x * x * x * x) - (15 * x * x * x * x) + (10 * x * x * x); 
 }
