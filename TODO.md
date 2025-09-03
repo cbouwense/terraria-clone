@@ -1,5 +1,5 @@
 # In progress
-- world gen: dirt underground
+- culling
 
 # Features
 - world gen: rock underground
@@ -11,15 +11,14 @@
 - Celeste movement juice
 - hot reloading
 - block lighting
-- culling
 - ramps
 - holding down attack / place
 - more terraria-like placement and attacking of blocks
 
 # Bugs
-- you can fall into the ground falling from really high up 
-- block placement doesn't seem to always go where your cursor is
+- block placement isn't grid aligned
 
 # Done
 - fix animation clipping next frame over when running left
 - block removal / placement
+- world gen: dirt underground

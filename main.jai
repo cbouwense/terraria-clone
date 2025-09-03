@@ -54,13 +54,11 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-WORLD_WIDTH  :: 5000;
-WORLD_HEIGHT :: 5000;
-WORLD_GRID_COLS :: 1000;
+WORLD_GRID_COLS :: 10000;
 
 PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
 #assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
-PERLIN_NOISE_AMPLITUDE :: 200;
+PERLIN_NOISE_AMPLITUDE :: 300;
 PERLIN_NOISE_OCTAVES :: 5;
 
 DEBUG_CAM_SPEED :: 5;
@@ -130,14 +128,13 @@ main :: () {
     // @TODO: is this a good idea?
     global_id_counter : u32 = 0;
     
-    pos := Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
+    pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
     player := Player.{
         id = global_id_counter,
 
         pos = pos,
         vel = Vector2.{ 0, 0 },
 
-        // @TODO: can I reference a field on a struct during a literal declaration.
         bounding_rect = Rectangle.{
             pos.x - floor(PLAYER_WORLD_BOUNDING_WIDTH / 2.0),
             pos.y - floor(PLAYER_WORLD_BOUNDING_HEIGHT / 2.0) + 5,
@@ -283,6 +280,22 @@ main :: () {
         dt := GetFrameTime();
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
+        window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+        window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
+
+        dirt_blocks_on_screen: [..] Entity;
+        dirt_blocks_on_screen.allocator = temp;
+
+        // @TODO: What is a clever way to do this quickly?
+        for dirt_blocks {
+            if it.pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH  continue;
+            if it.pos.x > window_end.x   + DIRT_WORLD_TILE_WIDTH  continue;
+            if it.pos.y < window_start.y - DIRT_WORLD_TILE_HEIGHT continue;
+            if it.pos.y > window_end.y   + DIRT_WORLD_TILE_HEIGHT continue;
+
+            array_add(*dirt_blocks_on_screen, it);
+        }
+
         // @TODO: function?
         // Reset controls that need to be.
         try_to_jump     = false;
@@ -315,11 +328,11 @@ main :: () {
                 player.vel.x = 0;
 
                 if move_player_left {
-                    player.vel.x -= PLAYER_MOVE_SPEED * dt;
+                    player.vel.x -= PLAYER_MOVE_SPEED;
                     player.is_facing_left = true;
                 }
                 if move_player_right {
-                    player.vel.x += PLAYER_MOVE_SPEED * dt;
+                    player.vel.x += PLAYER_MOVE_SPEED;
                     player.is_facing_left = false;
                 }
 
@@ -330,19 +343,18 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                try_to_move_x(*player, player.vel.x, dirt_blocks);
-                try_to_move_y(*player, player.vel.y * dt, dirt_blocks);
+                try_to_move_x(*player, player.vel.x * dt, dirt_blocks_on_screen);
+                try_to_move_y(*player, player.vel.y * dt, dirt_blocks_on_screen);
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
                 // Update position-dependent fields on player entity
                 player.bounding_rect.x = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
                 player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
-                player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH  / 2.0;
-                player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT / 2.0;
+                player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
+                player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
 
-                // @TODO: does the order of where this is done matter?
-                if is_grounded(player, dirt_blocks) {
+                if is_grounded(player, dirt_blocks_on_screen) {
                     player.jumps_remaining = player.jumps_capacity;
                     player.vel.y = 0;
                 }
@@ -350,7 +362,8 @@ main :: () {
                 if try_to_attack {
                     if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                         // @TODO: there's a function to extract here
-                        for dirt_blocks {
+                        // @TODO: this won't work but I'm in the middle of something, it_index is different
+                        for dirt_blocks_on_screen {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 array_unordered_remove_by_index(*dirt_blocks, it_index);
                             }
@@ -363,7 +376,7 @@ main :: () {
                     is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                     would_be_on_existing_entity := false;
 
-                    for dirt_blocks {
+                    for dirt_blocks_on_screen {
                         if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                             would_be_on_existing_entity = true;
                             break;
@@ -459,7 +472,7 @@ main :: () {
 
                 // Draw dirt
                 {
-                    for dirt_blocks {
+                    for dirt_blocks_on_screen {
                         DIRT_TILE_PADDING :: 2;
                         source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
 
@@ -497,9 +510,7 @@ main :: () {
 
             // Draw UI
             {
-                if debug_mode {
-                    DrawFPS(10, 10);
-                }
+                DrawFPS(10, 10);
 
                 // @TODO: Draw "paused"
                 if paused {
@@ -511,7 +522,6 @@ main :: () {
 }
 
 init_textures :: () {
-    // @TODO: factor out data path?
     player_map = LoadTexture("data/Player_Cropped.png");
     dirt_map   = LoadTexture("data/Tiles_0.png");
 }
@@ -653,19 +663,6 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
         height = xx tile_height,
     };
     return new_rect;
-}
-
-// Copied from "What is Perlin Noise?" by Suboptimal Engineer (https://www.youtube.com/watch?v=7fd331zsie0).
-random_vector :: (grid_corner: Vector2) -> Vector2 {
-    x := Vector2DotProduct(grid_corner, Vector2.{ 123.4, 234.5 });
-    y := Vector2DotProduct(grid_corner, Vector2.{ 234.5, 345.6 });
-    gradient := Vector2.{ x, y };
-    gradient = Vector2.{ sin(gradient.x), sin(gradient.y) };
-    gradient = Vector2Scale(gradient, 143758.0);
-    gradient = Vector2.{ sin(gradient.x), sin(gradient.y) };
-    // Update noise over time
-    // gradient = Vector2.{ sin(gradient.x + cast(float32)GetTime()), sin(gradient.y + cast(float32)GetTime()) };
-    return gradient;
 }
 
 smoothstep :: (x: float) -> float {

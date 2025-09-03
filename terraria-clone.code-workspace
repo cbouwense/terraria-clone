@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "terraria-clone",
+			"path": "."
+		},
+		{
+			"name": "jai",
+			"path": "../../../../ThirdParty/jai"
+		},
+		{
+			"name": "raylib",
+			"path": "../../../../raylib/raylib"
+		},
+		{
+			"name": "raylib-jai",
+			"path": "../../../../ThirdParty/raylib-jai"
+		}
+	],
+	"settings": {}
+}
