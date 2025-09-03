@@ -125,8 +125,7 @@ main :: () {
 
     init_textures();
 
-    // @TODO: is this a good idea?
-    global_id_counter : u32 = 0;
+    global_id_counter: u32 = 0;
     
     pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
     player := Player.{
@@ -172,13 +171,10 @@ main :: () {
     };
     global_id_counter += 1;
 
-    dirt_blocks: [..]Entity;
-
     // @TODO: extract
     // Generate perlin noise for heightmap
     perlin_values: [WORLD_GRID_COLS]float;
     for o: 0..PERLIN_NOISE_OCTAVES {
-        // @TODO: can I use macros to generate pow?
         octave_factor := pow(2.0, cast(float) o);
         amplitude := PERLIN_NOISE_AMPLITUDE / octave_factor;
         frequency := PERLIN_NOISE_FREQUENCY * octave_factor;
@@ -208,8 +204,22 @@ main :: () {
         }
     }
 
+    // dirt_blocks: [..]Entity;
+    CHUNK_MAX_WIDTH :: 16;
+    Chunk :: struct {
+        blocks : [..] Entity;
+    }
+    chunks : [..] Chunk;
+    // active_chunks: [..]Chunk;
+
     // Initialize hills
+    chunk: Chunk;
     for col: 0..(WORLD_GRID_COLS - 1) {
+        if col % CHUNK_MAX_WIDTH == 0 {
+            chunk = New(Chunk);
+            array_add(*chunks, chunk);
+        }
+
         blocks_in_col := cast(int) perlin_values[col];
         for height: 0..blocks_in_col {
             rect := Rectangle.{
@@ -221,7 +231,7 @@ main :: () {
 
             // @TODO: post increment macro or something?
             defer global_id_counter += 1;
-            array_add(*dirt_blocks, Entity.{
+            array_add(*chunks[col / CHUNK_MAX_WIDTH].blocks, Entity.{
                 id = global_id_counter,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                 bounding_rect = rect,
@@ -231,7 +241,7 @@ main :: () {
     }
 
     // Initialize dirt underground
-    for col: 0..(WORLD_GRID_COLS - 2) {
+    for col: 0..(WORLD_GRID_COLS - 1) {
         for height: 0..39 {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
@@ -242,7 +252,7 @@ main :: () {
 
             // @TODO: post incrememnt macro or something?
             defer global_id_counter += 1;
-            array_add(*dirt_blocks, Entity.{
+            array_add(*chunks[col / CHUNK_MAX_WIDTH].blocks, Entity.{
                 id = global_id_counter,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                 bounding_rect = rect,
@@ -250,7 +260,7 @@ main :: () {
             });
         }
     }
-
+    
     // Initialize camera
     camera: Camera2D;
     camera.target = player.pos;
@@ -270,18 +280,15 @@ main :: () {
     controls.interact[0]          = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_RIGHT) };
     controls.drag_cam[0]          = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE) };
 
-    frame := 0;
-
     while !WindowShouldClose() {
         defer reset_temporary_storage();
 
-        time := GetTime(); 
-        frame += 1;
+        time := GetTime();
         dt := GetFrameTime();
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
-        window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
-        window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
+        // window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+        // window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
 
         // @TODO: function?
         // Reset controls that need to be.
@@ -330,8 +337,8 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                try_to_move_x(*player, player.vel.x * dt, dirt_blocks);
-                try_to_move_y(*player, player.vel.y * dt, dirt_blocks);
+                // try_to_move_x(*player, player.vel.x * dt, dirt_blocks);
+                // try_to_move_y(*player, player.vel.y * dt, dirt_blocks);
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
@@ -341,20 +348,19 @@ main :: () {
                 player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
                 player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
 
-                if is_grounded(player, dirt_blocks) {
-                    player.jumps_remaining = player.jumps_capacity;
-                    player.vel.y = 0;
-                }
+                // if is_grounded(player, dirt_blocks) {
+                    // player.jumps_remaining = player.jumps_capacity;
+                    // player.vel.y = 0;
+                // }
 
                 if try_to_attack {
                     if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                         // @TODO: there's a function to extract here
-                        // @TODO: this won't work but I'm in the middle of something, it_index is different
-                        for dirt_blocks {
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                array_unordered_remove_by_index(*dirt_blocks, it_index);
-                            }
-                        }
+                        // for dirt_blocks {
+                        //     if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                        //         array_unordered_remove_by_index(*dirt_blocks, it_index);
+                        //     }
+                        // }
                     }
                 }
 
@@ -363,12 +369,12 @@ main :: () {
                     is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                     would_be_on_existing_entity := false;
 
-                    for dirt_blocks {
-                        if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                            would_be_on_existing_entity = true;
-                            break;
-                        }
-                    }
+                    // for dirt_blocks {
+                    //     if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                    //         would_be_on_existing_entity = true;
+                    //         break;
+                    //     }
+                    // }
 
                     can_place_block := is_within_reach && !would_be_on_existing_entity;
 
@@ -383,7 +389,7 @@ main :: () {
                             sprite_rect   = new_rect,
                         };
                         
-                        array_add(*dirt_blocks, new_dirt_block);
+                        // array_add(*dirt_blocks, new_dirt_block);
                     }
                 }
 
@@ -442,34 +448,20 @@ main :: () {
                 BeginMode2D(camera);
                 defer EndMode2D();
 
-                // @TODO: fix this
-                // if debug_mode {
-                //     WORLD_COL_WIDTH  :: WORLD_WIDTH  / WORLD_GRID_COLS;
-                //     WORLD_COL_HEIGHT :: WORLD_HEIGHT / WORLD_GRID_ROWS;
-
-                //     for c: 0..WORLD_GRID_COLS {
-                //         col := (c * WORLD_COL_WIDTH) - WORLD_WIDTH/2.0;
-                //         DrawLineEx(Vector2.{ col, xx -WORLD_HEIGHT }, Vector2.{ col, xx WORLD_HEIGHT }, 1.0, WHITE);
-                //     }
-
-                //     for r: 0..WORLD_GRID_ROWS {
-                //         row := (r * WORLD_COL_HEIGHT) - WORLD_HEIGHT/2.0;
-                //         DrawLineEx(Vector2.{ xx -WORLD_WIDTH, row }, Vector2.{ xx WORLD_WIDTH, row }, 1.0, WHITE);
-                //     }
-                // }
-
                 // Draw dirt
                 {
-                    for dirt_blocks {
-                        DIRT_TILE_PADDING :: 2;
-                        source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
+                    for chunks {
+                        for it.blocks {
+                            DIRT_TILE_PADDING :: 2;
+                            source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
 
-                        DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                            DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
-                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
-                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                            if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
+                                if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                    TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
+                                    DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                                }
                             }
                         }
                     }
