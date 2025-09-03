@@ -54,7 +54,7 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-WORLD_GRID_COLS :: 10000;
+WORLD_GRID_COLS :: 1000;
 
 PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
 #assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
@@ -283,19 +283,6 @@ main :: () {
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
 
-        dirt_blocks_on_screen: [..] Entity;
-        dirt_blocks_on_screen.allocator = temp;
-
-        // @TODO: What is a clever way to do this quickly?
-        for dirt_blocks {
-            if it.pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH  continue;
-            if it.pos.x > window_end.x   + DIRT_WORLD_TILE_WIDTH  continue;
-            if it.pos.y < window_start.y - DIRT_WORLD_TILE_HEIGHT continue;
-            if it.pos.y > window_end.y   + DIRT_WORLD_TILE_HEIGHT continue;
-
-            array_add(*dirt_blocks_on_screen, it);
-        }
-
         // @TODO: function?
         // Reset controls that need to be.
         try_to_jump     = false;
@@ -343,8 +330,8 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                try_to_move_x(*player, player.vel.x * dt, dirt_blocks_on_screen);
-                try_to_move_y(*player, player.vel.y * dt, dirt_blocks_on_screen);
+                try_to_move_x(*player, player.vel.x * dt, dirt_blocks);
+                try_to_move_y(*player, player.vel.y * dt, dirt_blocks);
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
@@ -354,7 +341,7 @@ main :: () {
                 player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
                 player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
 
-                if is_grounded(player, dirt_blocks_on_screen) {
+                if is_grounded(player, dirt_blocks) {
                     player.jumps_remaining = player.jumps_capacity;
                     player.vel.y = 0;
                 }
@@ -363,7 +350,7 @@ main :: () {
                     if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                         // @TODO: there's a function to extract here
                         // @TODO: this won't work but I'm in the middle of something, it_index is different
-                        for dirt_blocks_on_screen {
+                        for dirt_blocks {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 array_unordered_remove_by_index(*dirt_blocks, it_index);
                             }
@@ -376,7 +363,7 @@ main :: () {
                     is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                     would_be_on_existing_entity := false;
 
-                    for dirt_blocks_on_screen {
+                    for dirt_blocks {
                         if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                             would_be_on_existing_entity = true;
                             break;
@@ -425,10 +412,11 @@ main :: () {
                     free_cam_pos = Vector2Add(free_cam_pos, Vector2Scale(GetMouseDelta(), -1.0 * DEBUG_CAM_SPEED));
                 }
 
-                camera.zoom += GetMouseWheelMove() * 0.05;
+                camera.zoom += GetMouseWheelMove() * 0.1;
 
                 if camera.zoom > 3.0 camera.zoom = 3.0;
-                else if camera.zoom < 0.01 camera.zoom = 0.01;
+                else if debug_mode && camera.zoom < 0.01 camera.zoom = 0.01;
+                else if !debug_mode && camera.zoom < 0.5 camera.zoom = 0.5;
 
                 if debug_mode {
                     camera.offset = Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
@@ -472,7 +460,7 @@ main :: () {
 
                 // Draw dirt
                 {
-                    for dirt_blocks_on_screen {
+                    for dirt_blocks {
                         DIRT_TILE_PADDING :: 2;
                         source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
 
