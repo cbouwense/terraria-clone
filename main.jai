@@ -54,7 +54,7 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-WORLD_GRID_COLS :: 1000;
+WORLD_GRID_COLS :: 10000;
 
 PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
 #assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
@@ -204,7 +204,6 @@ main :: () {
         }
     }
 
-    // dirt_blocks: [..]Entity;
     CHUNK_MAX_WIDTH :: 16;
     Chunk :: struct {
         blocks : [..] Entity;
@@ -287,8 +286,36 @@ main :: () {
         dt := GetFrameTime();
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
-        // window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
-        // window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
+        window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+        window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
+
+        // active_chunks: [..]Chunk;
+        // active_chunks.allocator = temp;
+
+        active_dirt_blocks: [..]Entity;
+        active_dirt_blocks.allocator = temp;
+
+        // @TODO: This is still too slow, but it's a step in the right direction.
+        for chunks {
+            // The first block in a chunk will always be the left-most with the current method for world generation.
+            if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH {
+                continue;
+            }
+
+            // The last block in a chunk will always be the right-most with the current method for world generation.
+            if it.blocks[0].pos.x > window_end.x {
+                continue;
+            }
+
+            // array_add(*active_chunks, it);
+            // @TODO: is there a cool way I can do this?
+            for block: it.blocks {
+                array_add(*active_dirt_blocks, block);
+            }
+        }
+
+        // print("active_chunks: %\n", active_chunks.count);
+        print("active_dirt_blocks: %\n", active_dirt_blocks.count);
 
         // @TODO: function?
         // Reset controls that need to be.
@@ -337,8 +364,8 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                // try_to_move_x(*player, player.vel.x * dt, dirt_blocks);
-                // try_to_move_y(*player, player.vel.y * dt, dirt_blocks);
+                try_to_move_x(*player, player.vel.x * dt, active_dirt_blocks);
+                try_to_move_y(*player, player.vel.y * dt, active_dirt_blocks);
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
@@ -348,19 +375,22 @@ main :: () {
                 player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
                 player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
 
-                // if is_grounded(player, dirt_blocks) {
-                    // player.jumps_remaining = player.jumps_capacity;
-                    // player.vel.y = 0;
-                // }
+                if is_grounded(player, active_dirt_blocks) {
+                    player.jumps_remaining = player.jumps_capacity;
+                    player.vel.y = 0;
+                }
 
                 if try_to_attack {
                     if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                         // @TODO: there's a function to extract here
-                        // for dirt_blocks {
-                        //     if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                        //         array_unordered_remove_by_index(*dirt_blocks, it_index);
-                        //     }
-                        // }
+                        for active_dirt_blocks {
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                // @TODO: I have to get the id of the block, look up which chunk it's in, and then remove it
+                                // from there.
+
+                                // array_unordered_remove_by_index(*active_dirt_blocks, it_index);
+                            }
+                        }
                     }
                 }
 
@@ -369,12 +399,12 @@ main :: () {
                     is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                     would_be_on_existing_entity := false;
 
-                    // for dirt_blocks {
-                    //     if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                    //         would_be_on_existing_entity = true;
-                    //         break;
-                    //     }
-                    // }
+                    for active_dirt_blocks {
+                        if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                            would_be_on_existing_entity = true;
+                            break;
+                        }
+                    }
 
                     can_place_block := is_within_reach && !would_be_on_existing_entity;
 
@@ -389,6 +419,7 @@ main :: () {
                             sprite_rect   = new_rect,
                         };
                         
+                        // @TODO: I'll have to decide which chunk to add this to.
                         // array_add(*dirt_blocks, new_dirt_block);
                     }
                 }
@@ -450,18 +481,16 @@ main :: () {
 
                 // Draw dirt
                 {
-                    for chunks {
-                        for it.blocks {
-                            DIRT_TILE_PADDING :: 2;
-                            source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
+                    for active_dirt_blocks {
+                        DIRT_TILE_PADDING :: 2;
+                        source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
 
-                            DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                        DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
-                            if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
-                                if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                    TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
-                                    DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
-                                }
+                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
+                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
                             }
                         }
                     }
