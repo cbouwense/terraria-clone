@@ -94,6 +94,13 @@ Player :: struct {
     is_facing_left : bool;
 }
 
+CHUNK_MAX_WIDTH :: 16;
+Chunk :: struct {
+    id     : u32;
+    blocks : [..] Entity;
+    bounding_rect : Rectangle;
+}
+
 Control :: struct {
     type:  Type;
     value: s32; // KeyboardKey | MouseButton;
@@ -205,11 +212,6 @@ main :: () {
         }
     }
 
-    CHUNK_MAX_WIDTH :: 16;
-    Chunk :: struct {
-        id     : u32;
-        blocks : [..] Entity;
-    }
     chunks : [..] Chunk;
 
     // Initialize hills
@@ -267,6 +269,15 @@ main :: () {
         }
     }
     
+    for *chunks {
+        it.bounding_rect = Rectangle.{
+            it.blocks[0].bounding_rect.x,
+            -500000,
+            it.blocks[it.blocks.count-1].bounding_rect.x - it.blocks[0].bounding_rect.x + it.blocks[0].bounding_rect.width,
+            1000000
+        };
+    }
+
     // Initialize camera
     camera: Camera2D;
     camera.target = player.pos;
@@ -411,24 +422,25 @@ main :: () {
                         defer global_id_counter += 1;
 
                         new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
+                        new_pos  := get_rect_center(new_rect);
 
                         new_dirt_block := Entity.{
                             id            = global_id_counter,
-                            pos           = get_rect_center(new_rect),
+                            pos           = new_pos,
                             bounding_rect = new_rect,
                             sprite_rect   = new_rect,
                         };
                         
                         found_chunk := false;
-                        for *active_chunks {
-                            // @TODO: function for is_within_chunk
-                            if new_dirt_block.pos.x < it.blocks[0].pos.x continue;
-                            if new_dirt_block.pos.x > it.blocks[it.blocks.count-1].pos.x continue;
+                        for active_chunks {
+                            print("checking chunk %\n", it.id);
+                            if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
                             
                             found_chunk = true;
                             new_dirt_block.chunk_id = it.id;
                             array_add(*chunks[it.id].blocks, new_dirt_block);
                             print_vars(it.id, new_dirt_block);
+                            break;
                         }
                         assert(found_chunk);
                     }
@@ -501,6 +513,21 @@ main :: () {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                            }
+                        }
+                    }
+
+                    if debug_mode {
+                        for chunks {
+                            DrawRectangleLinesEx(it.bounding_rect, 2.0, LIME);
+                        }
+                        for active_chunks {
+                            center := get_rect_center(it.bounding_rect);
+                            DrawText(tprint("%\0", it.id).data, xx center.x, xx center.y, 25, WHITE);
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                DrawRectangleLinesEx(it.bounding_rect, 2.0, ORANGE);
+                            } else {
+                                DrawRectangleLinesEx(it.bounding_rect, 2.0, WHITE);
                             }
                         }
                     }
