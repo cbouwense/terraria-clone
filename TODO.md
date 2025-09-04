@@ -1,5 +1,5 @@
 # In progress
-- culling
+- block placement isn't grid aligned
 
 # Features
 - world gen: rock underground
@@ -14,11 +14,12 @@
 - ramps
 - holding down attack / place
 - more terraria-like placement and attacking of blocks
+- parametrize world seeds
 
 # Bugs
-- block placement isn't grid aligned
 
 # Done
 - fix animation clipping next frame over when running left
 - block removal / placement
 - world gen: dirt underground
+- culling

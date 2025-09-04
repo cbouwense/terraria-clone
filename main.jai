@@ -54,7 +54,7 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-WORLD_GRID_COLS :: 10000;
+WORLD_GRID_COLS :: 2000;
 
 PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
 #assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
@@ -64,18 +64,14 @@ PERLIN_NOISE_OCTAVES :: 5;
 DEBUG_CAM_SPEED :: 5;
 
 Entity :: struct {
-    id : u32; 
+    id       : u32; 
+    chunk_id : u32;
 
     pos : Vector2;
     vel : Vector2;
 
     bounding_rect : Rectangle; // Used for collision
     sprite_rect   : Rectangle;
-
-    jumps_remaining : int;
-    jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
-
-    is_facing_left : bool;
 }
 
 Animation :: struct {
@@ -89,8 +85,13 @@ Animation :: struct {
 Player :: struct {
     using #as entity : Entity;
 
-    idle_animation   : Animation;
-    run_animation   : Animation;
+    idle_animation : Animation;
+    run_animation  : Animation;
+
+    jumps_remaining : int;
+    jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
+
+    is_facing_left : bool;
 }
 
 Control :: struct {
@@ -206,16 +207,19 @@ main :: () {
 
     CHUNK_MAX_WIDTH :: 16;
     Chunk :: struct {
+        id     : u32;
         blocks : [..] Entity;
     }
     chunks : [..] Chunk;
-    // active_chunks: [..]Chunk;
 
     // Initialize hills
     chunk: Chunk;
     for col: 0..(WORLD_GRID_COLS - 1) {
+        chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
+
         if col % CHUNK_MAX_WIDTH == 0 {
             chunk = New(Chunk);
+            chunk.id = xx chunk_id;
             array_add(*chunks, chunk);
         }
 
@@ -230,8 +234,9 @@ main :: () {
 
             // @TODO: post increment macro or something?
             defer global_id_counter += 1;
-            array_add(*chunks[col / CHUNK_MAX_WIDTH].blocks, Entity.{
-                id = global_id_counter,
+            array_add(*chunks[chunk_id].blocks, Entity.{
+                id       = global_id_counter,
+                chunk_id = xx chunk_id,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                 bounding_rect = rect,
                 sprite_rect   = rect,
@@ -250,9 +255,11 @@ main :: () {
             };
 
             // @TODO: post incrememnt macro or something?
+            chunk_id := col / CHUNK_MAX_WIDTH;
             defer global_id_counter += 1;
-            array_add(*chunks[col / CHUNK_MAX_WIDTH].blocks, Entity.{
-                id = global_id_counter,
+            array_add(*chunks[chunk_id].blocks, Entity.{
+                id       = global_id_counter,
+                chunk_id = xx chunk_id,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                 bounding_rect = rect,
                 sprite_rect   = rect,
@@ -289,13 +296,13 @@ main :: () {
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
 
-        // active_chunks: [..]Chunk;
-        // active_chunks.allocator = temp;
+        active_chunks: [..]Chunk;
+        active_chunks.allocator = temp;
 
         active_dirt_blocks: [..]Entity;
         active_dirt_blocks.allocator = temp;
 
-        // @TODO: This is still too slow, but it's a step in the right direction.
+        // @TODO: This is probably still too slow, but it's a step in the right direction.
         for chunks {
             // The first block in a chunk will always be the left-most with the current method for world generation.
             if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH {
@@ -307,17 +314,12 @@ main :: () {
                 continue;
             }
 
-            // array_add(*active_chunks, it);
-            // @TODO: is there a cool way I can do this?
+            array_add(*active_chunks, it);
             for block: it.blocks {
                 array_add(*active_dirt_blocks, block);
             }
         }
 
-        // print("active_chunks: %\n", active_chunks.count);
-        print("active_dirt_blocks: %\n", active_dirt_blocks.count);
-
-        // @TODO: function?
         // Reset controls that need to be.
         try_to_jump     = false;
         try_to_attack   = false;
@@ -385,10 +387,7 @@ main :: () {
                         // @TODO: there's a function to extract here
                         for active_dirt_blocks {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                // @TODO: I have to get the id of the block, look up which chunk it's in, and then remove it
-                                // from there.
-
-                                // array_unordered_remove_by_index(*active_dirt_blocks, it_index);
+                                removed := array_unordered_remove_entity_by_id(*chunks[it.chunk_id].blocks, it, true);
                             }
                         }
                     }
@@ -415,12 +414,23 @@ main :: () {
 
                         new_dirt_block := Entity.{
                             id            = global_id_counter,
+                            pos           = get_rect_center(new_rect),
                             bounding_rect = new_rect,
                             sprite_rect   = new_rect,
                         };
                         
-                        // @TODO: I'll have to decide which chunk to add this to.
-                        // array_add(*dirt_blocks, new_dirt_block);
+                        found_chunk := false;
+                        for *active_chunks {
+                            // @TODO: function for is_within_chunk
+                            if new_dirt_block.pos.x < it.blocks[0].pos.x continue;
+                            if new_dirt_block.pos.x > it.blocks[it.blocks.count-1].pos.x continue;
+                            
+                            found_chunk = true;
+                            new_dirt_block.chunk_id = it.id;
+                            array_add(*chunks[it.id].blocks, new_dirt_block);
+                            print_vars(it.id, new_dirt_block);
+                        }
+                        assert(found_chunk);
                     }
                 }
 
@@ -623,8 +633,8 @@ try_to_move_y :: (entity: *Entity, distance: float, collidables: []Entity) {
     }
 }
 
-can_jump :: (entity: Entity) -> bool {
-    return entity.jumps_remaining > 0;
+can_jump :: (player: Player) -> bool {
+    return player.jumps_remaining > 0;
 }
 
 is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
@@ -674,6 +684,10 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     return new_rect;
 }
 
+get_rect_center :: (rect: Rectangle) -> Vector2 {
+    return Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+}
+
 smoothstep :: (x: float) -> float {
     if x <= 0.0 return 0.0;
     if x >= 1.0 return 1.0;
@@ -684,4 +698,16 @@ smootherstep :: (x: float) -> float {
     if x <= 0.0 return 0.0;
     if x >= 1.0 return 1.0;
     return (6 * x * x * x * x * x) - (15 * x * x * x * x) + (10 * x * x * x); 
+}
+
+array_unordered_remove_entity_by_id :: inline (array: *[] $Entity, item: Entity, $stop_after_first := false) -> s64 {
+    removed := 0;
+    for array.*  if it.id == item.id {
+        removed += 1;
+        remove it;
+
+        #if stop_after_first  break;   // Early-out optimization.
+    }
+
+    return removed;
 }
