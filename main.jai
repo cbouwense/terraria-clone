@@ -237,8 +237,8 @@ main :: () {
             // @TODO: post increment macro or something?
             defer global_id_counter += 1;
             array_add(*chunks[chunk_id].blocks, Entity.{
-                id       = global_id_counter,
-                chunk_id = xx chunk_id,
+                id            = global_id_counter,
+                chunk_id      = xx chunk_id,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                 bounding_rect = rect,
                 sprite_rect   = rect,
@@ -271,7 +271,9 @@ main :: () {
     
     for *chunks {
         it.bounding_rect = Rectangle.{
+            // @TODO: This will actually not work always. What if a chunk has no blocks?
             it.blocks[0].bounding_rect.x,
+            // @TODO: Probably make a constant for this.
             -500000,
             it.blocks[it.blocks.count-1].bounding_rect.x - it.blocks[0].bounding_rect.x + it.blocks[0].bounding_rect.width,
             1000000
@@ -301,7 +303,7 @@ main :: () {
         defer reset_temporary_storage();
 
         time := GetTime();
-        dt := GetFrameTime();
+        dt   := GetFrameTime();
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
@@ -315,17 +317,18 @@ main :: () {
 
         // @TODO: This is probably still too slow, but it's a step in the right direction.
         for chunks {
-            // The first block in a chunk will always be the left-most with the current method for world generation.
+            // The last block in a chunk will always be the right-most with the current method for world generation.
             if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH {
                 continue;
             }
-
-            // The last block in a chunk will always be the right-most with the current method for world generation.
+            
+            // The first block in a chunk will always be the left-most with the current method for world generation.
             if it.blocks[0].pos.x > window_end.x {
                 continue;
             }
 
             array_add(*active_chunks, it);
+            
             for block: it.blocks {
                 array_add(*active_dirt_blocks, block);
             }
@@ -340,8 +343,8 @@ main :: () {
         // Input
         //
         {
-            if IsKeyPressed(.KEY_P)  paused = !paused;
-            if IsKeyPressed(.KEY_F1) debug_mode = !debug_mode;
+            if IsKeyPressed(.KEY_P) paused     = !paused;
+            if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
 
             move_player_left  = control_down(controls.move_player_left);
             move_player_right = control_down(controls.move_player_right);
@@ -557,6 +560,10 @@ main :: () {
             // Draw UI
             {
                 DrawFPS(10, 10);
+                
+                if debug_mode {
+                    DrawText(tprint("(%, %)\0", mouse_pos_in_world.x, mouse_pos_in_world.y).data, 10, 30, 18, LIME);
+                }
 
                 // @TODO: Draw "paused"
                 if paused {
@@ -702,8 +709,11 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
 
     if pos.x < 0 { x -= tile_width - 1; }
 
+    // I don't exactly understand why I have to add this 8, but it makes it placed correctly, so...
+    // I have a funny feeling that I'll have to redo the tiling system anyways if I need to have a more
+    // robust thing.
     new_rect := Rectangle.{
-        x      = floor(x),
+        x      = floor(x) + 8,
         y      = floor(y),
         width  = xx tile_width,
         height = xx tile_height,
@@ -738,3 +748,4 @@ array_unordered_remove_entity_by_id :: inline (array: *[] $Entity, item: Entity,
 
     return removed;
 }
+ 

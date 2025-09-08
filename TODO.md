@@ -17,6 +17,7 @@
 - parametrize world seeds
 
 # Bugs
+- player looks one pixel off the ground
 
 # Done
 - fix animation clipping next frame over when running left
