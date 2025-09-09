@@ -14,7 +14,7 @@ window_height := 800;
 // Metagame state
 should_quit_game := false;
 paused           := false;
-debug_mode       := true;
+debug_mode       := false;
 free_cam_pos     := Vector2.{ 0, 0 };
 
 // Controls
@@ -73,7 +73,6 @@ Entity :: struct {
     vel : Vector2;
 
     bounding_rect : Rectangle; // Used for collision
-    sprite_rect   : Rectangle;
 }
 
 Animation :: struct {
@@ -85,24 +84,32 @@ Animation :: struct {
 }
 
 Player :: struct {
-    using #as entity : Entity;
+    #as using entity : Entity;
 
-    idle_animation : Animation;
-    run_animation  : Animation;
+    sprite_head_rect : Rectangle;
 
-    jumps_remaining : int;
-    jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
+    idle_animation   : Animation;
+    run_animation    : Animation;
 
-    is_facing_left : bool;
+    jumps_remaining  : int;
+    jumps_capacity   : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
+
+    is_facing_left   : bool;
 
     attack_cooldown_current_ms   : s32;
     interact_cooldown_current_ms : s32;
 }
 
+Block :: struct {
+    #as using entity : Entity;
+
+    sprite_rect : Rectangle;
+}
+
 CHUNK_MAX_WIDTH :: 16;
 Chunk :: struct {
     id     : u32;
-    blocks : [..] Entity;
+    blocks : [..] Block;
     bounding_rect : Rectangle;
 }
 
@@ -153,7 +160,7 @@ main :: () {
             xx PLAYER_WORLD_BOUNDING_WIDTH,
             xx PLAYER_WORLD_BOUNDING_HEIGHT
         },
-        sprite_rect = Rectangle.{
+        sprite_head_rect = Rectangle.{
             pos.x - floor(PLAYER_WORLD_SPRITE_WIDTH / 2.0),
             pos.y - floor(PLAYER_WORLD_SPRITE_HEIGHT / 2.0),
             xx PLAYER_WORLD_SPRITE_WIDTH,
@@ -244,7 +251,7 @@ main :: () {
 
             // @TODO: post increment macro or something?
             defer global_id_counter += 1;
-            array_add(*chunks[chunk_id].blocks, Entity.{
+            array_add(*chunks[chunk_id].blocks, Block.{
                 id            = global_id_counter,
                 chunk_id      = xx chunk_id,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
@@ -267,7 +274,7 @@ main :: () {
             // @TODO: post incrememnt macro or something?
             chunk_id := col / CHUNK_MAX_WIDTH;
             defer global_id_counter += 1;
-            array_add(*chunks[chunk_id].blocks, Entity.{
+            array_add(*chunks[chunk_id].blocks, Block.{
                 id       = global_id_counter,
                 chunk_id = xx chunk_id,
                 pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
@@ -320,25 +327,21 @@ main :: () {
         active_chunks: [..]Chunk;
         active_chunks.allocator = temp;
 
-        active_dirt_blocks: [..]Entity;
-        active_dirt_blocks.allocator = temp;
+        active_blocks: [..]Block;
+        active_blocks.allocator = temp;
 
         // @TODO: This is probably still too slow, but it's a step in the right direction.
         for chunks {
             // The last block in a chunk will always be the right-most with the current method for world generation.
-            if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH {
-                continue;
-            }
+            if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH continue;
             
             // The first block in a chunk will always be the left-most with the current method for world generation.
-            if it.blocks[0].pos.x > window_end.x {
-                continue;
-            }
+            if it.blocks[0].pos.x > window_end.x continue;
 
             array_add(*active_chunks, it);
             
             for block: it.blocks {
-                array_add(*active_dirt_blocks, block);
+                array_add(*active_blocks, block);
             }
         }
 
@@ -388,18 +391,18 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                try_to_move_x(*player, player.vel.x * dt, active_dirt_blocks);
-                try_to_move_y(*player, player.vel.y * dt, active_dirt_blocks);
+                try_to_move_x(*player, player.vel.x * dt, active_blocks);
+                try_to_move_y(*player, player.vel.y * dt, active_blocks);
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
                 // Update position-dependent fields on player entity
-                player.bounding_rect.x = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
-                player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
-                player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
-                player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
+                player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
+                player.bounding_rect.y    = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
+                player.sprite_head_rect.x = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
+                player.sprite_head_rect.y = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
 
-                if is_grounded(player, active_dirt_blocks) {
+                if is_grounded(player, active_blocks) {
                     player.jumps_remaining = player.jumps_capacity;
                     player.vel.y = 0;
                 }
@@ -410,7 +413,7 @@ main :: () {
                     if !is_on_cooldown {
                         if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                             // @TODO: there's a function to extract here
-                            for active_dirt_blocks {
+                            for active_blocks {
                                 if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                     removed := array_unordered_remove_entity_by_id(*chunks[it.chunk_id].blocks, it, true);
                                 }
@@ -430,7 +433,7 @@ main :: () {
                         would_be_on_existing_entity := false;
 
                         // Check if the block would be placed on any existing blocks
-                        for active_dirt_blocks {
+                        for active_blocks {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 would_be_on_existing_entity = true;
                                 break;
@@ -449,10 +452,9 @@ main :: () {
                         if can_place_block { 
                             defer global_id_counter += 1;
 
-                            
                             new_pos  := get_rect_center(new_rect);
 
-                            new_dirt_block := Entity.{
+                            new_dirt_block := Block.{
                                 id            = global_id_counter,
                                 pos           = new_pos,
                                 bounding_rect = new_rect,
@@ -546,7 +548,7 @@ main :: () {
 
                 // Draw dirt
                 {
-                    for active_dirt_blocks {
+                    for active_blocks {
                         DIRT_TILE_PADDING :: 2;
                         source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
 
@@ -588,7 +590,7 @@ main :: () {
 
                     source_width : float = xx ifx is_facing_left then PLAYER_MAP_TILE_WIDTH else -PLAYER_MAP_TILE_WIDTH;
                     source := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
-                    DrawTexturePro(player_map, source, sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                    DrawTexturePro(player_map, source, sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
@@ -648,7 +650,7 @@ round_to_int :: (f: float) -> int {
 }
 
 // @TODO: maybe dry up these move functions
-try_to_move_x :: (entity: *Entity, distance: float, collidables: []Entity) {
+try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
     // x_remainder := distance;
     move := round_to_int(distance);
     if (move == 0) return;
@@ -678,7 +680,7 @@ try_to_move_x :: (entity: *Entity, distance: float, collidables: []Entity) {
 }
 
 // @TODO: maybe dry up these move functions
-try_to_move_y :: (entity: *Entity, distance: float, collidables: []Entity) {
+try_to_move_y :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
     // y_remainder := distance;
     move := round_to_int(distance);
     if (move == 0) return;
@@ -711,7 +713,7 @@ can_jump :: (player: Player) -> bool {
     return player.jumps_remaining > 0;
 }
 
-is_grounded :: (entity: Entity, collidables: []Entity) -> bool {
+is_grounded :: (entity: Entity, collidables: [] $T/interface Entity) -> bool {
     entity_rect_if_move := entity.bounding_rect;
     entity_rect_if_move.y += 1;
 
