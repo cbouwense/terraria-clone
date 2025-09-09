@@ -44,6 +44,8 @@ PLAYER_REACH_DISTANCE :: 300.0;
 
 PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
 PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
+PLAYER_ATTACK_COOLDOWN_MS   :: 150;
+PLAYER_INTERACT_COOLDOWN_MS :: 150;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -92,6 +94,9 @@ Player :: struct {
     jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     is_facing_left : bool;
+
+    attack_cooldown_current_ms   : s32;
+    interact_cooldown_current_ms : s32;
 }
 
 CHUNK_MAX_WIDTH :: 16;
@@ -176,6 +181,9 @@ main :: () {
             frame_duration_ms = 33,
             timer_ms          = 0,
         },
+
+        attack_cooldown_current_ms   = 0,
+        interact_cooldown_current_ms = 0,
     };
     global_id_counter += 1;
 
@@ -349,8 +357,8 @@ main :: () {
             move_player_left  = control_down(controls.move_player_left);
             move_player_right = control_down(controls.move_player_right);
             try_to_jump       = control_pressed(controls.jump);
-            try_to_attack     = control_pressed(controls.attack);
-            try_to_interact   = control_pressed(controls.interact); // place blocks, open doors, etc.
+            try_to_attack     = control_down(controls.attack);
+            try_to_interact   = control_down(controls.interact); // place blocks, open doors, etc.
             drag_cam          = control_down(controls.drag_cam);
         }
 
@@ -397,55 +405,75 @@ main :: () {
                 }
 
                 if try_to_attack {
-                    if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
-                        // @TODO: there's a function to extract here
-                        for active_dirt_blocks {
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                removed := array_unordered_remove_entity_by_id(*chunks[it.chunk_id].blocks, it, true);
+                    is_on_cooldown := player.attack_cooldown_current_ms > 0;
+
+                    if !is_on_cooldown {
+                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
+                            // @TODO: there's a function to extract here
+                            for active_dirt_blocks {
+                                if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                    removed := array_unordered_remove_entity_by_id(*chunks[it.chunk_id].blocks, it, true);
+                                }
                             }
                         }
+
+                        player.attack_cooldown_current_ms = PLAYER_ATTACK_COOLDOWN_MS;
                     }
                 }
 
                 // For now this just places down dirt blocks
                 if try_to_interact {
-                    is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
-                    would_be_on_existing_entity := false;
+                    is_on_cooldown := player.interact_cooldown_current_ms > 0;
 
-                    for active_dirt_blocks {
-                        if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                            would_be_on_existing_entity = true;
-                            break;
+                    if !is_on_cooldown {
+                        is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+                        would_be_on_existing_entity := false;
+
+                        // Check if the block would be placed on any existing blocks
+                        for active_dirt_blocks {
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                would_be_on_existing_entity = true;
+                                break;
+                            }
                         }
-                    }
-
-                    can_place_block := is_within_reach && !would_be_on_existing_entity;
-
-                    if can_place_block { 
-                        defer global_id_counter += 1;
 
                         new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
-                        new_pos  := get_rect_center(new_rect);
 
-                        new_dirt_block := Entity.{
-                            id            = global_id_counter,
-                            pos           = new_pos,
-                            bounding_rect = new_rect,
-                            sprite_rect   = new_rect,
-                        };
-                        
-                        found_chunk := false;
-                        for active_chunks {
-                            print("checking chunk %\n", it.id);
-                            if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
-                            
-                            found_chunk = true;
-                            new_dirt_block.chunk_id = it.id;
-                            array_add(*chunks[it.id].blocks, new_dirt_block);
-                            print_vars(it.id, new_dirt_block);
-                            break;
+                        // Check if the new block would be placed on the player
+                        if CheckCollisionRecs(new_rect, player.bounding_rect) {
+                            would_be_on_existing_entity = true;
                         }
-                        assert(found_chunk);
+
+                        can_place_block := is_within_reach && !would_be_on_existing_entity;
+                        
+                        if can_place_block { 
+                            defer global_id_counter += 1;
+
+                            
+                            new_pos  := get_rect_center(new_rect);
+
+                            new_dirt_block := Entity.{
+                                id            = global_id_counter,
+                                pos           = new_pos,
+                                bounding_rect = new_rect,
+                                sprite_rect   = new_rect,
+                            };
+                            
+                            found_chunk := false;
+                            for active_chunks {
+                                print("checking chunk %\n", it.id);
+                                if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
+                                
+                                found_chunk = true;
+                                new_dirt_block.chunk_id = it.id;
+                                array_add(*chunks[it.id].blocks, new_dirt_block);
+                                print_vars(it.id, new_dirt_block);
+                                break;
+                            }
+                            assert(found_chunk);
+
+                            player.interact_cooldown_current_ms = PLAYER_INTERACT_COOLDOWN_MS;
+                        }
                     }
                 }
 
@@ -465,6 +493,18 @@ main :: () {
                     } else {
                         player.run_animation.timer_ms = 0;
                     }; 
+                }
+
+                // Update player cooldowns
+                // @TODO: feels like there's some metaprogramming possibility here.
+                {
+                    if player.attack_cooldown_current_ms > 0 {
+                        player.attack_cooldown_current_ms -= xx (dt * 1000);
+                    }
+
+                    if player.interact_cooldown_current_ms > 0 {
+                        player.interact_cooldown_current_ms -= xx (dt * 1000);
+                    }
                 }
             }
 
