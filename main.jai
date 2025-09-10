@@ -174,7 +174,7 @@ main :: () {
         jumps_capacity  = 2,
         jumps_remaining = 2,
 
-        is_facing_left = true,
+        is_facing_left = false,
 
         // @TODO: kinda a dumb way to implement idling.
         idle_animation = Animation.{
@@ -383,6 +383,7 @@ main :: () {
                     player.vel.x -= PLAYER_MOVE_SPEED;
                     player.is_facing_left = true;
                 }
+
                 if move_player_right {
                     player.vel.x += PLAYER_MOVE_SPEED;
                     player.is_facing_left = false;
@@ -403,8 +404,8 @@ main :: () {
                 // Update position-dependent fields on player entity
                 player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
                 player.bounding_rect.y    = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
-                player.sprite_head_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH    / 2.0;
-                player.sprite_head_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT   / 2.0;
+                player.sprite_head_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
+                player.sprite_head_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
 
                 if is_grounded(player, active_blocks) {
                     player.jumps_remaining = player.jumps_capacity;
@@ -473,7 +474,7 @@ main :: () {
                                 found_chunk = true;
                                 new_dirt_block.chunk_id = it.id;
                                 array_add(*chunks[it.id].blocks, new_dirt_block);
-                                print_vars(it.id, new_dirt_block);
+                                // print_vars(it.id, new_dirt_block);
                                 break;
                             }
                             assert(found_chunk);
@@ -488,6 +489,7 @@ main :: () {
                     player.idle_animation.active = move_player_left == move_player_right;
                     player.run_animation.active  = move_player_left != move_player_right;
                     
+                    // @TODO: metaprogramming moment?
                     if player.idle_animation.active {
                         player.idle_animation.timer_ms += xx (dt * 1000);
                     } else {
@@ -513,7 +515,7 @@ main :: () {
                     }
                 }
 
-                print_vars(player);
+                // print_vars(player);
             }
 
             // Update camera
@@ -645,22 +647,23 @@ control_pressed :: (haystack: [] Control) -> bool {
 }
 
 round_to_int :: (f: float) -> int {
-    i := cast(int) floor(f);
-    decimal_part := f - i;
-    if f < 0 {
-        return ifx decimal_part >= 0.5 then i - 1 else i;
-    } else {
-        return ifx decimal_part >= 0.5 then i + 1 else i;
+    i := cast(int) f;
+    decimal_part := abs(f) - abs(i);
+
+    if decimal_part >= 0.5 {
+        if f >= 0 return i + 1;
+        else      return i - 1;
     }
+
+    return i;
 }
 
 // @TODO: maybe dry up these move functions
 try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
-    // x_remainder := distance;
     move := round_to_int(distance);
+    print_vars(move, distance);
     if (move == 0) return;
 
-    // x_remainder -= move;
     sign := ifx move > 0 then 1 else -1;
 
     entity_rect_if_move := entity.bounding_rect;
@@ -686,11 +689,9 @@ try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface
 
 // @TODO: maybe dry up these move functions
 try_to_move_y :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
-    // y_remainder := distance;
     move := round_to_int(distance);
     if (move == 0) return;
 
-    // y_remainder -= move;
     sign := ifx move > 0 then 1 else -1;
 
     entity_rect_if_move := entity.bounding_rect;
@@ -699,7 +700,7 @@ try_to_move_y :: (entity: *Entity, distance: float, collidables: [] $T/interface
     while move != 0 {
         entity_rect_if_move.y += sign;
         
-        // @TODO: extract?
+        // @TODO: extract
         for collidables {
             if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) {
                 collided = true;

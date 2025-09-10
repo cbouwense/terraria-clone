@@ -33,12 +33,3 @@
 
 # Bugs
 - player looks one pixel off the ground
-
-# Done
-- animation: clipping next frame over when running left
-- controls: hold down buttons and cooldowns
-- world gen: dirt underground
-- block removal / placement
-- culling
-- block placement isn't grid aligned
-- player can put dirt blocks on top of himself
