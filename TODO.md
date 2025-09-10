@@ -1,11 +1,11 @@
 # In progress
+- animation: use real player sprites
 
 # Gameplay features
 - animation: jumping
 - animation: hitting the ground
 - animation: placing blocks
 - animation: attacking blocks
-- animation: use real player sprites
 - lighting: world from day / night cycle
 - lighting: block fog of war
 - sound effects: placing blocks

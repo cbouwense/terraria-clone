@@ -33,12 +33,16 @@ SCALE :: 2;
 
 PLAYER_MAP_COLS :: 1;
 PLAYER_MAP_ROWS :: 26;
-PLAYER_MAP_TILE_WIDTH  :: 36;
-PLAYER_MAP_TILE_HEIGHT :: 48;
-PLAYER_WORLD_SPRITE_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * SCALE;
-PLAYER_WORLD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE - 5;
-PLAYER_WORLD_BOUNDING_WIDTH  :: PLAYER_WORLD_SPRITE_WIDTH  - 40;
-PLAYER_WORLD_BOUNDING_HEIGHT :: PLAYER_WORLD_SPRITE_HEIGHT - 20;
+
+PLAYER_MAP_HEAD_TILE_WIDTH  :: 40;
+PLAYER_MAP_HEAD_TILE_HEIGHT :: 53;
+PLAYER_WORLD_HEAD_SPRITE_WIDTH  :: PLAYER_MAP_HEAD_TILE_WIDTH  * SCALE;
+PLAYER_WORLD_HEAD_SPRITE_HEIGHT :: PLAYER_MAP_HEAD_TILE_HEIGHT * SCALE - 5;
+
+// PLAYER_WORLD_SPRITE_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * SCALE;
+// PLAYER_WORLD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE - 5;
+PLAYER_WORLD_BOUNDING_WIDTH  :: PLAYER_WORLD_HEAD_SPRITE_WIDTH  - 40;
+PLAYER_WORLD_BOUNDING_HEIGHT :: PLAYER_WORLD_HEAD_SPRITE_HEIGHT - 20;
 
 PLAYER_REACH_DISTANCE :: 300.0;
 
@@ -158,13 +162,13 @@ main :: () {
             pos.x - floor(PLAYER_WORLD_BOUNDING_WIDTH / 2.0),
             pos.y - floor(PLAYER_WORLD_BOUNDING_HEIGHT / 2.0) + 5,
             xx PLAYER_WORLD_BOUNDING_WIDTH,
-            xx PLAYER_WORLD_BOUNDING_HEIGHT
+            xx PLAYER_WORLD_BOUNDING_HEIGHT,
         },
         sprite_head_rect = Rectangle.{
-            pos.x - floor(PLAYER_WORLD_SPRITE_WIDTH / 2.0),
-            pos.y - floor(PLAYER_WORLD_SPRITE_HEIGHT / 2.0),
-            xx PLAYER_WORLD_SPRITE_WIDTH,
-            xx PLAYER_WORLD_SPRITE_HEIGHT
+            pos.x - floor(PLAYER_WORLD_HEAD_SPRITE_WIDTH / 2.0),
+            pos.y - floor(PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0),
+            xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
+            xx PLAYER_WORLD_HEAD_SPRITE_HEIGHT,
         },
 
         jumps_capacity  = 2,
@@ -183,8 +187,8 @@ main :: () {
 
         run_animation = Animation.{
             active            = false,
-            frame_one_coords  = Vector2.{ 2, 0 }, 
-            frame_count       = 14,
+            frame_one_coords  = Vector2.{ 0, 0 }, 
+            frame_count       = 20,
             frame_duration_ms = 33,
             timer_ms          = 0,
         },
@@ -399,8 +403,8 @@ main :: () {
                 // Update position-dependent fields on player entity
                 player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
                 player.bounding_rect.y    = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
-                player.sprite_head_rect.x = player.pos.x - PLAYER_WORLD_SPRITE_WIDTH    / 2.0;
-                player.sprite_head_rect.y = player.pos.y - PLAYER_WORLD_SPRITE_HEIGHT   / 2.0;
+                player.sprite_head_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH    / 2.0;
+                player.sprite_head_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT   / 2.0;
 
                 if is_grounded(player, active_blocks) {
                     player.jumps_remaining = player.jumps_capacity;
@@ -508,6 +512,8 @@ main :: () {
                         player.interact_cooldown_current_ms -= xx (dt * 1000);
                     }
                 }
+
+                print_vars(player);
             }
 
             // Update camera
@@ -580,17 +586,15 @@ main :: () {
 
                 // Draw player
                 {
-                    using player;
+                    active_animation : Animation = ifx player.idle_animation.active then player.idle_animation else player.run_animation; 
 
-                    active_animation : Animation = ifx idle_animation.active then idle_animation else run_animation; 
-
+                    // This logic assumes that the animation is a contiguous horizontal strip of tiles.
                     frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
-
                     tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
 
-                    source_width : float = xx ifx is_facing_left then PLAYER_MAP_TILE_WIDTH else -PLAYER_MAP_TILE_WIDTH;
-                    source := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
-                    DrawTexturePro(player_map, source, sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                    source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_HEAD_TILE_WIDTH else PLAYER_MAP_HEAD_TILE_WIDTH;
+                    source := Rectangle.{tile.x * PLAYER_MAP_HEAD_TILE_WIDTH, tile.y * PLAYER_MAP_HEAD_TILE_HEIGHT, source_width, PLAYER_MAP_HEAD_TILE_HEIGHT};
+                    DrawTexturePro(player_map, source, player.sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
@@ -616,8 +620,9 @@ main :: () {
     }
 }
 
+// @TODO: it would be cool to have a debug mode for this and hot swap the debug sprite sheets.
 init_textures :: () {
-    player_map = LoadTexture("data/Player_Cropped.png");
+    player_map = LoadTexture("data/Player_Head_Debug.png");
     dirt_map   = LoadTexture("data/Tiles_0.png");
 }
 
