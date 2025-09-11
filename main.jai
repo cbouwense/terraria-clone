@@ -23,24 +23,20 @@ move_player_right : bool;
 try_to_jump       : bool;
 try_to_attack     : bool;
 try_to_interact   : bool;
-drag_cam   : bool;
+drag_cam          : bool;
 
 // Texture maps
-player_map : Texture;
-dirt_map   : Texture;
+player_head_map   : Texture;
+player_hair_1_map : Texture;
+dirt_map          : Texture;
 
 SCALE :: 2;
 
-PLAYER_MAP_COLS :: 1;
-PLAYER_MAP_ROWS :: 26;
+PLAYER_MAP_TILE_WIDTH  :: 40;
+PLAYER_MAP_TILE_HEIGHT :: 53;
+PLAYER_WORLD_HEAD_SPRITE_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * SCALE;
+PLAYER_WORLD_HEAD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE - 5;
 
-PLAYER_MAP_HEAD_TILE_WIDTH  :: 40;
-PLAYER_MAP_HEAD_TILE_HEIGHT :: 53;
-PLAYER_WORLD_HEAD_SPRITE_WIDTH  :: PLAYER_MAP_HEAD_TILE_WIDTH  * SCALE;
-PLAYER_WORLD_HEAD_SPRITE_HEIGHT :: PLAYER_MAP_HEAD_TILE_HEIGHT * SCALE - 5;
-
-// PLAYER_WORLD_SPRITE_WIDTH  :: PLAYER_MAP_TILE_WIDTH  * SCALE;
-// PLAYER_WORLD_SPRITE_HEIGHT :: PLAYER_MAP_TILE_HEIGHT * SCALE - 5;
 PLAYER_WORLD_BOUNDING_WIDTH  :: PLAYER_WORLD_HEAD_SPRITE_WIDTH  - 40;
 PLAYER_WORLD_BOUNDING_HEIGHT :: PLAYER_WORLD_HEAD_SPRITE_HEIGHT - 20;
 
@@ -594,9 +590,12 @@ main :: () {
                     frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
                     tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
 
-                    source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_HEAD_TILE_WIDTH else PLAYER_MAP_HEAD_TILE_WIDTH;
-                    source := Rectangle.{tile.x * PLAYER_MAP_HEAD_TILE_WIDTH, tile.y * PLAYER_MAP_HEAD_TILE_HEIGHT, source_width, PLAYER_MAP_HEAD_TILE_HEIGHT};
-                    DrawTexturePro(player_map, source, player.sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                    source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
+                    source_rect := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
+                    
+                    // @TODO: Might be cool to have the animation struct have a list of tile maps or something
+                    DrawTexturePro(player_head_map, source_rect, player.sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                    DrawTexturePro(player_hair_1_map, source_rect, player.sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
@@ -624,8 +623,9 @@ main :: () {
 
 // @TODO: it would be cool to have a debug mode for this and hot swap the debug sprite sheets.
 init_textures :: () {
-    player_map = LoadTexture("data/Player_Head_Debug.png");
-    dirt_map   = LoadTexture("data/Tiles_0.png");
+    player_head_map   = LoadTexture("data/Player_Head_Debug.png");
+    player_hair_1_map = LoadTexture("data/Player_Hair_1_Debug.png");
+    dirt_map          = LoadTexture("data/Tiles_0.png");
 }
 
 control_down :: (haystack: [] Control) -> bool {
