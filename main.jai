@@ -26,9 +26,16 @@ try_to_interact   : bool;
 drag_cam          : bool;
 
 // Texture maps
-player_head_map   : Texture;
-player_hair_1_map : Texture;
-dirt_map          : Texture;
+player_head_map           : Texture;
+player_hair_1_map         : Texture;
+player_eye_white_map      : Texture;
+player_eye_iris_map       : Texture;
+player_chest_grounded_map : Texture;
+player_chest_airborne_map : Texture;
+dirt_map                  : Texture;
+
+// Animated sprites
+player_animations : [..] *AnimatedSprite;
 
 SCALE :: 2;
 
@@ -46,6 +53,13 @@ PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
 PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
 PLAYER_ATTACK_COOLDOWN_MS   :: 150;
 PLAYER_INTERACT_COOLDOWN_MS :: 150;
+
+PLAYER_RUNNING_FRAME_DURATION_MS :: 50;
+
+PLAYER_COLOR_HEAD  :: BEIGE;
+PLAYER_COLOR_HAIR  :: ORANGE;
+PLAYER_COLOR_EYE   :: LIME;
+PLAYER_COLOR_CHEST :: GRAY;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -75,21 +89,21 @@ Entity :: struct {
     bounding_rect : Rectangle; // Used for collision
 }
 
-Animation :: struct {
-    active            : bool;
+AnimatedSprite :: struct {
+    map               : Texture;
+    timer_active      : bool;
+    visible           : bool;
     frame_one_coords  : Vector2;
     frame_count       : u32;
     frame_duration_ms : u32;
     timer_ms          : u32;
+    color             : Color;
 }
 
 Player :: struct {
     #as using entity : Entity;
 
-    sprite_head_rect : Rectangle;
-
-    idle_animation   : Animation;
-    run_animation    : Animation;
+    sprite_rect : Rectangle;
 
     jumps_remaining  : int;
     jumps_capacity   : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
@@ -160,7 +174,7 @@ main :: () {
             xx PLAYER_WORLD_BOUNDING_WIDTH,
             xx PLAYER_WORLD_BOUNDING_HEIGHT,
         },
-        sprite_head_rect = Rectangle.{
+        sprite_rect = Rectangle.{
             pos.x - floor(PLAYER_WORLD_HEAD_SPRITE_WIDTH / 2.0),
             pos.y - floor(PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0),
             xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
@@ -172,27 +186,129 @@ main :: () {
 
         is_facing_left = false,
 
-        // @TODO: kinda a dumb way to implement idling.
-        idle_animation = Animation.{
-            active            = true,
-            frame_one_coords  = Vector2.{ 0, 0 }, 
-            frame_count       = 1,
-            frame_duration_ms = 100,
-            timer_ms          = 0,
-        },
-
-        run_animation = Animation.{
-            active            = false,
-            frame_one_coords  = Vector2.{ 0, 0 }, 
-            frame_count       = 20,
-            frame_duration_ms = 33,
-            timer_ms          = 0,
-        },
-
         attack_cooldown_current_ms   = 0,
         interact_cooldown_current_ms = 0,
     };
     global_id_counter += 1;
+
+    // @TODO: so, the idle "animation" is really just showing one tile in a tile map. Really, what would make more sense is if there was some mechanism for simply
+    // showing sprites instead of paused AnimatedSprites. But this works and slots in nicely with the current mechanism I have for animations. So my plan is to come
+    // back to this once I have it fully working and then compress the code into something that makes a bit more sense.
+    player_animation_head_idle := AnimatedSprite.{
+        map              = player_head_map,
+        timer_active     = true,
+        visible          = true,
+        frame_one_coords = Vector2.{ 0, 0 },
+        frame_count      = 1,
+        color            = PLAYER_COLOR_HEAD,
+    };
+
+    player_animation_head_running := AnimatedSprite.{
+        map               = player_head_map,
+        timer_active      = false,
+        visible           = false,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        color             = PLAYER_COLOR_HEAD,
+    };
+
+    player_animation_hair_1_idle := AnimatedSprite.{
+        map               = player_hair_1_map,
+        timer_active      = false,
+        visible           = true,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        color             = PLAYER_COLOR_HAIR,
+    };
+
+    player_animation_hair_1_running := AnimatedSprite.{
+        map               = player_hair_1_map,
+        timer_active      = false,
+        visible           = false,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        color             = PLAYER_COLOR_HAIR,
+    };
+
+    player_animation_eye_white_idle := AnimatedSprite.{
+        map               = player_eye_white_map,
+        timer_active      = false,
+        visible           = true,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        color             = WHITE,
+    };
+
+    player_animation_eye_white_running := AnimatedSprite.{
+        map               = player_eye_white_map,
+        timer_active      = false,
+        visible           = false,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        color             = WHITE,
+    };
+    
+    player_animation_eye_iris_idle := AnimatedSprite.{
+        map               = player_eye_iris_map,
+        timer_active      = false,
+        visible           = true,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        color             = PLAYER_COLOR_EYE,
+    };
+
+    player_animation_eye_iris_running := AnimatedSprite.{
+        map               = player_eye_iris_map,
+        timer_active      = false,
+        visible           = false,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        color             = PLAYER_COLOR_EYE,
+    };
+
+    player_animation_chest_grounded_idle := AnimatedSprite.{
+        map               = player_chest_grounded_map,
+        timer_active      = false,
+        visible           = true,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        color             = PLAYER_COLOR_CHEST,
+    };
+
+    player_animation_chest_grounded_running := AnimatedSprite.{
+        map               = player_chest_grounded_map,
+        timer_active      = false,
+        visible           = false,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        color             = PLAYER_COLOR_CHEST,
+    };
+
+    // There's not really a need for a running version of this.
+    player_animation_chest_airborne := AnimatedSprite.{
+        map               = player_chest_airborne_map,
+        timer_active      = false,
+        frame_one_coords  = Vector2.{ 0, 0 },
+        frame_count       = 20,
+        frame_duration_ms = 100,
+    };
+
+    array_add(*player_animations, *player_animation_head_idle);
+    array_add(*player_animations, *player_animation_head_running);
+    array_add(*player_animations, *player_animation_hair_1_idle);
+    array_add(*player_animations, *player_animation_hair_1_running);
+    array_add(*player_animations, *player_animation_eye_white_idle);
+    array_add(*player_animations, *player_animation_eye_white_running);
+    array_add(*player_animations, *player_animation_eye_iris_idle);
+    array_add(*player_animations, *player_animation_eye_iris_running);
+    array_add(*player_animations, *player_animation_chest_grounded_idle);
+    array_add(*player_animations, *player_animation_chest_grounded_running);
+    array_add(*player_animations, *player_animation_chest_airborne);
 
     // @TODO: extract
     // Generate perlin noise for heightmap
@@ -321,6 +437,8 @@ main :: () {
         dt   := GetFrameTime();
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
+        player_is_grounded : bool; // updated in player update
+
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
 
@@ -354,7 +472,7 @@ main :: () {
         // Input
         //
         {
-            if IsKeyPressed(.KEY_P) paused     = !paused;
+            if IsKeyPressed(.KEY_P) paused = !paused;
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
 
             move_player_left  = control_down(controls.move_player_left);
@@ -400,10 +518,11 @@ main :: () {
                 // Update position-dependent fields on player entity
                 player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
                 player.bounding_rect.y    = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
-                player.sprite_head_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
-                player.sprite_head_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
+                player.sprite_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
+                player.sprite_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
 
-                if is_grounded(player, active_blocks) {
+                player_is_grounded = is_grounded(player, active_blocks);
+                if player_is_grounded {
                     player.jumps_remaining = player.jumps_capacity;
                     player.vel.y = 0;
                 }
@@ -464,13 +583,12 @@ main :: () {
                             
                             found_chunk := false;
                             for active_chunks {
-                                print("checking chunk %\n", it.id);
                                 if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
                                 
                                 found_chunk = true;
                                 new_dirt_block.chunk_id = it.id;
                                 array_add(*chunks[it.id].blocks, new_dirt_block);
-                                // print_vars(it.id, new_dirt_block);
+
                                 break;
                             }
                             assert(found_chunk);
@@ -480,23 +598,45 @@ main :: () {
                     }
                 }
 
-                // Update animation state
+                // Update animations
                 {
-                    player.idle_animation.active = move_player_left == move_player_right;
-                    player.run_animation.active  = move_player_left != move_player_right;
-                    
-                    // @TODO: metaprogramming moment?
-                    if player.idle_animation.active {
-                        player.idle_animation.timer_ms += xx (dt * 1000);
-                    } else {
-                        player.idle_animation.timer_ms = 0;
-                    };
+                    trying_to_move_horizontally := move_player_left != move_player_right;
 
-                    if player.run_animation.active {
-                        player.run_animation.timer_ms += xx (dt * 1000);
-                    } else {
-                        player.run_animation.timer_ms = 0;
-                    }; 
+                    player_animation_head_idle.visible = !trying_to_move_horizontally;
+
+                    player_animation_head_running.timer_active = trying_to_move_horizontally;
+                    player_animation_head_running.visible      = trying_to_move_horizontally;
+
+                    player_animation_hair_1_idle.visible = !trying_to_move_horizontally;
+
+                    player_animation_hair_1_running.timer_active = trying_to_move_horizontally;
+                    player_animation_hair_1_running.visible      = trying_to_move_horizontally;
+
+                    player_animation_eye_white_idle.visible = !trying_to_move_horizontally;
+
+                    player_animation_eye_white_running.timer_active = trying_to_move_horizontally;
+                    player_animation_eye_white_running.visible      = trying_to_move_horizontally;
+
+                    player_animation_eye_iris_idle.visible = !trying_to_move_horizontally;
+
+                    player_animation_eye_iris_running.timer_active = trying_to_move_horizontally;
+                    player_animation_eye_iris_running.visible      = trying_to_move_horizontally;
+
+                    player_animation_chest_grounded_idle.visible = !trying_to_move_horizontally;
+
+                    player_animation_chest_grounded_running.timer_active = trying_to_move_horizontally;
+                    player_animation_chest_grounded_running.visible      = trying_to_move_horizontally;
+
+                    player_animation_chest_airborne.timer_active = !player_is_grounded;
+                    player_animation_chest_airborne.visible      = !player_is_grounded;
+
+                    for player_animations {
+                        if it.timer_active {
+                            it.timer_ms += xx (dt * 1000);
+                        } else {
+                            it.timer_ms = 0;
+                        };
+                    }
                 }
 
                 // Update player cooldowns
@@ -584,18 +724,18 @@ main :: () {
 
                 // Draw player
                 {
-                    active_animation : Animation = ifx player.idle_animation.active then player.idle_animation else player.run_animation; 
+                    for player_animations {
+                        if !it.visible continue;
 
-                    // This logic assumes that the animation is a contiguous horizontal strip of tiles.
-                    frame := (active_animation.timer_ms / active_animation.frame_duration_ms) % active_animation.frame_count;
-                    tile := Vector2.{ frame + active_animation.frame_one_coords.x, active_animation.frame_one_coords.y };
+                        // This logic assumes that the animation is a contiguous horizontal strip of tiles.
+                        frame := ifx it.frame_duration_ms == 0 then 0 else (it.timer_ms / it.frame_duration_ms) % it.frame_count;
+                        tile  := Vector2.{ frame + it.frame_one_coords.x, it.frame_one_coords.y };
 
-                    source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
-                    source_rect := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
-                    
-                    // @TODO: Might be cool to have the animation struct have a list of tile maps or something
-                    DrawTexturePro(player_head_map, source_rect, player.sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
-                    DrawTexturePro(player_hair_1_map, source_rect, player.sprite_head_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                        source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
+                        source_rect  := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
+                        
+                        DrawTexturePro(it.map, source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, it.color);
+                    }
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
@@ -612,7 +752,7 @@ main :: () {
                     DrawText(tprint("(%, %)\0", mouse_pos_in_world.x, mouse_pos_in_world.y).data, 10, 30, 18, LIME);
                 }
 
-                // @TODO: Draw "paused"
+                // @TODO: Draw pause menu
                 if paused {
 
                 }
@@ -623,9 +763,13 @@ main :: () {
 
 // @TODO: it would be cool to have a debug mode for this and hot swap the debug sprite sheets.
 init_textures :: () {
-    player_head_map   = LoadTexture("data/Player_Head_Debug.png");
-    player_hair_1_map = LoadTexture("data/Player_Hair_1_Debug.png");
-    dirt_map          = LoadTexture("data/Tiles_0.png");
+    player_head_map           = LoadTexture("data/Player_Head_Debug.png");
+    player_hair_1_map         = LoadTexture("data/Player_Hair_1_Debug.png");
+    player_eye_white_map      = LoadTexture("data/Player_Eye_White_Release.png");
+    player_eye_iris_map       = LoadTexture("data/Player_Eye_Iris_Release.png");
+    player_chest_grounded_map = LoadTexture("data/Player_Chest_Grounded_Release.png");
+    player_chest_airborne_map = LoadTexture("data/Player_Chest_Airborne_Release.png");
+    dirt_map                  = LoadTexture("data/Tiles_0.png");
 }
 
 control_down :: (haystack: [] Control) -> bool {
@@ -661,7 +805,6 @@ round_to_int :: (f: float) -> int {
 // @TODO: maybe dry up these move functions
 try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
     move := round_to_int(distance);
-    print_vars(move, distance);
     if (move == 0) return;
 
     sign := ifx move > 0 then 1 else -1;
