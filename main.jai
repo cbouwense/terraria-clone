@@ -32,6 +32,7 @@ player_eye_white_map      : Texture;
 player_eye_iris_map       : Texture;
 player_chest_grounded_map : Texture;
 player_chest_airborne_map : Texture;
+player_undershirt_map     : Texture;
 dirt_map                  : Texture;
 
 // Animated sprites
@@ -56,10 +57,11 @@ PLAYER_INTERACT_COOLDOWN_MS :: 150;
 
 PLAYER_RUNNING_FRAME_DURATION_MS :: 50;
 
-PLAYER_COLOR_HEAD  :: BEIGE;
-PLAYER_COLOR_HAIR  :: ORANGE;
-PLAYER_COLOR_EYE   :: LIME;
-PLAYER_COLOR_CHEST :: GRAY;
+PLAYER_COLOR_HEAD       :: BEIGE;
+PLAYER_COLOR_HAIR       :: ORANGE;
+PLAYER_COLOR_EYE        :: LIME;
+PLAYER_COLOR_CHEST      :: GRAY;
+PLAYER_COLOR_UNDERSHIRT :: PINK;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -91,9 +93,8 @@ Entity :: struct {
 
 AnimatedSprite :: struct {
     map               : Texture;
-    timer_active      : bool;
-    visible           : bool;
-    frame_one_coords  : Vector2;
+    active            : bool;
+    first_frame       : u32; // Starts from 0
     frame_count       : u32;
     frame_duration_ms : u32;
     timer_ms          : u32;
@@ -195,19 +196,16 @@ main :: () {
     // showing sprites instead of paused AnimatedSprites. But this works and slots in nicely with the current mechanism I have for animations. So my plan is to come
     // back to this once I have it fully working and then compress the code into something that makes a bit more sense.
     player_animation_head_idle := AnimatedSprite.{
-        map              = player_head_map,
-        timer_active     = true,
-        visible          = true,
-        frame_one_coords = Vector2.{ 0, 0 },
-        frame_count      = 1,
-        color            = PLAYER_COLOR_HEAD,
+        map               = player_head_map,
+        first_frame       = 0,
+        frame_count       = 1,
+        frame_duration_ms = 0,
+        color             = PLAYER_COLOR_HEAD,
     };
 
     player_animation_head_running := AnimatedSprite.{
         map               = player_head_map,
-        timer_active      = false,
-        visible           = false,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
         frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
         color             = PLAYER_COLOR_HEAD,
@@ -215,18 +213,15 @@ main :: () {
 
     player_animation_hair_1_idle := AnimatedSprite.{
         map               = player_hair_1_map,
-        timer_active      = false,
-        visible           = true,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
+        frame_duration_ms = 0,
         color             = PLAYER_COLOR_HAIR,
     };
 
     player_animation_hair_1_running := AnimatedSprite.{
         map               = player_hair_1_map,
-        timer_active      = false,
-        visible           = false,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
         frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
         color             = PLAYER_COLOR_HAIR,
@@ -234,18 +229,15 @@ main :: () {
 
     player_animation_eye_white_idle := AnimatedSprite.{
         map               = player_eye_white_map,
-        timer_active      = false,
-        visible           = true,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
+        frame_duration_ms = 0,
         color             = WHITE,
     };
 
     player_animation_eye_white_running := AnimatedSprite.{
         map               = player_eye_white_map,
-        timer_active      = false,
-        visible           = false,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
         frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
         color             = WHITE,
@@ -253,18 +245,15 @@ main :: () {
     
     player_animation_eye_iris_idle := AnimatedSprite.{
         map               = player_eye_iris_map,
-        timer_active      = false,
-        visible           = true,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
+        frame_duration_ms = 0,
         color             = PLAYER_COLOR_EYE,
     };
 
     player_animation_eye_iris_running := AnimatedSprite.{
         map               = player_eye_iris_map,
-        timer_active      = false,
-        visible           = false,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
         frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
         color             = PLAYER_COLOR_EYE,
@@ -272,18 +261,15 @@ main :: () {
 
     player_animation_chest_grounded_idle := AnimatedSprite.{
         map               = player_chest_grounded_map,
-        timer_active      = false,
-        visible           = true,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
+        frame_duration_ms = 0,
         color             = PLAYER_COLOR_CHEST,
     };
 
     player_animation_chest_grounded_running := AnimatedSprite.{
         map               = player_chest_grounded_map,
-        timer_active      = false,
-        visible           = false,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
         frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
         color             = PLAYER_COLOR_CHEST,
@@ -292,10 +278,26 @@ main :: () {
     // There's not really a need for a running version of this.
     player_animation_chest_airborne := AnimatedSprite.{
         map               = player_chest_airborne_map,
-        timer_active      = false,
-        frame_one_coords  = Vector2.{ 0, 0 },
+        first_frame       = 0,
         frame_count       = 20,
-        frame_duration_ms = 100,
+        frame_duration_ms = 0,
+        color             = PLAYER_COLOR_CHEST,
+    };
+
+    player_animation_undershirt_idle := AnimatedSprite.{
+        map               = player_undershirt_map,
+        first_frame       = 0,
+        frame_count       = 1,
+        frame_duration_ms = 0,
+        color             = PLAYER_COLOR_UNDERSHIRT,
+    };
+
+    player_animation_undershirt_running := AnimatedSprite.{
+        map               = player_undershirt_map,
+        first_frame       = 6,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        color             = PLAYER_COLOR_UNDERSHIRT,
     };
 
     array_add(*player_animations, *player_animation_head_idle);
@@ -309,6 +311,8 @@ main :: () {
     array_add(*player_animations, *player_animation_chest_grounded_idle);
     array_add(*player_animations, *player_animation_chest_grounded_running);
     array_add(*player_animations, *player_animation_chest_airborne);
+    array_add(*player_animations, *player_animation_undershirt_idle);
+    array_add(*player_animations, *player_animation_undershirt_running);
 
     // @TODO: extract
     // Generate perlin noise for heightmap
@@ -601,37 +605,30 @@ main :: () {
                 // Update animations
                 {
                     trying_to_move_horizontally := move_player_left != move_player_right;
+                    trying_to_run               := trying_to_move_horizontally && player_is_grounded;
+                    airborne_or_idle            := !trying_to_run;
 
-                    player_animation_head_idle.visible = !trying_to_move_horizontally;
+                    // Idle (or airborne)
+                    player_animation_head_idle.active           = airborne_or_idle;
+                    player_animation_hair_1_idle.active         = airborne_or_idle;
+                    player_animation_eye_white_idle.active      = airborne_or_idle;
+                    player_animation_eye_iris_idle.active       = airborne_or_idle;
+                    player_animation_chest_grounded_idle.active = !trying_to_move_horizontally && player_is_grounded;
+                    player_animation_undershirt_idle.active     = airborne_or_idle;
 
-                    player_animation_head_running.timer_active = trying_to_move_horizontally;
-                    player_animation_head_running.visible      = trying_to_move_horizontally;
+                    // Running
+                    player_animation_head_running.active           = trying_to_run;
+                    player_animation_hair_1_running.active         = trying_to_run;
+                    player_animation_eye_white_running.active      = trying_to_run;
+                    player_animation_eye_iris_running.active       = trying_to_run;
+                    player_animation_chest_grounded_running.active = trying_to_run;
+                    player_animation_undershirt_running.active     = trying_to_run;
 
-                    player_animation_hair_1_idle.visible = !trying_to_move_horizontally;
-
-                    player_animation_hair_1_running.timer_active = trying_to_move_horizontally;
-                    player_animation_hair_1_running.visible      = trying_to_move_horizontally;
-
-                    player_animation_eye_white_idle.visible = !trying_to_move_horizontally;
-
-                    player_animation_eye_white_running.timer_active = trying_to_move_horizontally;
-                    player_animation_eye_white_running.visible      = trying_to_move_horizontally;
-
-                    player_animation_eye_iris_idle.visible = !trying_to_move_horizontally;
-
-                    player_animation_eye_iris_running.timer_active = trying_to_move_horizontally;
-                    player_animation_eye_iris_running.visible      = trying_to_move_horizontally;
-
-                    player_animation_chest_grounded_idle.visible = !trying_to_move_horizontally;
-
-                    player_animation_chest_grounded_running.timer_active = trying_to_move_horizontally;
-                    player_animation_chest_grounded_running.visible      = trying_to_move_horizontally;
-
-                    player_animation_chest_airborne.timer_active = !player_is_grounded;
-                    player_animation_chest_airborne.visible      = !player_is_grounded;
+                    // Airborne
+                    player_animation_chest_airborne.active = !player_is_grounded;
 
                     for player_animations {
-                        if it.timer_active {
+                        if it.active {
                             it.timer_ms += xx (dt * 1000);
                         } else {
                             it.timer_ms = 0;
@@ -650,8 +647,6 @@ main :: () {
                         player.interact_cooldown_current_ms -= xx (dt * 1000);
                     }
                 }
-
-                // print_vars(player);
             }
 
             // Update camera
@@ -725,15 +720,15 @@ main :: () {
                 // Draw player
                 {
                     for player_animations {
-                        if !it.visible continue;
+                        if !it.active continue;
 
                         // This logic assumes that the animation is a contiguous horizontal strip of tiles.
-                        frame := ifx it.frame_duration_ms == 0 then 0 else (it.timer_ms / it.frame_duration_ms) % it.frame_count;
-                        tile  := Vector2.{ frame + it.frame_one_coords.x, it.frame_one_coords.y };
-
+                        frame := ifx it.frame_duration_ms == 0 then 0 else ((it.timer_ms / it.frame_duration_ms) % it.frame_count) + it.first_frame;
                         source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
-                        source_rect  := Rectangle.{tile.x * PLAYER_MAP_TILE_WIDTH, tile.y * PLAYER_MAP_TILE_HEIGHT, source_width, PLAYER_MAP_TILE_HEIGHT};
-                        
+                        source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
+
+                        if it_index == 1 print_vars(frame, source_width, source_rect);
+
                         DrawTexturePro(it.map, source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, it.color);
                     }
 
@@ -769,6 +764,7 @@ init_textures :: () {
     player_eye_iris_map       = LoadTexture("data/Player_Eye_Iris_Release.png");
     player_chest_grounded_map = LoadTexture("data/Player_Chest_Grounded_Release.png");
     player_chest_airborne_map = LoadTexture("data/Player_Chest_Airborne_Release.png");
+    player_undershirt_map     = LoadTexture("data/Player_Undershirt_Debug.png");
     dirt_map                  = LoadTexture("data/Tiles_0.png");
 }
 
