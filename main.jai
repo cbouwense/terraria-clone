@@ -35,6 +35,7 @@ player_chest_airborne_map : Texture;
 player_undershirt_map     : Texture;
 player_pants_map          : Texture;
 player_hands_map          : Texture;
+player_shoes_map          : Texture;
 dirt_map                  : Texture;
 
 // Animated sprites
@@ -66,6 +67,7 @@ PLAYER_COLOR_EYE        :: LIME;
 PLAYER_COLOR_CHEST      :: GRAY;
 PLAYER_COLOR_UNDERSHIRT :: PINK;
 PLAYER_COLOR_PANTS      :: BLUE;
+PLAYER_COLOR_SHOES      :: RED;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -418,6 +420,33 @@ main :: () {
         loops             = false,
     };
 
+    player_animation_shoes_idle := AnimatedSprite.{
+        map               = player_shoes_map,
+        first_frame       = 0,
+        frame_count       = 1,
+        frame_duration_ms = 0,
+        color             = PLAYER_COLOR_SHOES,
+        loops             = true,
+    };
+
+    player_animation_shoes_running := AnimatedSprite.{
+        map               = player_shoes_map,
+        first_frame       = 6,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_SHOES,
+        loops             = true,
+    };
+
+    player_animation_shoes_airborne := AnimatedSprite.{
+        map               = player_shoes_map,
+        first_frame       = 5,
+        frame_count       = 1,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_SHOES,
+        loops             = true,
+    };
+
     array_add(*player_animations, *player_animation_head_idle);
     array_add(*player_animations, *player_animation_head_running);
     array_add(*player_animations, *player_animation_hair_1_idle);
@@ -442,6 +471,9 @@ main :: () {
     array_add(*player_animations, *player_animation_hands_airborne);
     array_add(*player_animations, *player_animation_hands_falling);
     array_add(*player_animations, *player_animation_hands_swinging);
+    array_add(*player_animations, *player_animation_shoes_idle);
+    array_add(*player_animations, *player_animation_shoes_running);
+    array_add(*player_animations, *player_animation_shoes_airborne);
 
     // @TODO: extract
     // Generate perlin noise for heightmap
@@ -766,8 +798,9 @@ main :: () {
                         player_animation_hair_1_idle.active         = airborne_or_idle;
                         player_animation_eye_white_idle.active      = airborne_or_idle;
                         player_animation_eye_iris_idle.active       = airborne_or_idle;
-                        player_animation_chest_grounded_idle.active = idle_on_ground || (!player_is_grounded && !falling_quickly);
                         player_animation_pants_idle.active          = idle_on_ground;
+                        player_animation_shoes_idle.active          = idle_on_ground;
+                        player_animation_chest_grounded_idle.active = idle_on_ground || (!player_is_grounded && !falling_quickly);
                         player_animation_undershirt_idle.active     = idle_on_ground && !swinging;
                         player_animation_hands_idle.active          = idle_on_ground && !swinging;
                     }
@@ -780,6 +813,7 @@ main :: () {
                         player_animation_eye_iris_running.active       = trying_to_run;
                         player_animation_chest_grounded_running.active = trying_to_run;
                         player_animation_pants_running.active          = trying_to_run;
+                        player_animation_shoes_running.active          = trying_to_run;
                         player_animation_undershirt_running.active     = trying_to_run && !swinging;
                         player_animation_hands_running.active          = trying_to_run && !swinging;
                     }
@@ -787,6 +821,7 @@ main :: () {
                     // Airborne
                     {
                         player_animation_pants_airborne.active      = !player_is_grounded;
+                        player_animation_shoes_airborne.active      = !player_is_grounded;
                         player_animation_undershirt_airborne.active = !player_is_grounded && !falling_quickly && !swinging;
                         player_animation_hands_airborne.active      = !player_is_grounded && !falling_quickly && !swinging;
                     }
@@ -902,8 +937,6 @@ main :: () {
                         source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
                         source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
 
-                        if it_index == 1 print_vars(frame, source_width, source_rect);
-
                         DrawTexturePro(it.map, source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, it.color);
                     }
 
@@ -933,15 +966,16 @@ main :: () {
 
 // @TODO: it would be cool to have a debug mode for this and hot swap the debug sprite sheets.
 init_textures :: () {
-    player_head_map           = LoadTexture("data/Player_Head_Debug.png");
-    player_hair_1_map         = LoadTexture("data/Player_Hair_1_Debug.png");
+    player_head_map           = LoadTexture("data/Player_Head_Release.png");
+    player_hair_1_map         = LoadTexture("data/Player_Hair_1_Release.png");
     player_eye_white_map      = LoadTexture("data/Player_Eye_White_Release.png");
     player_eye_iris_map       = LoadTexture("data/Player_Eye_Iris_Release.png");
     player_chest_grounded_map = LoadTexture("data/Player_Chest_Grounded_Release.png");
     player_chest_airborne_map = LoadTexture("data/Player_Chest_Airborne_Release.png");
-    player_undershirt_map     = LoadTexture("data/Player_Undershirt_Debug.png");
+    player_undershirt_map     = LoadTexture("data/Player_Undershirt_Release.png");
     player_pants_map          = LoadTexture("data/Player_Pants_Release.png");
     player_hands_map          = LoadTexture("data/Player_Hands_Release.png");
+    player_shoes_map          = LoadTexture("data/Player_Shoes_Release.png");
     dirt_map                  = LoadTexture("data/Tiles_0.png");
 }
 
