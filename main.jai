@@ -54,10 +54,11 @@ PLAYER_REACH_DISTANCE :: 300.0;
 
 PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
 PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
-PLAYER_ATTACK_COOLDOWN_MS   :: 150;
-PLAYER_INTERACT_COOLDOWN_MS :: 150;
+PLAYER_COOLDOWN_ATTACK_DURATION_MS   :: 150;
+PLAYER_COOLDOWN_INTERACT_DURATION_MS :: 150;
 
-PLAYER_RUNNING_FRAME_DURATION_MS :: 25;
+PLAYER_ANIMATION_RUN_DURATION_MS   :: 25;
+PLAYER_ANIMATION_SWING_DURATION_MS :: 75;
 
 PLAYER_COLOR_SKIN       :: BEIGE;
 PLAYER_COLOR_HAIR       :: ORANGE;
@@ -102,6 +103,7 @@ AnimatedSprite :: struct {
     frame_duration_ms : u32;
     timer_ms          : u32;
     color             : Color;
+    loops             : bool;
 }
 
 Player :: struct {
@@ -114,8 +116,8 @@ Player :: struct {
 
     is_facing_left   : bool;
 
-    attack_cooldown_current_ms   : s32;
-    interact_cooldown_current_ms : s32;
+    cooldown_attack_current_ms   : s32;
+    cooldown_interact_current_ms : s32;
 }
 
 Block :: struct {
@@ -190,28 +192,31 @@ main :: () {
 
         is_facing_left = false,
 
-        attack_cooldown_current_ms   = 0,
-        interact_cooldown_current_ms = 0,
+        cooldown_attack_current_ms   = 0,
+        cooldown_interact_current_ms = 0,
     };
     global_id_counter += 1;
 
     // @TODO: so, the idle "animation" is really just showing one tile in a tile map. Really, what would make more sense is if there was some mechanism for simply
     // showing sprites instead of paused AnimatedSprites. But this works and slots in nicely with the current mechanism I have for animations. So my plan is to come
     // back to this once I have it fully working and then compress the code into something that makes a bit more sense.
+    // @TODO: DRY up the numbers here by animation variant. For example, there is a common first_frame for idle, running, and airborne. Same for frame_count.
     player_animation_head_idle := AnimatedSprite.{
         map               = player_head_map,
         first_frame       = 0,
         frame_count       = 1,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_SKIN,
+        loops             = true,
     };
 
     player_animation_head_running := AnimatedSprite.{
         map               = player_head_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_SKIN,
+        loops             = true,
     };
 
     player_animation_hair_1_idle := AnimatedSprite.{
@@ -220,14 +225,16 @@ main :: () {
         frame_count       = 20,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_HAIR,
+        loops             = true,
     };
 
     player_animation_hair_1_running := AnimatedSprite.{
         map               = player_hair_1_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_HAIR,
+        loops             = true,
     };
 
     player_animation_eye_white_idle := AnimatedSprite.{
@@ -236,14 +243,16 @@ main :: () {
         frame_count       = 20,
         frame_duration_ms = 0,
         color             = WHITE,
+        loops             = true,
     };
 
     player_animation_eye_white_running := AnimatedSprite.{
         map               = player_eye_white_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = WHITE,
+        loops             = true,
     };
     
     player_animation_eye_iris_idle := AnimatedSprite.{
@@ -252,14 +261,16 @@ main :: () {
         frame_count       = 20,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_EYE,
+        loops             = true,
     };
 
     player_animation_eye_iris_running := AnimatedSprite.{
         map               = player_eye_iris_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_EYE,
+        loops             = true,
     };
 
     player_animation_chest_grounded_idle := AnimatedSprite.{
@@ -268,23 +279,26 @@ main :: () {
         frame_count       = 20,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_CHEST,
+        loops             = true,
     };
 
     player_animation_chest_grounded_running := AnimatedSprite.{
         map               = player_chest_grounded_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_CHEST,
+        loops             = true,
     };
 
-    // There's not really a need for a running version of this.
+    // There's not really a need for a running version of this since it's a different sprite sheet.
     player_animation_chest_falling := AnimatedSprite.{
         map               = player_chest_airborne_map,
         first_frame       = 0,
         frame_count       = 20,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_CHEST,
+        loops             = true,
     };
 
     player_animation_undershirt_idle := AnimatedSprite.{
@@ -293,30 +307,43 @@ main :: () {
         frame_count       = 1,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = true,
     };
 
     player_animation_undershirt_running := AnimatedSprite.{
         map               = player_undershirt_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = true,
     };
 
     player_animation_undershirt_airborne := AnimatedSprite.{
         map               = player_undershirt_map,
         first_frame       = 6,
         frame_count       = 1,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = true,
     };
 
     player_animation_undershirt_falling := AnimatedSprite.{
         map               = player_undershirt_map,
         first_frame       = 5,
         frame_count       = 1,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = true,
+    };
+
+    player_animation_undershirt_swinging := AnimatedSprite.{
+        map               = player_undershirt_map,
+        first_frame       = 1,
+        frame_count       = 4,
+        frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
+        color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = false,
     };
 
     player_animation_pants_idle := AnimatedSprite.{
@@ -325,22 +352,25 @@ main :: () {
         frame_count       = 1,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_PANTS,
+        loops             = true,
     };
 
     player_animation_pants_running := AnimatedSprite.{
         map               = player_pants_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_PANTS,
+        loops             = true,
     };
 
     player_animation_pants_airborne := AnimatedSprite.{
         map               = player_pants_map,
         first_frame       = 5,
         frame_count       = 1,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_PANTS,
+        loops             = true,
     };
 
     player_animation_hands_idle := AnimatedSprite.{
@@ -349,30 +379,43 @@ main :: () {
         frame_count       = 1,
         frame_duration_ms = 0,
         color             = PLAYER_COLOR_SKIN,
+        loops             = true,
     };
 
     player_animation_hands_running := AnimatedSprite.{
         map               = player_hands_map,
         first_frame       = 6,
         frame_count       = 14,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_SKIN,
+        loops             = true,
     };
 
     player_animation_hands_airborne := AnimatedSprite.{
         map               = player_hands_map,
         first_frame       = 6,
         frame_count       = 1,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_SKIN,
+        loops             = true,
     };
 
     player_animation_hands_falling := AnimatedSprite.{
         map               = player_hands_map,
         first_frame       = 5,
         frame_count       = 1,
-        frame_duration_ms = PLAYER_RUNNING_FRAME_DURATION_MS,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
         color             = PLAYER_COLOR_SKIN,
+        loops             = true,
+    };
+
+    player_animation_hands_swinging := AnimatedSprite.{
+        map               = player_hands_map,
+        first_frame       = 1,
+        frame_count       = 4,
+        frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
+        color             = PLAYER_COLOR_SKIN,
+        loops             = false,
     };
 
     array_add(*player_animations, *player_animation_head_idle);
@@ -390,6 +433,7 @@ main :: () {
     array_add(*player_animations, *player_animation_undershirt_running);
     array_add(*player_animations, *player_animation_undershirt_airborne);
     array_add(*player_animations, *player_animation_undershirt_falling);
+    array_add(*player_animations, *player_animation_undershirt_swinging);
     array_add(*player_animations, *player_animation_pants_idle);
     array_add(*player_animations, *player_animation_pants_running);
     array_add(*player_animations, *player_animation_pants_airborne);
@@ -397,6 +441,7 @@ main :: () {
     array_add(*player_animations, *player_animation_hands_running);
     array_add(*player_animations, *player_animation_hands_airborne);
     array_add(*player_animations, *player_animation_hands_falling);
+    array_add(*player_animations, *player_animation_hands_swinging);
 
     // @TODO: extract
     // Generate perlin noise for heightmap
@@ -507,7 +552,6 @@ main :: () {
     camera.zoom = 0.5;
 
     // Initialize controls
-    // @TODO: would a different data structure work better here for perf?
     controls : Controls;
     controls.move_player_left[0]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_LEFT)  };
     controls.move_player_left[1]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_A)     };
@@ -525,7 +569,7 @@ main :: () {
         dt   := GetFrameTime();
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
-        player_is_grounded : bool; // updated in player update
+        player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
 
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
@@ -536,7 +580,7 @@ main :: () {
         active_blocks: [..]Block;
         active_blocks.allocator = temp;
 
-        // @TODO: This is probably still too slow, but it's a step in the right direction.
+        // @TODO: Having a notion of active chunks and active blocks is probably still too slow, but it's a step in the right direction.
         for chunks {
             // The last block in a chunk will always be the right-most with the current method for world generation.
             if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH continue;
@@ -616,7 +660,7 @@ main :: () {
                 }
 
                 if try_to_attack {
-                    is_on_cooldown := player.attack_cooldown_current_ms > 0;
+                    is_on_cooldown := player.cooldown_attack_current_ms > 0;
 
                     if !is_on_cooldown {
                         if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
@@ -628,13 +672,13 @@ main :: () {
                             }
                         }
 
-                        player.attack_cooldown_current_ms = PLAYER_ATTACK_COOLDOWN_MS;
+                        player.cooldown_attack_current_ms = PLAYER_COOLDOWN_ATTACK_DURATION_MS;
                     }
                 }
 
                 // For now this just places down dirt blocks
                 if try_to_interact {
-                    is_on_cooldown := player.interact_cooldown_current_ms > 0;
+                    is_on_cooldown := player.cooldown_interact_current_ms > 0;
 
                     if !is_on_cooldown {
                         is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
@@ -681,7 +725,7 @@ main :: () {
                             }
                             assert(found_chunk);
 
-                            player.interact_cooldown_current_ms = PLAYER_INTERACT_COOLDOWN_MS;
+                            player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
                         }
                     }
                 }
@@ -689,47 +733,79 @@ main :: () {
                 // @TODO: this feels not great. I have to remember to add these here.
                 // Update animations
                 {
+                    swinging : bool;
+
                     trying_to_move_horizontally := move_player_left != move_player_right;
                     trying_to_run               := trying_to_move_horizontally && player_is_grounded;
                     airborne_or_idle            := !trying_to_move_horizontally || !player_is_grounded;
                     idle_on_ground              := !trying_to_move_horizontally && player_is_grounded;
                     falling_quickly             := player.vel.y > 325.0;
 
+                    // Arms swinging
+                    {
+                        was_previously_active := player_animation_hands_swinging.active;
+                        // @NOTE: this check relies on the assumption that the interaction cooldown will always be reset when
+                        // a player does something. This seems like a fairly reasonable assumption, but it's possible that this
+                        // will not always be the case. A more explicit record of what the player actually did this frame and the
+                        // previous frame is what is probably needed to bulletproof this.
+                        player_began_action   := player.cooldown_interact_current_ms == PLAYER_COOLDOWN_INTERACT_DURATION_MS ||
+                                                 player.cooldown_attack_current_ms   == PLAYER_COOLDOWN_ATTACK_DURATION_MS;
+                        still_playing_out     := player_animation_hands_swinging.timer_ms <= animation_get_total_duration_ms(player_animation_hands_swinging);
+                        should_start_now := !was_previously_active && player_began_action;
+                        should_continue  := was_previously_active && still_playing_out;
+                        
+                        swinging = should_start_now || should_continue;
+
+                        player_animation_hands_swinging.active      = swinging;
+                        player_animation_undershirt_swinging.active = swinging;
+                    }
+
                     // Idle (or airborne)
-                    player_animation_head_idle.active           = airborne_or_idle;
-                    player_animation_hair_1_idle.active         = airborne_or_idle;
-                    player_animation_eye_white_idle.active      = airborne_or_idle;
-                    player_animation_eye_iris_idle.active       = airborne_or_idle;
-                    player_animation_chest_grounded_idle.active = idle_on_ground || (!player_is_grounded && !falling_quickly);
-                    player_animation_undershirt_idle.active     = idle_on_ground;
-                    player_animation_pants_idle.active          = idle_on_ground;
-                    player_animation_hands_idle.active          = idle_on_ground;
+                    {
+                        player_animation_head_idle.active           = airborne_or_idle;
+                        player_animation_hair_1_idle.active         = airborne_or_idle;
+                        player_animation_eye_white_idle.active      = airborne_or_idle;
+                        player_animation_eye_iris_idle.active       = airborne_or_idle;
+                        player_animation_chest_grounded_idle.active = idle_on_ground || (!player_is_grounded && !falling_quickly);
+                        player_animation_pants_idle.active          = idle_on_ground;
+                        player_animation_undershirt_idle.active     = idle_on_ground && !swinging;
+                        player_animation_hands_idle.active          = idle_on_ground && !swinging;
+                    }
 
                     // Running
-                    player_animation_head_running.active           = trying_to_run;
-                    player_animation_hair_1_running.active         = trying_to_run;
-                    player_animation_eye_white_running.active      = trying_to_run;
-                    player_animation_eye_iris_running.active       = trying_to_run;
-                    player_animation_chest_grounded_running.active = trying_to_run;
-                    player_animation_undershirt_running.active     = trying_to_run;
-                    player_animation_pants_running.active          = trying_to_run;
-                    player_animation_hands_running.active          = trying_to_run;
+                    {
+                        player_animation_head_running.active           = trying_to_run;
+                        player_animation_hair_1_running.active         = trying_to_run;
+                        player_animation_eye_white_running.active      = trying_to_run;
+                        player_animation_eye_iris_running.active       = trying_to_run;
+                        player_animation_chest_grounded_running.active = trying_to_run;
+                        player_animation_pants_running.active          = trying_to_run;
+                        player_animation_undershirt_running.active     = trying_to_run && !swinging;
+                        player_animation_hands_running.active          = trying_to_run && !swinging;
+                    }
 
                     // Airborne
-                    player_animation_pants_airborne.active      = !player_is_grounded;
-                    player_animation_undershirt_airborne.active = !player_is_grounded && !falling_quickly;
-                    player_animation_hands_airborne.active      = !player_is_grounded && !falling_quickly;
-
-                    // print_vars(player.vel);
+                    {
+                        player_animation_pants_airborne.active      = !player_is_grounded;
+                        player_animation_undershirt_airborne.active = !player_is_grounded && !falling_quickly && !swinging;
+                        player_animation_hands_airborne.active      = !player_is_grounded && !falling_quickly && !swinging;
+                    }
 
                     // Falling
-                    player_animation_chest_falling.active      = falling_quickly;
-                    player_animation_hands_falling.active      = falling_quickly;
-                    player_animation_undershirt_falling.active = falling_quickly;
+                    {
+                        player_animation_chest_falling.active      = falling_quickly;
+                        player_animation_undershirt_falling.active = falling_quickly && !swinging;
+                        player_animation_hands_falling.active      = falling_quickly && !swinging;
+                    }
 
                     for player_animations {
                         if it.active {
                             it.timer_ms += xx (dt * 1000);
+
+                            if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
+                                it.timer_ms = 0;
+                                it.active   = false;
+                            }   
                         } else {
                             it.timer_ms = 0;
                         };
@@ -737,14 +813,14 @@ main :: () {
                 }
 
                 // Update player cooldowns
-                // @TODO: feels like there's some metaprogramming possibility here.
+                // @TODO: feels like there's some metaprogramming possibility here, or at least a loop.
                 {
-                    if player.attack_cooldown_current_ms > 0 {
-                        player.attack_cooldown_current_ms -= xx (dt * 1000);
+                    if player.cooldown_attack_current_ms > 0 {
+                        player.cooldown_attack_current_ms -= xx (dt * 1000);
                     }
 
-                    if player.interact_cooldown_current_ms > 0 {
-                        player.interact_cooldown_current_ms -= xx (dt * 1000);
+                    if player.cooldown_interact_current_ms > 0 {
+                        player.cooldown_interact_current_ms -= xx (dt * 1000);
                     }
                 }
             }
@@ -822,8 +898,7 @@ main :: () {
                     for player_animations {
                         if !it.active continue;
 
-                        // This logic assumes that the animation is a contiguous horizontal strip of tiles.
-                        frame := ifx it.frame_duration_ms == 0 then 0 else ((it.timer_ms / it.frame_duration_ms) % it.frame_count) + it.first_frame;
+                        frame        := animation_get_current_frame(it);
                         source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
                         source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
 
@@ -1037,4 +1112,14 @@ array_unordered_remove_entity_by_id :: inline (array: *[] $Entity, item: Entity,
 
     return removed;
 }
- 
+
+animation_get_current_frame :: (animation: AnimatedSprite) -> u32 {
+    if animation.frame_duration_ms == 0 return 0;
+    return ((animation.timer_ms / animation.frame_duration_ms) % animation.frame_count) + animation.first_frame;
+}
+
+// Returns the duration of one full playing of the animation. So, if there are 10 frames, each 50 ms long, the
+// duration would be 500ms
+animation_get_total_duration_ms :: (animation: AnimatedSprite) -> u32 {
+    return animation.frame_count * animation.frame_duration_ms;
+}

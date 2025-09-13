@@ -1,8 +1,8 @@
 # In progress
+- animation: placing blocks
 
 # Gameplay features
-- animation: placing blocks
-- animation: attacking blocks
+
 - lighting: world from day / night cycle
 - lighting: block fog of war
 - menus: make player color customizable
