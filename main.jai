@@ -674,10 +674,11 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                try_to_move_x(*player, player.vel.x * dt, active_blocks);
-                try_to_move_y(*player, player.vel.y * dt, active_blocks);
+                collided_horizontally := try_to_move_x(*player, player.vel.x * dt, active_blocks);
+                collided_vertically   := try_to_move_y(*player, player.vel.y * dt, active_blocks);
 
-                player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+                if collided_horizontally player.vel.x = 0;
+                if collided_vertically { player.vel.y = 0; } else { player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5; }
 
                 // Update position-dependent fields on player entity
                 player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
@@ -1010,59 +1011,52 @@ round_to_int :: (f: float) -> int {
 }
 
 // @TODO: maybe dry up these move functions
-try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
+// Returns whether or not the character collided while being moved.
+try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) -> bool {
     move := round_to_int(distance);
-    if (move == 0) return;
+    if move == 0 return false;
 
     sign := ifx move > 0 then 1 else -1;
 
     entity_rect_if_move := entity.bounding_rect;
-    collided := false;
 
     while move != 0 {
         entity_rect_if_move.x += sign;
         
         // @TODO: extract?
         for collidables {
-            if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) {
-                collided = true;
-                break;
-            }
+            if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) return true;
         }
-
-        if collided break;
 
         entity.pos.x += sign;
         move -= sign;
     }
+
+    return false;
 }
 
 // @TODO: maybe dry up these move functions
-try_to_move_y :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) {
+try_to_move_y :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) -> bool {
     move := round_to_int(distance);
-    if (move == 0) return;
+    if move == 0 return false;
 
     sign := ifx move > 0 then 1 else -1;
 
     entity_rect_if_move := entity.bounding_rect;
-    collided := false;
 
     while move != 0 {
         entity_rect_if_move.y += sign;
         
         // @TODO: extract
         for collidables {
-            if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) {
-                collided = true;
-                break;
-            }
+            if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) return true;
         }
-
-        if collided break;
 
         entity.pos.y += sign;
         move -= sign;
     }
+
+    return false;
 }
 
 can_jump :: (player: Player) -> bool {

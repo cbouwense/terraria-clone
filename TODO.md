@@ -1,5 +1,5 @@
 # In progress
-- animation: placing blocks
+
 
 # Gameplay features
 
@@ -24,7 +24,6 @@
 - trees
 - background image
 - background parallax
-- bonking your head should probably kill your upward momentum
 
 # Tech
 - hot reloading
