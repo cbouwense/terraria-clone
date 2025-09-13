@@ -1,13 +1,13 @@
 # In progress
-- animation: use real player sprites
 
 # Gameplay features
-- animation: jumping
-- animation: hitting the ground
 - animation: placing blocks
 - animation: attacking blocks
 - lighting: world from day / night cycle
 - lighting: block fog of war
+- menus: make player color customizable
+- menus: main menu
+- menus: settings menu
 - sound effects: placing blocks
 - sound effects: attacking blocks
 - world gen: rock underground
@@ -15,16 +15,16 @@
 - world gen: cave gen
 - world gen: ore gen
 - block hardness
-- make player color customizable
 - game saves
-- main menu
-- settings
 - Celeste movement juice
 - ramps
 - parametrize world seeds
 - multiplayer
 - font
 - trees
+- background image
+- background parallax
+- bonking your head should probably kill your upward momentum
 
 # Tech
 - hot reloading
