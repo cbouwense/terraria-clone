@@ -609,7 +609,7 @@ main :: () {
         active_chunks: [..]Chunk;
         active_chunks.allocator = temp;
 
-        active_blocks: [..]Block;
+        active_blocks: [..]*Block;
         active_blocks.allocator = temp;
 
         // @TODO: Having a notion of active chunks and active blocks is probably still too slow, but it's a step in the right direction.
@@ -623,7 +623,7 @@ main :: () {
             array_add(*active_chunks, it);
             
             for block: it.blocks {
-                array_add(*active_blocks, block);
+                array_add(*active_blocks, *block);
             }
         }
 
@@ -674,8 +674,8 @@ main :: () {
 
                 player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                collided_horizontally := try_to_move_x(*player, player.vel.x * dt, active_blocks);
-                collided_vertically   := try_to_move_y(*player, player.vel.y * dt, active_blocks);
+                collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true) != null;
+                collided_vertically   := try_to_move(*player, player.vel.y * dt, active_blocks, false) != null;
 
                 if collided_horizontally player.vel.x = 0;
                 if collided_vertically { player.vel.y = 0; } else { player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5; }
@@ -697,11 +697,9 @@ main :: () {
 
                     if !is_on_cooldown {
                         if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
-                            // @TODO: there's a function to extract here
-                            for active_blocks {
-                                if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                    removed := array_unordered_remove_entity_by_id(*chunks[it.chunk_id].blocks, it, true);
-                                }
+                            block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
+                            if block_mouse_is_over != null {
+                                removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                             }
                         }
 
@@ -1010,53 +1008,65 @@ round_to_int :: (f: float) -> int {
     return i;
 }
 
-// @TODO: maybe dry up these move functions
-// Returns whether or not the character collided while being moved.
-try_to_move_x :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) -> bool {
-    move := round_to_int(distance);
-    if move == 0 return false;
-
-    sign := ifx move > 0 then 1 else -1;
-
-    entity_rect_if_move := entity.bounding_rect;
-
-    while move != 0 {
-        entity_rect_if_move.x += sign;
-        
-        // @TODO: extract?
-        for collidables {
-            if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) return true;
+is_colliding :: (subject: Entity, collidables: [] $T/interface Entity) -> bool {
+    for collidables {
+        if CheckCollisionRecs(it.bounding_rect, subject.bounding_rect) {
+            return true;
         }
-
-        entity.pos.x += sign;
-        move -= sign;
     }
 
     return false;
 }
 
-// @TODO: maybe dry up these move functions
-try_to_move_y :: (entity: *Entity, distance: float, collidables: [] $T/interface Entity) -> bool {
+get_colliding_by_rect :: (subject_rect: Rectangle, collidables: [] $T/interface *Entity) -> *Entity {
+    for collidables {
+        if CheckCollisionRecs(it.bounding_rect, subject_rect) {
+            return it;
+        }
+    }
+
+    return null;
+}
+
+get_colliding_entity_by_vec2 :: (subject_vec2: Vector2, collidables: [] $T/interface *Entity) -> result: *Entity {
+    for collidables {
+        if CheckCollisionPointRec(subject_vec2, it.bounding_rect) {
+            return it;
+        }
+    }
+
+    return null;
+}
+
+// Returns a pointer to the entity the subject collided with, if anything.
+try_to_move :: (entity: *Entity, distance: float, collidables: [] $T/interface *Entity, horizontal: bool) -> *Entity {
     move := round_to_int(distance);
-    if move == 0 return false;
+    if move == 0 return null;
 
     sign := ifx move > 0 then 1 else -1;
 
     entity_rect_if_move := entity.bounding_rect;
 
     while move != 0 {
-        entity_rect_if_move.y += sign;
-        
-        // @TODO: extract
-        for collidables {
-            if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) return true;
+        if horizontal {
+            entity_rect_if_move.x += sign;
+        } else {
+            entity_rect_if_move.y += sign;
         }
 
-        entity.pos.y += sign;
+        entity_subject_would_have_collided_with := get_colliding_by_rect(entity_rect_if_move, collidables);
+        if entity_subject_would_have_collided_with != null return entity_subject_would_have_collided_with;
+
+        if horizontal {
+            entity.pos.x += sign;
+        } else {
+            entity.pos.y += sign;
+        }
+        
         move -= sign;
     }
 
-    return false;
+    return null;
 }
 
 can_jump :: (player: Player) -> bool {
@@ -1066,12 +1076,7 @@ can_jump :: (player: Player) -> bool {
 is_grounded :: (entity: Entity, collidables: [] $T/interface Entity) -> bool {
     entity_rect_if_move := entity.bounding_rect;
     entity_rect_if_move.y += 1;
-
-    for collidables {
-        if CheckCollisionRecs(it.bounding_rect, entity_rect_if_move) return true;
-    }
-
-    return false;
+    return get_colliding_by_rect(entity_rect_if_move, collidables) != null;
 }
 
 update_camera_center :: (camera: *Camera2D, player: *Player, width: s32, height: s32) {

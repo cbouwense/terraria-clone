@@ -1,5 +1,5 @@
 # In progress
-
+- block hardness
 
 # Gameplay features
 
@@ -14,7 +14,6 @@
 - world gen: grass on top
 - world gen: cave gen
 - world gen: ore gen
-- block hardness
 - game saves
 - Celeste movement juice
 - ramps
@@ -28,7 +27,6 @@
 # Tech
 - hot reloading
 - single mesh for chunks / entire mass of blocks
-- update jai version
 
 # Bugs
 - player looks one pixel off the ground
