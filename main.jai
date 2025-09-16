@@ -112,7 +112,7 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-DAMAGE_MAP_COLS :: 9;
+DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
 DAMAGE_MAP_TILE_WIDTH  :: 16;
 DAMAGE_MAP_TILE_HEIGHT :: 16;
@@ -691,8 +691,7 @@ main :: () {
 
                         DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 
-                        x := it.health_max - it.health_curr;
-                        frame := 8 - floor(it.health_curr / 2.0); // @TODO: why the fuck does this not work
+                        frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
 
                         // Damage overlay (cracks)
                         if it.health_curr < it.health_max {
@@ -704,6 +703,7 @@ main :: () {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                                print_vars(it.health_curr, frame);
                             }
                         }
                     }
