@@ -1,5 +1,5 @@
 # In progress
-- block hardness
+- cull blocks by viewport
 
 # Gameplay features
 
@@ -11,10 +11,11 @@
 - menus: death menu
 - sound effects: placing blocks
 - sound effects: attacking blocks
-- world gen: rock underground
 - world gen: grass on top
+- world gen: rock underground
 - world gen: cave gen
 - world gen: ore gen
+- world gen: randomize tiles for specific type
 - game saves
 - Celeste movement juice
 - ramps
@@ -28,6 +29,7 @@
 # Tech
 - hot reloading
 - single mesh for chunks / entire mass of blocks
+- simulate chunks by player position
 
 # Bugs
 - player looks one pixel off the ground

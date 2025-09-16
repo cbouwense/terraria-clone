@@ -82,8 +82,9 @@ PLAYER_WORLD_BOUNDING_HEIGHT :: PLAYER_WORLD_HEAD_SPRITE_HEIGHT - 20;
 
 PLAYER_REACH_DISTANCE :: 300.0;
 
-PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
-PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
+PLAYER_SPEED_MOVE :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
+PLAYER_SPEED_JUMP :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
+PLAYER_SPEED_MAX  :: 3000.0;
 PLAYER_COOLDOWN_ATTACK_DURATION_MS   :: 100;
 PLAYER_COOLDOWN_INTERACT_DURATION_MS :: 100;
 
@@ -117,9 +118,9 @@ DAMAGE_MAP_ROWS :: 1;
 DAMAGE_MAP_TILE_WIDTH  :: 16;
 DAMAGE_MAP_TILE_HEIGHT :: 16;
 DAMAGE_WORLD_TILE_WIDTH  :: 18 * SCALE;
-DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE; // @TODO: 18?
+DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-WORLD_GRID_COLS :: 2000;
+WORLD_GRID_COLS :: 1000;
 
 PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
 #assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
@@ -419,6 +420,7 @@ main :: () {
         {
             if IsKeyPressed(.KEY_P) paused = !paused;
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
+            if IsKeyPressed(.KEY_R) player.pos = Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
 
             move_player_left  = control_down(controls.move_player_left);
             move_player_right = control_down(controls.move_player_right);
@@ -439,27 +441,31 @@ main :: () {
                 player.vel.x = 0;
 
                 if move_player_left {
-                    player.vel.x -= PLAYER_MOVE_SPEED;
+                    player.vel.x -= PLAYER_SPEED_MOVE;
                     player.is_facing_left = true;
                 }
 
                 if move_player_right {
-                    player.vel.x += PLAYER_MOVE_SPEED;
+                    player.vel.x += PLAYER_SPEED_MOVE;
                     player.is_facing_left = false;
                 }
 
                 if try_to_jump && can_jump(player) {
-                    player.vel.y = -PLAYER_JUMP_SPEED;
+                    player.vel.y = -PLAYER_SPEED_JUMP;
                     player.jumps_remaining -= 1;
                 }
 
-                player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+                if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
                 collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true) != null;
                 collided_vertically   := try_to_move(*player, player.vel.y * dt, active_blocks, false) != null;
 
                 if collided_horizontally player.vel.x = 0;
-                if collided_vertically { player.vel.y = 0; } else { player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5; }
+                if collided_vertically {
+                    player.vel.y = 0;
+                } else {
+                    if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+                }
 
                 // Update position-dependent fields on player entity
                 player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
@@ -467,6 +473,7 @@ main :: () {
                 player.sprite_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                 player.sprite_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
 
+                print_vars(active_blocks.count);
                 player_is_grounded = is_grounded(player, active_blocks);
                 if player_is_grounded {
                     player.jumps_remaining = player.jumps_capacity;
