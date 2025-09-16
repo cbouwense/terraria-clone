@@ -37,6 +37,35 @@ player_pants_map          : Texture;
 player_hands_map          : Texture;
 player_shoes_map          : Texture;
 dirt_map                  : Texture;
+damage_map                : Texture;
+
+player_sprite_head_idle                 : Sprite;
+player_animation_head_running           : AnimatedSprite;
+player_sprite_hair_1_idle               : Sprite;
+player_animation_hair_1_running         : AnimatedSprite;
+player_sprite_eye_white_idle            : Sprite;
+player_animation_eye_white_running      : AnimatedSprite;
+player_sprite_eye_iris_idle             : Sprite;
+player_animation_eye_iris_running       : AnimatedSprite;
+player_sprite_chest_grounded_idle       : Sprite;
+player_animation_chest_grounded_running : AnimatedSprite;
+player_sprite_chest_falling             : Sprite;
+player_sprite_undershirt_idle           : Sprite;
+player_animation_undershirt_running     : AnimatedSprite;
+player_sprite_undershirt_airborne       : Sprite;
+player_sprite_undershirt_falling        : Sprite;
+player_animation_undershirt_swinging    : AnimatedSprite;
+player_sprite_pants_idle                : Sprite;
+player_animation_pants_running          : AnimatedSprite;
+player_sprite_pants_airborne            : Sprite;
+player_sprite_hands_idle                : Sprite;
+player_animation_hands_running          : AnimatedSprite;
+player_sprite_hands_airborne            : Sprite;
+player_sprite_hands_falling             : Sprite;
+player_animation_hands_swinging         : AnimatedSprite;
+player_sprite_shoes_idle                : Sprite;
+player_animation_shoes_running          : AnimatedSprite;
+player_sprite_shoes_airborne            : Sprite;
 
 player_sprites    : [..] *Sprite;
 player_animations : [..] *AnimatedSprite;
@@ -55,8 +84,8 @@ PLAYER_REACH_DISTANCE :: 300.0;
 
 PLAYER_MOVE_SPEED :: PLAYER_WORLD_BOUNDING_WIDTH * 8;
 PLAYER_JUMP_SPEED :: PLAYER_WORLD_BOUNDING_HEIGHT * 8;
-PLAYER_COOLDOWN_ATTACK_DURATION_MS   :: 150;
-PLAYER_COOLDOWN_INTERACT_DURATION_MS :: 150;
+PLAYER_COOLDOWN_ATTACK_DURATION_MS   :: 100;
+PLAYER_COOLDOWN_INTERACT_DURATION_MS :: 100;
 
 PLAYER_ANIMATION_RUN_DURATION_MS   :: 25;
 PLAYER_ANIMATION_SWING_DURATION_MS :: 75;
@@ -83,6 +112,13 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
+DAMAGE_MAP_COLS :: 9;
+DAMAGE_MAP_ROWS :: 1;
+DAMAGE_MAP_TILE_WIDTH  :: 16;
+DAMAGE_MAP_TILE_HEIGHT :: 16;
+DAMAGE_WORLD_TILE_WIDTH  :: 18 * SCALE;
+DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE; // @TODO: 18?
+
 WORLD_GRID_COLS :: 2000;
 
 PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
@@ -100,6 +136,10 @@ Entity :: struct {
     vel : Vector2;
 
     bounding_rect : Rectangle; // Used for collision
+    sprite_rect   : Rectangle;
+
+    health_max  : s32;
+    health_curr : s32;
 }
 
 Sprite :: struct {
@@ -120,8 +160,6 @@ AnimatedSprite :: struct {
 Player :: struct {
     #as using entity : Entity;
 
-    sprite_rect : Rectangle;
-
     jumps_remaining  : int;
     jumps_capacity   : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
@@ -133,8 +171,6 @@ Player :: struct {
 
 Block :: struct {
     #as using entity : Entity;
-
-    sprite_rect : Rectangle;
 }
 
 CHUNK_MAX_WIDTH :: 16;
@@ -175,6 +211,7 @@ main :: () {
     data_folder = join(base_path, "data");
 
     init_textures();
+    init_sprites();
 
     global_id_counter: u32 = 0;
     
@@ -207,231 +244,6 @@ main :: () {
         cooldown_interact_current_ms = 0,
     };
     global_id_counter += 1;
-
-    player_sprite_head_idle := Sprite.{
-        map         = player_head_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE,
-        color       = PLAYER_COLOR_SKIN,
-    };
-
-    player_animation_head_running := AnimatedSprite.{
-        map               = player_head_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_SKIN,
-        loops             = true,
-    };
-
-    player_sprite_hair_1_idle := Sprite.{
-        map         = player_hair_1_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_HAIR,
-    };
-
-    player_animation_hair_1_running := AnimatedSprite.{
-        map               = player_hair_1_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_HAIR,
-        loops             = true,
-    };
-
-    player_sprite_eye_white_idle := Sprite.{
-        map         = player_eye_white_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = WHITE,
-    };
-
-    player_animation_eye_white_running := AnimatedSprite.{
-        map               = player_eye_white_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = WHITE,
-        loops             = true,
-    };
-    
-    player_sprite_eye_iris_idle := Sprite.{
-        map         = player_eye_iris_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_EYE,
-    };
-
-    player_animation_eye_iris_running := AnimatedSprite.{
-        map               = player_eye_iris_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_EYE,
-        loops             = true,
-    };
-
-    player_sprite_chest_grounded_idle := Sprite.{
-        map         = player_chest_grounded_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_CHEST,
-    };
-
-    player_animation_chest_grounded_running := AnimatedSprite.{
-        map               = player_chest_grounded_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_CHEST,
-        loops             = true,
-    };
-
-    // There's not really a need for a running version of this since it's a different sprite sheet.
-    player_sprite_chest_falling := Sprite.{
-        map         = player_chest_airborne_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_CHEST,
-    };
-
-    player_sprite_undershirt_idle := Sprite.{
-        map         = player_undershirt_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_UNDERSHIRT,
-    };
-
-    player_animation_undershirt_running := AnimatedSprite.{
-        map               = player_undershirt_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_UNDERSHIRT,
-        loops             = true,
-    };
-
-    player_sprite_undershirt_airborne := Sprite.{
-        map         = player_undershirt_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        color       = PLAYER_COLOR_UNDERSHIRT,
-    };
-
-    player_sprite_undershirt_falling := Sprite.{
-        map         = player_undershirt_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
-        color       = PLAYER_COLOR_UNDERSHIRT,
-    };
-
-    player_animation_undershirt_swinging := AnimatedSprite.{
-        map               = player_undershirt_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_SWINGING,
-        frame_count       = 4,
-        frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
-        color             = PLAYER_COLOR_UNDERSHIRT,
-        loops             = false,
-    };
-
-    player_sprite_pants_idle := Sprite.{
-        map         = player_pants_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_PANTS,
-    };
-
-    player_animation_pants_running := AnimatedSprite.{
-        map               = player_pants_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_PANTS,
-        loops             = true,
-    };
-
-    player_sprite_pants_airborne := Sprite.{
-        map         = player_pants_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
-        color       = PLAYER_COLOR_PANTS,
-    };
-
-    player_sprite_hands_idle := Sprite.{
-        map               = player_hands_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color             = PLAYER_COLOR_SKIN,
-    };
-
-    player_animation_hands_running := AnimatedSprite.{
-        map               = player_hands_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_SKIN,
-        loops             = true,
-    };
-
-    player_sprite_hands_airborne := Sprite.{
-        map         = player_hands_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        color       = PLAYER_COLOR_SKIN,
-    };
-
-    player_sprite_hands_falling := Sprite.{
-        map               = player_hands_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
-        color             = PLAYER_COLOR_SKIN,
-    };
-
-    player_animation_hands_swinging := AnimatedSprite.{
-        map               = player_hands_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_SWINGING,
-        frame_count       = 4,
-        frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
-        color             = PLAYER_COLOR_SKIN,
-        loops             = false,
-    };
-
-    player_sprite_shoes_idle := Sprite.{
-        map               = player_shoes_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color             = PLAYER_COLOR_SHOES,
-    };
-
-    player_animation_shoes_running := AnimatedSprite.{
-        map               = player_shoes_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        frame_count       = 14,
-        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
-        color             = PLAYER_COLOR_SHOES,
-        loops             = true,
-    };
-
-    player_sprite_shoes_airborne := Sprite.{
-        map               = player_shoes_map,
-        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
-        color             = PLAYER_COLOR_SHOES,
-    };
-
-    array_add(*player_sprites, *player_sprite_head_idle);
-    array_add(*player_sprites, *player_sprite_hair_1_idle);
-    array_add(*player_sprites, *player_sprite_eye_white_idle);
-    array_add(*player_sprites, *player_sprite_eye_iris_idle);
-    array_add(*player_sprites, *player_sprite_chest_grounded_idle);
-    array_add(*player_sprites, *player_sprite_chest_falling);
-    array_add(*player_sprites, *player_sprite_undershirt_airborne);
-    array_add(*player_sprites, *player_sprite_undershirt_falling);
-    array_add(*player_sprites, *player_sprite_undershirt_idle);
-    array_add(*player_sprites, *player_sprite_pants_idle);
-    array_add(*player_sprites, *player_sprite_pants_airborne);
-    array_add(*player_sprites, *player_sprite_hands_idle);
-    array_add(*player_sprites, *player_sprite_hands_airborne);
-    array_add(*player_sprites, *player_sprite_hands_falling);
-    array_add(*player_sprites, *player_sprite_shoes_idle);
-    array_add(*player_sprites, *player_sprite_shoes_airborne);
-
-    array_add(*player_animations, *player_animation_head_running);
-    array_add(*player_animations, *player_animation_hair_1_running);
-    array_add(*player_animations, *player_animation_eye_white_running);
-    array_add(*player_animations, *player_animation_eye_iris_running);
-    array_add(*player_animations, *player_animation_chest_grounded_running);
-    array_add(*player_animations, *player_animation_undershirt_running);
-    array_add(*player_animations, *player_animation_undershirt_swinging);
-    array_add(*player_animations, *player_animation_pants_running);
-    array_add(*player_animations, *player_animation_hands_running);
-    array_add(*player_animations, *player_animation_hands_swinging);
-    array_add(*player_animations, *player_animation_shoes_running);
 
     // @TODO: extract
     // Generate perlin noise for heightmap
@@ -490,13 +302,18 @@ main :: () {
 
             // @TODO: post increment macro or something?
             defer global_id_counter += 1;
-            array_add(*chunks[chunk_id].blocks, Block.{
-                id            = global_id_counter,
-                chunk_id      = xx chunk_id,
-                pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
-                bounding_rect = rect,
-                sprite_rect   = rect,
-            });
+            array_add(
+                *chunks[chunk_id].blocks,
+                Block.{
+                    id            = global_id_counter,
+                    chunk_id      = xx chunk_id,
+                    pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
+                    bounding_rect = rect,
+                    sprite_rect   = rect,
+                    health_max    = 20,
+                    health_curr   = 20,
+                }
+            );
         }
     }
 
@@ -511,15 +328,21 @@ main :: () {
             };
 
             // @TODO: post incrememnt macro or something?
+            // @TODO: this is identical to the block creation thing right above.
             chunk_id := col / CHUNK_MAX_WIDTH;
             defer global_id_counter += 1;
-            array_add(*chunks[chunk_id].blocks, Block.{
-                id       = global_id_counter,
-                chunk_id = xx chunk_id,
-                pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
-                bounding_rect = rect,
-                sprite_rect   = rect,
-            });
+            array_add(
+                *chunks[chunk_id].blocks,
+                Block.{
+                    id            = global_id_counter,
+                    chunk_id      = xx chunk_id,
+                    pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
+                    bounding_rect = rect,
+                    sprite_rect   = rect,
+                    health_max    = 20,
+                    health_curr   = 20,
+                }
+            );
         }
     }
     
@@ -536,21 +359,21 @@ main :: () {
 
     // Initialize camera
     camera: Camera2D;
-    camera.target = player.pos;
-    camera.offset = Vector2.{ GetScreenWidth()/2.0 + player.bounding_rect.width/2.0, GetScreenHeight()/2.0 };
+    camera.target   = player.pos;
+    camera.offset   = Vector2.{ GetScreenWidth()/2.0 + player.bounding_rect.width/2.0, GetScreenHeight()/2.0 };
     camera.rotation = 0.0;
-    camera.zoom = 0.5;
+    camera.zoom     = 0.5;
 
     // Initialize controls
     controls : Controls;
-    controls.move_player_left[0]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_LEFT)  };
-    controls.move_player_left[1]  = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_A)     };
-    controls.move_player_right[0] = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_RIGHT) };
-    controls.move_player_right[1] = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_D)     };
-    controls.jump[0]              = Control.{ type = KeyboardKey, value = (cast(s32) KeyboardKey.KEY_SPACE) };
-    controls.attack[0]            = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_LEFT) };
-    controls.interact[0]          = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_RIGHT) };
-    controls.drag_cam[0]          = Control.{ type = MouseButton, value = (cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE) };
+    controls.move_player_left[0]  = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT            };
+    controls.move_player_left[1]  = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_A               };
+    controls.move_player_right[0] = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT           };
+    controls.move_player_right[1] = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_D               };
+    controls.jump[0]              = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SPACE           };
+    controls.attack[0]            = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_LEFT   };
+    controls.interact[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_RIGHT  };
+    controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE };
 
     while !WindowShouldClose() {
         defer reset_temporary_storage();
@@ -562,7 +385,7 @@ main :: () {
         player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
 
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
-        window_end   := GetScreenToWorld2D(Vector2.{ cast(float)GetScreenWidth(), cast(float)GetScreenHeight()}, camera);
+        window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
 
         active_chunks: [..]Chunk;
         active_chunks.allocator = temp;
@@ -655,9 +478,16 @@ main :: () {
 
                     if !is_on_cooldown {
                         if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
+                            // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block? 
                             block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
                             if block_mouse_is_over != null {
-                                removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
+
+                                // @TODO: when there is an inventory, this 1 will have to be whatever attack stat the equipped weapon has.
+                                block_mouse_is_over.health_curr -= 1;
+                                if block_mouse_is_over.health_curr <= 0 {
+                                    removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                }
                             }
                         }
 
@@ -859,9 +689,18 @@ main :: () {
                         DIRT_TILE_PADDING :: 2;
                         source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
 
-                        DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, Color.{ 255, 255, 255, 255 });
+                        DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 
-                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE { 
+                        x := it.health_max - it.health_curr;
+                        frame := 8 - floor(it.health_curr / 2.0); // @TODO: why the fuck does this not work
+
+                        // Damage overlay (cracks)
+                        if it.health_curr < it.health_max {
+                            source = Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
+                            DrawTexturePro(damage_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        }
+
+                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
@@ -945,6 +784,234 @@ init_textures :: () {
     player_hands_map          = LoadTexture("data/Player_Hands_Release.png");
     player_shoes_map          = LoadTexture("data/Player_Shoes_Release.png");
     dirt_map                  = LoadTexture("data/Tiles_0.png");
+    damage_map                = LoadTexture("data/Damage.png");
+}
+
+init_sprites :: () {
+    player_sprite_head_idle = Sprite.{
+        map         = player_head_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE,
+        color       = PLAYER_COLOR_SKIN,
+    };
+
+    player_animation_head_running = AnimatedSprite.{
+        map               = player_head_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_SKIN,
+        loops             = true,
+    };
+
+    player_sprite_hair_1_idle = Sprite.{
+        map         = player_hair_1_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = PLAYER_COLOR_HAIR,
+    };
+
+    player_animation_hair_1_running = AnimatedSprite.{
+        map               = player_hair_1_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_HAIR,
+        loops             = true,
+    };
+
+    player_sprite_eye_white_idle = Sprite.{
+        map         = player_eye_white_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = WHITE,
+    };
+
+    player_animation_eye_white_running = AnimatedSprite.{
+        map               = player_eye_white_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = WHITE,
+        loops             = true,
+    };
+    
+    player_sprite_eye_iris_idle = Sprite.{
+        map         = player_eye_iris_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = PLAYER_COLOR_EYE,
+    };
+
+    player_animation_eye_iris_running = AnimatedSprite.{
+        map               = player_eye_iris_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_EYE,
+        loops             = true,
+    };
+
+    player_sprite_chest_grounded_idle = Sprite.{
+        map         = player_chest_grounded_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = PLAYER_COLOR_CHEST,
+    };
+
+    player_animation_chest_grounded_running = AnimatedSprite.{
+        map               = player_chest_grounded_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_CHEST,
+        loops             = true,
+    };
+
+    // There's not really a need for a running version of this since it's a different sprite sheet.
+    player_sprite_chest_falling = Sprite.{
+        map         = player_chest_airborne_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = PLAYER_COLOR_CHEST,
+    };
+
+    player_sprite_undershirt_idle = Sprite.{
+        map         = player_undershirt_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = PLAYER_COLOR_UNDERSHIRT,
+    };
+
+    player_animation_undershirt_running = AnimatedSprite.{
+        map               = player_undershirt_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = true,
+    };
+
+    player_sprite_undershirt_airborne = Sprite.{
+        map         = player_undershirt_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        color       = PLAYER_COLOR_UNDERSHIRT,
+    };
+
+    player_sprite_undershirt_falling = Sprite.{
+        map         = player_undershirt_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
+        color       = PLAYER_COLOR_UNDERSHIRT,
+    };
+
+    player_animation_undershirt_swinging = AnimatedSprite.{
+        map               = player_undershirt_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_SWINGING,
+        frame_count       = 4,
+        frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
+        color             = PLAYER_COLOR_UNDERSHIRT,
+        loops             = false,
+    };
+
+    player_sprite_pants_idle = Sprite.{
+        map         = player_pants_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color       = PLAYER_COLOR_PANTS,
+    };
+
+    player_animation_pants_running = AnimatedSprite.{
+        map               = player_pants_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_PANTS,
+        loops             = true,
+    };
+
+    player_sprite_pants_airborne = Sprite.{
+        map         = player_pants_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
+        color       = PLAYER_COLOR_PANTS,
+    };
+
+    player_sprite_hands_idle = Sprite.{
+        map               = player_hands_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_SKIN,
+    };
+
+    player_animation_hands_running = AnimatedSprite.{
+        map               = player_hands_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_SKIN,
+        loops             = true,
+    };
+
+    player_sprite_hands_airborne = Sprite.{
+        map         = player_hands_map,
+        first_frame = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        color       = PLAYER_COLOR_SKIN,
+    };
+
+    player_sprite_hands_falling = Sprite.{
+        map               = player_hands_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
+        color             = PLAYER_COLOR_SKIN,
+    };
+
+    player_animation_hands_swinging = AnimatedSprite.{
+        map               = player_hands_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_SWINGING,
+        frame_count       = 4,
+        frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
+        color             = PLAYER_COLOR_SKIN,
+        loops             = false,
+    };
+
+    player_sprite_shoes_idle = Sprite.{
+        map               = player_shoes_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_SHOES,
+    };
+
+    player_animation_shoes_running = AnimatedSprite.{
+        map               = player_shoes_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        frame_count       = 14,
+        frame_duration_ms = PLAYER_ANIMATION_RUN_DURATION_MS,
+        color             = PLAYER_COLOR_SHOES,
+        loops             = true,
+    };
+
+    player_sprite_shoes_airborne = Sprite.{
+        map               = player_shoes_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
+        color             = PLAYER_COLOR_SHOES,
+    };
+
+    array_add(*player_sprites, *player_sprite_head_idle);
+    array_add(*player_sprites, *player_sprite_hair_1_idle);
+    array_add(*player_sprites, *player_sprite_eye_white_idle);
+    array_add(*player_sprites, *player_sprite_eye_iris_idle);
+    array_add(*player_sprites, *player_sprite_chest_grounded_idle);
+    array_add(*player_sprites, *player_sprite_chest_falling);
+    array_add(*player_sprites, *player_sprite_undershirt_airborne);
+    array_add(*player_sprites, *player_sprite_undershirt_falling);
+    array_add(*player_sprites, *player_sprite_undershirt_idle);
+    array_add(*player_sprites, *player_sprite_pants_idle);
+    array_add(*player_sprites, *player_sprite_pants_airborne);
+    array_add(*player_sprites, *player_sprite_hands_idle);
+    array_add(*player_sprites, *player_sprite_hands_airborne);
+    array_add(*player_sprites, *player_sprite_hands_falling);
+    array_add(*player_sprites, *player_sprite_shoes_idle);
+    array_add(*player_sprites, *player_sprite_shoes_airborne);
+
+    array_add(*player_animations, *player_animation_head_running);
+    array_add(*player_animations, *player_animation_hair_1_running);
+    array_add(*player_animations, *player_animation_eye_white_running);
+    array_add(*player_animations, *player_animation_eye_iris_running);
+    array_add(*player_animations, *player_animation_chest_grounded_running);
+    array_add(*player_animations, *player_animation_undershirt_running);
+    array_add(*player_animations, *player_animation_undershirt_swinging);
+    array_add(*player_animations, *player_animation_pants_running);
+    array_add(*player_animations, *player_animation_hands_running);
+    array_add(*player_animations, *player_animation_hands_swinging);
+    array_add(*player_animations, *player_animation_shoes_running);
 }
 
 control_down :: (haystack: [] Control) -> bool {
