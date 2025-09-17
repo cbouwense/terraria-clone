@@ -112,6 +112,7 @@ DIRT_MAP_TILE_WIDTH  :: 18;
 DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
+DIRT_HEALTH_MAX :: 10;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -128,6 +129,8 @@ PERLIN_NOISE_AMPLITUDE :: 300;
 PERLIN_NOISE_OCTAVES :: 5;
 
 DEBUG_CAM_SPEED :: 5;
+
+global_id_counter: u32 = 0;
 
 Entity :: struct {
     id       : u32; 
@@ -213,38 +216,8 @@ main :: () {
 
     init_textures();
     init_sprites();
-
-    global_id_counter: u32 = 0;
     
-    pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
-    player := Player.{
-        id = global_id_counter,
-
-        pos = pos,
-        vel = Vector2.{ 0, 0 },
-
-        bounding_rect = Rectangle.{
-            pos.x - floor(PLAYER_WORLD_BOUNDING_WIDTH / 2.0),
-            pos.y - floor(PLAYER_WORLD_BOUNDING_HEIGHT / 2.0) + 5,
-            xx PLAYER_WORLD_BOUNDING_WIDTH,
-            xx PLAYER_WORLD_BOUNDING_HEIGHT,
-        },
-        sprite_rect = Rectangle.{
-            pos.x - floor(PLAYER_WORLD_HEAD_SPRITE_WIDTH / 2.0),
-            pos.y - floor(PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0),
-            xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
-            xx PLAYER_WORLD_HEAD_SPRITE_HEIGHT,
-        },
-
-        jumps_capacity  = 2,
-        jumps_remaining = 2,
-
-        is_facing_left = false,
-
-        cooldown_attack_current_ms   = 0,
-        cooldown_interact_current_ms = 0,
-    };
-    global_id_counter += 1;
+    player := spawn_player();
 
     // @TODO: extract
     // Generate perlin noise for heightmap
@@ -311,8 +284,8 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = 20,
-                    health_curr   = 20,
+                    health_max    = DIRT_HEALTH_MAX,
+                    health_curr   = DIRT_HEALTH_MAX,
                 }
             );
         }
@@ -340,8 +313,8 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = 20,
-                    health_curr   = 20,
+                    health_max    = DIRT_HEALTH_MAX,
+                    health_curr   = DIRT_HEALTH_MAX,
                 }
             );
         }
@@ -457,7 +430,7 @@ main :: () {
 
                 if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true) != null;
+                collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true)  != null;
                 collided_vertically   := try_to_move(*player, player.vel.y * dt, active_blocks, false) != null;
 
                 if collided_horizontally player.vel.x = 0;
@@ -465,6 +438,11 @@ main :: () {
                     player.vel.y = 0;
                 } else {
                     if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+                }
+
+                // Respawn player if they fall through the world
+                if player.pos.y > 500000 {
+                    player = spawn_player();
                 }
 
                 // Update position-dependent fields on player entity
@@ -1198,4 +1176,37 @@ animation_get_current_frame :: (animation: AnimatedSprite) -> u32 {
 // duration would be 500ms
 animation_get_total_duration_ms :: (animation: AnimatedSprite) -> u32 {
     return animation.frame_count * animation.frame_duration_ms;
+}
+
+spawn_player :: () -> Player {
+    pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
+
+    global_id_counter += 1;
+    return Player.{
+        id = global_id_counter,
+
+        pos = pos,
+        vel = Vector2.{ 0, 0 },
+
+        bounding_rect = Rectangle.{
+            pos.x - floor(PLAYER_WORLD_BOUNDING_WIDTH / 2.0),
+            pos.y - floor(PLAYER_WORLD_BOUNDING_HEIGHT / 2.0) + 5,
+            xx PLAYER_WORLD_BOUNDING_WIDTH,
+            xx PLAYER_WORLD_BOUNDING_HEIGHT,
+        },
+        sprite_rect = Rectangle.{
+            pos.x - floor(PLAYER_WORLD_HEAD_SPRITE_WIDTH / 2.0),
+            pos.y - floor(PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0),
+            xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
+            xx PLAYER_WORLD_HEAD_SPRITE_HEIGHT,
+        },
+
+        jumps_capacity  = 2,
+        jumps_remaining = 2,
+
+        is_facing_left = false,
+
+        cooldown_attack_current_ms   = 0,
+        cooldown_interact_current_ms = 0,
+    };
 }

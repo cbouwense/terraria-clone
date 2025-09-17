@@ -33,3 +33,4 @@
 
 # Bugs
 - player looks one pixel off the ground
+- there are two layers of dirt at ground level
