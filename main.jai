@@ -37,6 +37,7 @@ player_pants_map          : Texture;
 player_hands_map          : Texture;
 player_shoes_map          : Texture;
 dirt_map                  : Texture;
+rock_map                  : Texture;
 damage_map                : Texture;
 
 player_sprite_head_idle                 : Sprite;
@@ -110,9 +111,19 @@ DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
 DIRT_MAP_TILE_WIDTH  :: 18;
 DIRT_MAP_TILE_HEIGHT :: 18;
+DIRT_MAP_TILE_PADDING :: 2;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 DIRT_HEALTH_MAX :: 10;
+
+ROCK_MAP_COLS :: 16;
+ROCK_MAP_ROWS :: 15;
+ROCK_MAP_TILE_WIDTH  :: 18;
+ROCK_MAP_TILE_HEIGHT :: 18;
+ROCK_MAP_TILE_PADDING :: 2;
+ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
+ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
+ROCK_HEALTH_MAX :: 100;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -122,11 +133,6 @@ DAMAGE_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
 WORLD_GRID_COLS :: 1000;
-
-PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
-#assert WORLD_GRID_COLS % PERLIN_NOISE_FREQUENCY == 0 "The perlin noise frequency must be a divisor of the number of world columns.";
-PERLIN_NOISE_AMPLITUDE :: 300;
-PERLIN_NOISE_OCTAVES :: 5;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -173,8 +179,14 @@ Player :: struct {
     cooldown_interact_current_ms : s32;
 }
 
+BlockType :: enum {
+    DIRT;
+    ROCK;
+}
+
 Block :: struct {
     #as using entity : Entity;
+    block_type       : BlockType;
 }
 
 CHUNK_MAX_WIDTH :: 16;
@@ -219,38 +231,11 @@ main :: () {
     
     player := spawn_player();
 
-    // @TODO: extract
-    // Generate perlin noise for heightmap
-    perlin_values: [WORLD_GRID_COLS]float;
-    for o: 0..PERLIN_NOISE_OCTAVES {
-        octave_factor := pow(2.0, cast(float) o);
-        amplitude := PERLIN_NOISE_AMPLITUDE / octave_factor;
-        frequency := PERLIN_NOISE_FREQUENCY * octave_factor;
-        ratio := WORLD_GRID_COLS / frequency;
-        blocks_per_section := cast(int) (WORLD_GRID_COLS / frequency);
-    
-        random_grid_scalars: [..]float;
-        for i: 0..(xx frequency-1) {
-            array_add(*random_grid_scalars, random_get_within_range(-1, 1));
-        }
+    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
+    DIRT_PERLIN_NOISE_AMPLITUDE :: 300;
+    DIRT_PERLIN_NOISE_OCTAVES :: 5;
 
-        for i: 0..(WORLD_GRID_COLS - (blocks_per_section + 1)) {
-            // Get distance from current tile to each grid corner
-            f := floor(cast(float) i / ratio);
-            delta_l := (i - ratio * f) / blocks_per_section;
-            delta_r := (ratio * (f + 1) - i) / blocks_per_section;
-
-            // Get dot products of grid corner vectors and distances
-            l_scalar := random_grid_scalars[cast(int) (f)];
-            r_scalar := random_grid_scalars[cast(int) (f + 1)];
-            l_dot : float = l_scalar * delta_l;
-            r_dot : float = r_scalar * delta_r;
-
-            perlin := lerp(l_dot, r_dot, smootherstep(delta_l));
-            
-            perlin_values[i] += amplitude * perlin;
-        }
-    }
+    dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES);
 
     chunks : [..] Chunk;
 
@@ -265,7 +250,7 @@ main :: () {
             array_add(*chunks, chunk);
         }
 
-        blocks_in_col := cast(int) perlin_values[col];
+        blocks_in_col := cast(int) dirt_heights[col];
         for height: 0..blocks_in_col {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
@@ -286,19 +271,20 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = DIRT_HEALTH_MAX,
                     health_curr   = DIRT_HEALTH_MAX,
+                    block_type    = .DIRT,
                 }
             );
         }
     }
 
-    // Initialize dirt underground
+    // Initialize rock underground
     for col: 0..(WORLD_GRID_COLS - 1) {
-        for height: 0..39 {
+        for height: 1..39 {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-                y      = GetScreenHeight() + cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
-                width  = DIRT_WORLD_TILE_WIDTH,
-                height = DIRT_WORLD_TILE_HEIGHT,
+                x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
+                y      = GetScreenHeight() + cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
+                width  = ROCK_WORLD_TILE_WIDTH,
+                height = ROCK_WORLD_TILE_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
@@ -313,8 +299,9 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = DIRT_HEALTH_MAX,
-                    health_curr   = DIRT_HEALTH_MAX,
+                    health_max    = ROCK_HEALTH_MAX,
+                    health_curr   = ROCK_HEALTH_MAX,
+                    block_type    = .ROCK,
                 }
             );
         }
@@ -377,6 +364,7 @@ main :: () {
 
             array_add(*active_chunks, it);
             
+            // @TODO: draw active blocks, but simulate active chunks. Or something.
             for block: it.blocks {
                 array_add(*active_blocks, *block);
             }
@@ -451,7 +439,6 @@ main :: () {
                 player.sprite_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                 player.sprite_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
 
-                print_vars(active_blocks.count);
                 player_is_grounded = is_grounded(player, active_blocks);
                 if player_is_grounded {
                     player.jumps_remaining = player.jumps_capacity;
@@ -668,13 +655,24 @@ main :: () {
                 BeginMode2D(camera);
                 defer EndMode2D();
 
-                // Draw dirt
+                // Draw blocks
                 {
                     for active_blocks {
-                        DIRT_TILE_PADDING :: 2;
-                        source := Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_TILE_PADDING};
+                        block_map : Texture;
+                        source    : Rectangle;
 
-                        DrawTexturePro(dirt_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        if it.block_type == {
+                            case .DIRT;
+                                block_map = dirt_map;
+                                source    = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
+                            case .ROCK;
+                                block_map = rock_map;
+                                source    = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
+                            case;
+                                assert(false, "Unknown block type");
+                        }
+
+                        DrawTexturePro(block_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 
                         frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
 
@@ -688,7 +686,6 @@ main :: () {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
-                                print_vars(it.health_curr, frame);
                             }
                         }
                     }
@@ -769,6 +766,7 @@ init_textures :: () {
     player_hands_map          = LoadTexture("data/Player_Hands_Release.png");
     player_shoes_map          = LoadTexture("data/Player_Shoes_Release.png");
     dirt_map                  = LoadTexture("data/Tiles_0.png");
+    rock_map                  = LoadTexture("data/Tiles_1.png");
     damage_map                = LoadTexture("data/Damage.png");
 }
 
@@ -1209,4 +1207,47 @@ spawn_player :: () -> Player {
         cooldown_attack_current_ms   = 0,
         cooldown_interact_current_ms = 0,
     };
+}
+
+perlin_noise :: (desired_values: u32, starting_frequency: u32, amplitude: float32, octaves: u32) -> [..] float {
+    assert(desired_values % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
+
+    results : [..] float;
+    for i: 0..desired_values {
+        array_add(*results, xx i);
+    }
+
+    for o: 0..octaves {
+        octave_factor := pow(2.0, cast(float) o);
+        amplitude = amplitude / octave_factor;
+        frequency := starting_frequency * octave_factor;
+        ratio := desired_values / frequency;
+        blocks_per_section := cast(int) (desired_values / frequency);
+    
+        print_vars(octave_factor, amplitude, frequency, ratio, blocks_per_section);
+
+        random_grid_scalars: [..]float;
+        for i: 0..(xx frequency-1) {
+            array_add(*random_grid_scalars, random_get_within_range(-1, 1));
+        }
+
+        // @TODO: maybe loop around to the first section's left gradient?
+        for i: 0..(desired_values - (blocks_per_section + 1)) {
+            // Get distance from current tile to each grid corner
+            f := floor(cast(float) i / ratio);
+            delta_l := (i - ratio * f) / blocks_per_section;
+            delta_r := (ratio * (f + 1) - i) / blocks_per_section;
+
+            // Get dot products of grid corner vectors and distances
+            l_scalar := random_grid_scalars[cast(int) (f)];
+            r_scalar := random_grid_scalars[cast(int) (f + 1)];
+            l_dot : float = l_scalar * delta_l;
+            r_dot : float = r_scalar * delta_r;
+
+            perlin := lerp(l_dot, r_dot, smootherstep(delta_l));
+            results[i] += amplitude * perlin;
+        }
+    }
+
+    return results;
 }

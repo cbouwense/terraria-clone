@@ -1,5 +1,5 @@
 # In progress
-- cull blocks by viewport
+- world gen: rock underground
 
 # Gameplay features
 
@@ -12,7 +12,6 @@
 - sound effects: placing blocks
 - sound effects: attacking blocks
 - world gen: grass on top
-- world gen: rock underground
 - world gen: cave gen
 - world gen: ore gen
 - world gen: randomize tiles for specific type
@@ -30,7 +29,7 @@
 - hot reloading
 - single mesh for chunks / entire mass of blocks
 - simulate chunks by player position
+- cull blocks by viewport
 
 # Bugs
 - player looks one pixel off the ground
-- there are two layers of dirt at ground level
