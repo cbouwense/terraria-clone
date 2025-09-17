@@ -1209,22 +1209,22 @@ spawn_player :: () -> Player {
     };
 }
 
-perlin_noise :: (desired_values: u32, starting_frequency: u32, amplitude: float32, octaves: u32) -> [..] float {
+perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32) -> [..] float {
     assert(desired_values % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
 
     results : [..] float;
     for i: 0..desired_values {
-        array_add(*results, xx i);
+        array_add(*results, 0.0);
     }
 
     for o: 0..octaves {
-        octave_factor := pow(2.0, cast(float) o);
-        amplitude = amplitude / octave_factor;
-        frequency := starting_frequency * octave_factor;
-        ratio := desired_values / frequency;
+        octave_factor      := pow(2.0, cast(float) o);
+        amplitude          := starting_amplitude / octave_factor;
+        frequency          := starting_frequency * octave_factor;
+        ratio              := desired_values / frequency;
         blocks_per_section := cast(int) (desired_values / frequency);
     
-        print_vars(octave_factor, amplitude, frequency, ratio, blocks_per_section);
+        // print_vars(octave_factor, amplitude, frequency, ratio, blocks_per_section);
 
         random_grid_scalars: [..]float;
         for i: 0..(xx frequency-1) {
@@ -1245,7 +1245,9 @@ perlin_noise :: (desired_values: u32, starting_frequency: u32, amplitude: float3
             r_dot : float = r_scalar * delta_r;
 
             perlin := lerp(l_dot, r_dot, smootherstep(delta_l));
+            if i == 420 print_vars(perlin, amplitude, results[i], f, delta_l, delta_r, l_scalar, r_scalar, l_dot, r_dot);
             results[i] += amplitude * perlin;
+            if i == 420 print_vars(results[i]);
         }
     }
 
