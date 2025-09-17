@@ -214,15 +214,12 @@ data_folder: string;
 
 main :: () {
     //
-    // Window setup
+    // Initialization
     //
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
     SetTargetFPS(144);
 
-    //
-    // Initialization
-    //
     base_path := path_strip_filename(get_path_of_running_executable());
     data_folder = join(base_path, "data");
 
@@ -231,16 +228,11 @@ main :: () {
     
     player := spawn_player();
 
-    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
-    DIRT_PERLIN_NOISE_AMPLITUDE :: 300;
-    DIRT_PERLIN_NOISE_OCTAVES :: 5;
-
-    dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES);
-
     chunks : [..] Chunk;
 
-    // Initialize hills
+    // Initialize chunks
     chunk: Chunk;
+    // @TODO: this is fucked up
     for col: 0..(WORLD_GRID_COLS - 1) {
         chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
 
@@ -249,9 +241,17 @@ main :: () {
             chunk.id = xx chunk_id;
             array_add(*chunks, chunk);
         }
+    }
 
-        blocks_in_col := cast(int) dirt_heights[col];
-        for height: 0..blocks_in_col {
+    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
+    DIRT_PERLIN_NOISE_AMPLITUDE :: 300;
+    DIRT_PERLIN_NOISE_OCTAVES   :: 5;
+    dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES);
+
+    // Initialize hills
+    for col: 0..(WORLD_GRID_COLS - 1) {
+        blocks_in_column := cast(int) dirt_heights[col];
+        for height: 0..blocks_in_column {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
                 y      = GetScreenHeight() - cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
@@ -260,6 +260,7 @@ main :: () {
             };
 
             // @TODO: post increment macro or something?
+            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
             array_add(
                 *chunks[chunk_id].blocks,
@@ -277,19 +278,54 @@ main :: () {
         }
     }
 
+    ROCK_PERLIN_NOISE_FREQUENCY :: 8; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_AMPLITUDE :: 50;
+    ROCK_PERLIN_NOISE_OCTAVES   :: 3;
+    rock_heights := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES);
+
     // Initialize rock underground
     for col: 0..(WORLD_GRID_COLS - 1) {
-        for height: 1..39 {
+        blocks_in_column := cast(int) rock_heights[col];
+        for height: 0..blocks_in_column {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-                y      = GetScreenHeight() + cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
+                x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
+                y      = GetScreenHeight() - cast(float)(ROCK_WORLD_TILE_HEIGHT * height) + (10 * ROCK_WORLD_TILE_HEIGHT),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
             // @TODO: this is identical to the block creation thing right above.
-            chunk_id := col / CHUNK_MAX_WIDTH;
+            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
+            defer global_id_counter += 1;
+            array_add(
+                *chunks[chunk_id].blocks,
+                Block.{
+                    id            = global_id_counter,
+                    chunk_id      = xx chunk_id,
+                    pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
+                    bounding_rect = rect,
+                    sprite_rect   = rect,
+                    health_max    = ROCK_HEALTH_MAX,
+                    health_curr   = ROCK_HEALTH_MAX,
+                    block_type    = .ROCK,
+                }
+            );
+        }
+    }
+
+    for col: 0..(WORLD_GRID_COLS - 1) {
+        for height: 0..30 {
+            rect := Rectangle.{
+                x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
+                y      = GetScreenHeight() + cast(float)(ROCK_WORLD_TILE_HEIGHT * height) + (10 * ROCK_WORLD_TILE_HEIGHT),
+                width  = ROCK_WORLD_TILE_WIDTH,
+                height = ROCK_WORLD_TILE_HEIGHT,
+            };
+
+            // @TODO: post incrememnt macro or something?
+            // @TODO: this is identical to the block creation thing right above.
+            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
             array_add(
                 *chunks[chunk_id].blocks,
