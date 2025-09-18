@@ -216,6 +216,8 @@ main :: () {
     //
     // Initialization
     //
+    random_seed(123456779);
+
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
     SetTargetFPS(144);
@@ -243,18 +245,24 @@ main :: () {
         }
     }
 
-    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
-    DIRT_PERLIN_NOISE_AMPLITUDE :: 300;
+    DIRT_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
+    DIRT_PERLIN_NOISE_AMPLITUDE :: 200;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
     dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES);
 
+    negative_height_count := 0;
+    for dirt_heights {
+        if it < 0 negative_height_count += 1;
+    }
+    print_vars(negative_height_count);
+
     // Initialize hills
     for col: 0..(WORLD_GRID_COLS - 1) {
-        blocks_in_column := cast(int) dirt_heights[col];
+        blocks_in_column := 100 - cast(int) abs(dirt_heights[col]);
         for height: 0..blocks_in_column {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-                y      = GetScreenHeight() - cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
+                y      = GetScreenHeight() - cast(float) (DIRT_WORLD_TILE_HEIGHT * height),
                 width  = DIRT_WORLD_TILE_WIDTH,
                 height = DIRT_WORLD_TILE_HEIGHT,
             };
@@ -278,18 +286,18 @@ main :: () {
         }
     }
 
-    ROCK_PERLIN_NOISE_FREQUENCY :: 8; // How many grid nodes per map
-    ROCK_PERLIN_NOISE_AMPLITUDE :: 50;
-    ROCK_PERLIN_NOISE_OCTAVES   :: 3;
+    ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
+    ROCK_PERLIN_NOISE_OCTAVES   :: 1;
     rock_heights := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES);
 
     // Initialize rock underground
     for col: 0..(WORLD_GRID_COLS - 1) {
-        blocks_in_column := cast(int) rock_heights[col];
+        blocks_in_column := 10 - xx abs(cast(float) rock_heights[col]);
         for height: 0..blocks_in_column {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GetScreenHeight() - cast(float)(ROCK_WORLD_TILE_HEIGHT * height) + (10 * ROCK_WORLD_TILE_HEIGHT),
+                y      = GetScreenHeight() - cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
@@ -318,7 +326,7 @@ main :: () {
         for height: 0..30 {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GetScreenHeight() + cast(float)(ROCK_WORLD_TILE_HEIGHT * height) + (10 * ROCK_WORLD_TILE_HEIGHT),
+                y      = GetScreenHeight() + cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
@@ -1281,9 +1289,7 @@ perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitud
             r_dot : float = r_scalar * delta_r;
 
             perlin := lerp(l_dot, r_dot, smootherstep(delta_l));
-            if i == 420 print_vars(perlin, amplitude, results[i], f, delta_l, delta_r, l_scalar, r_scalar, l_dot, r_dot);
             results[i] += amplitude * perlin;
-            if i == 420 print_vars(results[i]);
         }
     }
 
