@@ -250,19 +250,21 @@ main :: () {
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
     dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES);
 
-    negative_height_count := 0;
-    for dirt_heights {
-        if it < 0 negative_height_count += 1;
-    }
-    print_vars(negative_height_count);
+    ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
+    ROCK_PERLIN_NOISE_OCTAVES   :: 5;
+    rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES);
 
-    // Initialize hills
+    GROUND_HEIGHT := GetScreenHeight() / 4;
+
+    // Initialize blocks
     for col: 0..(WORLD_GRID_COLS - 1) {
-        blocks_in_column := 100 - cast(int) abs(dirt_heights[col]);
-        for height: 0..blocks_in_column {
+        // Generate hills
+        hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
+        for height: 0..hill_dirt_blocks {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-                y      = GetScreenHeight() - cast(float) (DIRT_WORLD_TILE_HEIGHT * height),
+                y      = GROUND_HEIGHT - cast(float) (DIRT_WORLD_TILE_HEIGHT * height),
                 width  = DIRT_WORLD_TILE_WIDTH,
                 height = DIRT_WORLD_TILE_HEIGHT,
             };
@@ -284,26 +286,18 @@ main :: () {
                 }
             );
         }
-    }
 
-    ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
-    ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
-    ROCK_PERLIN_NOISE_OCTAVES   :: 1;
-    rock_heights := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES);
-
-    // Initialize rock underground
-    for col: 0..(WORLD_GRID_COLS - 1) {
-        blocks_in_column := 10 - xx abs(cast(float) rock_heights[col]);
-        for height: 0..blocks_in_column {
+        // Generate ground dirt
+        ground_dirt_blocks := cast(int) abs(rock_depths[col]);
+        for height: 0..ground_dirt_blocks {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GetScreenHeight() - cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
-                width  = ROCK_WORLD_TILE_WIDTH,
-                height = ROCK_WORLD_TILE_HEIGHT,
+                x      = ((col - WORLD_GRID_COLS/2.0) * DIRT_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
+                y      = GROUND_HEIGHT + cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
+                width  = DIRT_WORLD_TILE_WIDTH,
+                height = DIRT_WORLD_TILE_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
-            // @TODO: this is identical to the block creation thing right above.
             chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
             array_add(
@@ -314,25 +308,24 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = ROCK_HEALTH_MAX,
-                    health_curr   = ROCK_HEALTH_MAX,
-                    block_type    = .ROCK,
+                    health_max    = DIRT_HEALTH_MAX,
+                    health_curr   = DIRT_HEALTH_MAX,
+                    block_type    = .DIRT,
                 }
             );
         }
-    }
 
-    for col: 0..(WORLD_GRID_COLS - 1) {
-        for height: 0..30 {
+        // Generate rock
+        rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
+        for height: 0..rock_blocks {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS / 2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GetScreenHeight() + cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
+                x      = ((col - WORLD_GRID_COLS/2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
+                y      = GROUND_HEIGHT + ground_dirt_blocks + cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
-            // @TODO: this is identical to the block creation thing right above.
             chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
             array_add(
