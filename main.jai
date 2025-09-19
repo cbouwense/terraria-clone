@@ -320,7 +320,7 @@ main :: () {
         for height: 0..rock_blocks {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS/2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GROUND_HEIGHT + ground_dirt_blocks + cast(float)(ROCK_WORLD_TILE_HEIGHT * height),
+                y      = GROUND_HEIGHT + cast(float)(ROCK_WORLD_TILE_HEIGHT * 2.0 * height),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
@@ -731,6 +731,7 @@ main :: () {
                         for chunks {
                             DrawRectangleLinesEx(it.bounding_rect, 2.0, LIME);
                         }
+
                         for active_chunks {
                             center := get_rect_center(it.bounding_rect);
                             DrawText(tprint("%\0", it.id).data, xx center.x, xx center.y, 25, WHITE);
@@ -740,6 +741,8 @@ main :: () {
                                 DrawRectangleLinesEx(it.bounding_rect, 2.0, WHITE);
                             }
                         }
+
+                        DrawLineEx(Vector2.{-WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, xx GROUND_HEIGHT }, Vector2.{ WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, xx GROUND_HEIGHT }, 2.0, RED);
                     }
                 }
 
