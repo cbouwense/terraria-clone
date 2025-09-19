@@ -261,7 +261,7 @@ main :: () {
     for col: 0..(WORLD_GRID_COLS - 1) {
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
-        for height: 0..hill_dirt_blocks {
+        for height: 1..hill_dirt_blocks+1 {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
                 y      = GROUND_HEIGHT - cast(float) (DIRT_WORLD_TILE_HEIGHT * height),
@@ -320,7 +320,7 @@ main :: () {
         for height: 0..rock_blocks {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS/2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GROUND_HEIGHT + cast(float)(ROCK_WORLD_TILE_HEIGHT * 2.0 * height),
+                y      = GROUND_HEIGHT + cast(float)(ROCK_WORLD_TILE_HEIGHT * (height + ground_dirt_blocks)),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
@@ -418,7 +418,7 @@ main :: () {
         {
             if IsKeyPressed(.KEY_P) paused = !paused;
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
-            if IsKeyPressed(.KEY_R) player.pos = Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
+            if IsKeyPressed(.KEY_R) player = spawn_player();
 
             move_player_left  = control_down(controls.move_player_left);
             move_player_right = control_down(controls.move_player_right);
