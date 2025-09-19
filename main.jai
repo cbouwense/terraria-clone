@@ -234,7 +234,6 @@ main :: () {
 
     // Initialize chunks
     chunk: Chunk;
-    // @TODO: this is fucked up
     for col: 0..(WORLD_GRID_COLS - 1) {
         chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
 
@@ -245,20 +244,32 @@ main :: () {
         }
     }
 
-    DIRT_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
-    DIRT_PERLIN_NOISE_AMPLITUDE :: 200;
+    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
+    DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
-    dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES);
+    DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
+    dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
     ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
-    ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
-    ROCK_PERLIN_NOISE_OCTAVES   :: 5;
-    rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES);
+    ROCK_PERLIN_NOISE_AMPLITUDE :: 50;
+    ROCK_PERLIN_NOISE_OCTAVES   :: 3;
+    ROCK_PERLIN_NOISE_MIN_VALUE :: 5;
+    rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    GROUND_HEIGHT := GetScreenHeight() / 4;
+    min_depth : float = FLOAT32_MAX;
+    for rock_depths {
+        if it < min_depth {
+            min_depth = it;
+        }
+    }
+    print_vars(min_depth);
+
+    GROUND_HEIGHT  := GetScreenHeight() / 4;
+    BEDROCK_HEIGHT := GROUND_HEIGHT * 2;
 
     // Initialize blocks
     for col: 0..(WORLD_GRID_COLS - 1) {
+        
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for height: 1..hill_dirt_blocks+1 {
@@ -317,10 +328,10 @@ main :: () {
 
         // Generate rock
         rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
-        for height: 0..rock_blocks {
+        for height: 0..(100 - ground_dirt_blocks) {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS/2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GROUND_HEIGHT + cast(float)(ROCK_WORLD_TILE_HEIGHT * (height + ground_dirt_blocks)),
+                y      = GROUND_HEIGHT + cast(float)(ROCK_WORLD_TILE_HEIGHT * (ground_dirt_blocks + height)),
                 width  = ROCK_WORLD_TILE_WIDTH,
                 height = ROCK_WORLD_TILE_HEIGHT,
             };
@@ -483,24 +494,29 @@ main :: () {
                 }
 
                 if try_to_attack {
-                    is_on_cooldown := player.cooldown_attack_current_ms > 0;
+                    if debug_mode {
+                        block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, blocks);
+                        removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                    } else {
+                        is_on_cooldown := player.cooldown_attack_current_ms > 0;
 
-                    if !is_on_cooldown {
-                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
-                            // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block? 
-                            block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
-                            if block_mouse_is_over != null {
-                                // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
+                        if !is_on_cooldown {
+                            if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
+                                // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block? 
+                                block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
+                                if block_mouse_is_over != null {
+                                    // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
-                                // @TODO: when there is an inventory, this 1 will have to be whatever attack stat the equipped weapon has.
-                                block_mouse_is_over.health_curr -= 1;
-                                if block_mouse_is_over.health_curr <= 0 {
-                                    removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                    // @TODO: when there is an inventory, this 1 will have to be whatever attack stat the equipped weapon has.
+                                    block_mouse_is_over.health_curr -= 1;
+                                    if block_mouse_is_over.health_curr <= 0 {
+                                        removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                    }
                                 }
                             }
-                        }
 
-                        player.cooldown_attack_current_ms = PLAYER_COOLDOWN_ATTACK_DURATION_MS;
+                            player.cooldown_attack_current_ms = PLAYER_COOLDOWN_ATTACK_DURATION_MS;
+                        }
                     }
                 }
 
@@ -1139,7 +1155,6 @@ is_grounded :: (entity: Entity, collidables: [] $T/interface Entity) -> bool {
 }
 
 update_camera_center :: (camera: *Camera2D, player: *Player, width: s32, height: s32) {
-    // camera.offset = Vector2.{ width/2.0 - player.bounding_rect.width/2.0, height/2.0 - player.bounding_rect.height/2.0 };
     camera.offset = Vector2.{ width/2.0 - player.bounding_rect.width/2.0, height/2.0 + 100 };
     camera.target = player.pos;
 }
@@ -1249,7 +1264,7 @@ spawn_player :: () -> Player {
     };
 }
 
-perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32) -> [..] float {
+perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [..] float {
     assert(desired_values % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
 
     results : [..] float;
@@ -1263,8 +1278,6 @@ perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitud
         frequency          := starting_frequency * octave_factor;
         ratio              := desired_values / frequency;
         blocks_per_section := cast(int) (desired_values / frequency);
-    
-        // print_vars(octave_factor, amplitude, frequency, ratio, blocks_per_section);
 
         random_grid_scalars: [..]float;
         for i: 0..(xx frequency-1) {
@@ -1286,6 +1299,13 @@ perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitud
 
             perlin := lerp(l_dot, r_dot, smootherstep(delta_l));
             results[i] += amplitude * perlin;
+        }
+    }
+
+    // @PERF
+    for *results {
+        if it.* < min_value {
+            it.* = min_value + abs(it.*);
         }
     }
 
