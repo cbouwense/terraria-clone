@@ -116,6 +116,7 @@ DIRT_MAP_TILE_PADDING :: 2;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 DIRT_HEALTH_MAX :: 10;
+DIRT_STACK_CAPACITY :: 64;
 
 GRASS_MAP_COLS :: 16;
 GRASS_MAP_ROWS :: 22;
@@ -125,6 +126,7 @@ GRASS_MAP_TILE_PADDING :: 2;
 GRASS_WORLD_TILE_WIDTH  :: 18 * SCALE;
 GRASS_WORLD_TILE_HEIGHT :: 18 * SCALE;
 GRASS_HEALTH_MAX :: 10;
+GRASS_STACK_CAPACITY :: 64;
 
 ROCK_MAP_COLS :: 16;
 ROCK_MAP_ROWS :: 15;
@@ -134,6 +136,7 @@ ROCK_MAP_TILE_PADDING :: 2;
 ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
 ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
 ROCK_HEALTH_MAX :: 100;
+ROCK_STACK_CAPACITY :: 64;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -149,17 +152,19 @@ DEBUG_CAM_SPEED :: 5;
 global_id_counter: u32 = 0;
 
 Entity :: struct {
-    id       : u32; 
-    chunk_id : u32;
+    type          : Type;
 
-    pos : Vector2;
-    vel : Vector2;
+    id            : u32; 
+    chunk_id      : u32;
+
+    pos           : Vector2;
+    vel           : Vector2;
 
     bounding_rect : Rectangle; // Used for collision
     sprite_rect   : Rectangle;
 
-    health_max  : s32;
-    health_curr : s32;
+    health_max    : s32;
+    health_curr   : s32;
 }
 
 Sprite :: struct {
@@ -177,6 +182,17 @@ AnimatedSprite :: struct {
     loops             : bool;
 }
 
+ItemStack :: struct {
+    block_type     : BlockType;
+    stack_capacity : u32;
+    stack_count    : u32;
+}
+
+Inventory :: struct {
+    item_stacks         : [32] ItemStack;
+    selected_item_stack : u32;
+}
+
 Player :: struct {
     #as using entity : Entity;
 
@@ -187,6 +203,8 @@ Player :: struct {
 
     cooldown_attack_current_ms   : s32;
     cooldown_interact_current_ms : s32;
+
+    inventory : Inventory;
 }
 
 BlockType :: enum {
@@ -289,6 +307,7 @@ main :: () {
             array_add(
                 *chunks[chunk_id].blocks,
                 Block.{
+                    type          = Block,
                     id            = global_id_counter,
                     chunk_id      = xx chunk_id,
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
@@ -317,6 +336,7 @@ main :: () {
             array_add(
                 *chunks[chunk_id].blocks,
                 Block.{
+                    type          = Block,
                     id            = global_id_counter,
                     chunk_id      = xx chunk_id,
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
@@ -345,6 +365,7 @@ main :: () {
             array_add(
                 *chunks[chunk_id].blocks,
                 Block.{
+                    type          = Block,
                     id            = global_id_counter,
                     chunk_id      = xx chunk_id,
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
@@ -532,51 +553,58 @@ main :: () {
                     is_on_cooldown := player.cooldown_interact_current_ms > 0;
 
                     if !is_on_cooldown {
-                        is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
-                        would_be_on_existing_entity := false;
 
-                        // Check if the block would be placed on any existing blocks
-                        for active_blocks {
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                        // @TODO: this will probably need some sort of logic to distinguish between blocks and tools
+                        selected_item_stack, result := get_selected_item_stack(player.inventory);
+                        has_item_stack_selected := result == xx ReturnStatus.SUCCESS;
+                        if has_item_stack_selected {
+                            is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+                            would_be_on_existing_entity := false;
+
+                            // Check if the block would be placed on any existing blocks
+                            for active_blocks {
+                                if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                    would_be_on_existing_entity = true;
+                                    break;
+                                }
+                            }
+
+                            new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
+
+                            // Check if the new block would be placed on the player
+                            if CheckCollisionRecs(new_rect, player.bounding_rect) {
                                 would_be_on_existing_entity = true;
-                                break;
                             }
-                        }
 
-                        new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
-
-                        // Check if the new block would be placed on the player
-                        if CheckCollisionRecs(new_rect, player.bounding_rect) {
-                            would_be_on_existing_entity = true;
-                        }
-
-                        can_place_block := is_within_reach && !would_be_on_existing_entity;
-                        
-                        if can_place_block { 
-                            defer global_id_counter += 1;
-
-                            new_pos  := get_rect_center(new_rect);
-
-                            new_dirt_block := Block.{
-                                id            = global_id_counter,
-                                pos           = new_pos,
-                                bounding_rect = new_rect,
-                                sprite_rect   = new_rect,
-                            };
+                            can_place_block := is_within_reach && !would_be_on_existing_entity;
                             
-                            found_chunk := false;
-                            for active_chunks {
-                                if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
+                            if can_place_block {
+                                defer global_id_counter += 1;
+
+                                new_pos := get_rect_center(new_rect);
+
+                                new_dirt_block := Block.{
+                                    id            = global_id_counter,
+                                    pos           = new_pos,
+                                    bounding_rect = new_rect,
+                                    sprite_rect   = new_rect,
+                                    block_type    = selected_item_stack.block_type,
+                                };
                                 
-                                found_chunk = true;
-                                new_dirt_block.chunk_id = it.id;
-                                array_add(*chunks[it.id].blocks, new_dirt_block);
+                                found_chunk := false;
+                                for active_chunks {
+                                    if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
+                                    
+                                    found_chunk = true;
+                                    new_dirt_block.chunk_id = it.id;
+                                    array_add(*chunks[it.id].blocks, new_dirt_block);
 
-                                break;
+                                    break;
+                                }
+                                assert(found_chunk);
+
+                                player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
                             }
-                            assert(found_chunk);
-
-                            player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
                         }
                     }
                 }
@@ -1248,11 +1276,12 @@ spawn_player :: () -> Player {
     pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
 
     global_id_counter += 1;
-    return Player.{
-        id = global_id_counter,
+    player := Player.{
+        type = Player,
+        id   = global_id_counter,
 
-        pos = pos,
-        vel = Vector2.{ 0, 0 },
+        pos  = pos,
+        vel  = Vector2.{ 0, 0 },
 
         bounding_rect = Rectangle.{
             pos.x - floor(PLAYER_WORLD_BOUNDING_WIDTH / 2.0),
@@ -1275,6 +1304,16 @@ spawn_player :: () -> Player {
         cooldown_attack_current_ms   = 0,
         cooldown_interact_current_ms = 0,
     };
+
+    // Initialize inventory
+    player.inventory.selected_item_stack = 0;
+    player.inventory.item_stacks[0]      = ItemStack.{
+        block_type     = .DIRT,
+        stack_capacity = DIRT_STACK_CAPACITY,
+        stack_count    = DIRT_STACK_CAPACITY,
+    };
+
+    return player;
 }
 
 perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [..] float {
@@ -1323,4 +1362,14 @@ perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitud
     }
 
     return results;
+}
+
+ReturnStatus :: enum u16 {
+    SUCCESS;
+    NOT_FOUND;
+}
+
+get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: u16 {
+    print_vars(inventory.item_stacks[inventory.selected_item_stack]);
+    return inventory.item_stacks[inventory.selected_item_stack], xx ReturnStatus.SUCCESS;
 }
