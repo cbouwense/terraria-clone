@@ -37,6 +37,7 @@ player_pants_map          : Texture;
 player_hands_map          : Texture;
 player_shoes_map          : Texture;
 dirt_map                  : Texture;
+grass_map                 : Texture;
 rock_map                  : Texture;
 damage_map                : Texture;
 
@@ -116,6 +117,15 @@ DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 DIRT_HEALTH_MAX :: 10;
 
+GRASS_MAP_COLS :: 16;
+GRASS_MAP_ROWS :: 22;
+GRASS_MAP_TILE_WIDTH  :: 18;
+GRASS_MAP_TILE_HEIGHT :: 18;
+GRASS_MAP_TILE_PADDING :: 2;
+GRASS_WORLD_TILE_WIDTH  :: 18 * SCALE;
+GRASS_WORLD_TILE_HEIGHT :: 18 * SCALE;
+GRASS_HEALTH_MAX :: 10;
+
 ROCK_MAP_COLS :: 16;
 ROCK_MAP_ROWS :: 15;
 ROCK_MAP_TILE_WIDTH  :: 18;
@@ -181,6 +191,7 @@ Player :: struct {
 
 BlockType :: enum {
     DIRT;
+    GRASS;
     ROCK;
 }
 
@@ -251,18 +262,10 @@ main :: () {
     dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
     ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
-    ROCK_PERLIN_NOISE_AMPLITUDE :: 50;
-    ROCK_PERLIN_NOISE_OCTAVES   :: 3;
-    ROCK_PERLIN_NOISE_MIN_VALUE :: 5;
+    ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
+    ROCK_PERLIN_NOISE_OCTAVES   :: 2;
+    ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
-
-    min_depth : float = FLOAT32_MAX;
-    for rock_depths {
-        if it < min_depth {
-            min_depth = it;
-        }
-    }
-    print_vars(min_depth);
 
     GROUND_HEIGHT  := GetScreenHeight() / 4;
     BEDROCK_HEIGHT := GROUND_HEIGHT * 2;
@@ -272,7 +275,7 @@ main :: () {
         
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
-        for height: 1..hill_dirt_blocks+1 {
+        for height: 1..hill_dirt_blocks {
             rect := Rectangle.{
                 x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
                 y      = GROUND_HEIGHT - cast(float) (DIRT_WORLD_TILE_HEIGHT * height),
@@ -293,7 +296,7 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = DIRT_HEALTH_MAX,
                     health_curr   = DIRT_HEALTH_MAX,
-                    block_type    = .DIRT,
+                    block_type    = ifx height == hill_dirt_blocks then .GRASS else .DIRT,
                 }
             );
         }
@@ -309,7 +312,7 @@ main :: () {
             };
 
             // @TODO: post incrememnt macro or something?
-            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
+            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division. @TODO: int division function for clarity? like divide_u32, divide_s64, etc.? 
             defer global_id_counter += 1;
             array_add(
                 *chunks[chunk_id].blocks,
@@ -445,8 +448,6 @@ main :: () {
         if !paused {
             // Update player
             {
-                // I think since we are always going to be controlling the player velocity directly, we can just reset
-                // the velocity like this for now. Although, this will have to change if we ever want momentum.
                 player.vel.x = 0;
 
                 if move_player_left {
@@ -495,8 +496,14 @@ main :: () {
 
                 if try_to_attack {
                     if debug_mode {
-                        block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, blocks);
-                        removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                        for chunks {
+                            // @TODO: it would be nice to have the chunk the mouse is pointing in, as well as the chunk the player is in.
+                            block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, it.blocks);
+                            if block_mouse_is_over != null {
+                                removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                break;
+                            }
+                        }
                     } else {
                         is_on_cooldown := player.cooldown_attack_current_ms > 0;
 
@@ -718,6 +725,9 @@ main :: () {
                             case .DIRT;
                                 block_map = dirt_map;
                                 source    = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
+                            case .GRASS;
+                                block_map = grass_map;
+                                source    = Rectangle.{3 * GRASS_MAP_TILE_WIDTH, 0 * GRASS_MAP_TILE_HEIGHT, GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING, GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING};
                             case .ROCK;
                                 block_map = rock_map;
                                 source    = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
@@ -735,7 +745,9 @@ main :: () {
                             DrawTexturePro(damage_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                         }
 
-                        if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
+                        // Mouse overlay (hover)
+                        show_block_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
+                        if show_block_hover {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
@@ -823,6 +835,7 @@ init_textures :: () {
     player_shoes_map          = LoadTexture("data/Player_Shoes_Release.png");
     dirt_map                  = LoadTexture("data/Tiles_0.png");
     rock_map                  = LoadTexture("data/Tiles_1.png");
+    grass_map                 = LoadTexture("data/Tiles_2.png");
     damage_map                = LoadTexture("data/Damage.png");
 }
 

@@ -1,9 +1,9 @@
 # In progress
-- world gen: rock underground
+- inventory
 
 # Gameplay features
 
-- lighting: world from day / night cycle
+- lighting: world day / night cycle
 - lighting: block fog of war
 - menus: make player color customizable
 - menus: main menu
@@ -11,14 +11,12 @@
 - menus: death menu
 - sound effects: placing blocks
 - sound effects: attacking blocks
-- world gen: grass on top
 - world gen: cave gen
 - world gen: ore gen
+- world gen: ramps
 - world gen: randomize tiles for specific type
 - game saves
 - Celeste movement juice
-- ramps
-- parametrize world seeds
 - multiplayer
 - font
 - trees
