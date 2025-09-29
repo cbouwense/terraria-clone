@@ -583,12 +583,14 @@ main :: () {
 
                                 new_pos := get_rect_center(new_rect);
 
-                                new_dirt_block := Block.{
+                                new_block := Block.{
                                     id            = global_id_counter,
                                     pos           = new_pos,
                                     bounding_rect = new_rect,
                                     sprite_rect   = new_rect,
                                     block_type    = selected_item_stack.block_type,
+                                    health_max    = get_block_max_health(selected_item_stack.block_type),
+                                    health_curr   = get_block_max_health(selected_item_stack.block_type),
                                 };
                                 
                                 found_chunk := false;
@@ -596,8 +598,8 @@ main :: () {
                                     if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
                                     
                                     found_chunk = true;
-                                    new_dirt_block.chunk_id = it.id;
-                                    array_add(*chunks[it.id].blocks, new_dirt_block);
+                                    new_block.chunk_id = it.id;
+                                    array_add(*chunks[it.id].blocks, new_block);
 
                                     break;
                                 }
@@ -760,7 +762,7 @@ main :: () {
                                 block_map = rock_map;
                                 source    = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
                             case;
-                                assert(false, "Unknown block type");
+                                assert(false, "You forgot a block type in your switch statement");
                         }
 
                         DrawTexturePro(block_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
@@ -1210,7 +1212,7 @@ update_camera_center_smooth_follow :: (camera: *Camera2D, player: *Player, delta
     length: float = Vector2Length(diff);
 
     if (length > minEffectLength) {
-        speed: float = max(fractionSpeed*length, minSpeed);
+        speed: float = ifx fractionSpeed*length > minSpeed then fractionSpeed*length else minSpeed;
         camera.target = Vector2Add(camera.target, Vector2Scale(diff, speed*delta/length));
     }
 }
@@ -1225,7 +1227,7 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     // I have a funny feeling that I'll have to redo the tiling system anyways if I need to have a more
     // robust thing.
     new_rect := Rectangle.{
-        x      = floor(x) + 8,
+        x      = floor(x),
         y      = floor(y),
         width  = xx tile_width,
         height = xx tile_height,
@@ -1308,9 +1310,9 @@ spawn_player :: () -> Player {
     // Initialize inventory
     player.inventory.selected_item_stack = 0;
     player.inventory.item_stacks[0]      = ItemStack.{
-        block_type     = .DIRT,
-        stack_capacity = DIRT_STACK_CAPACITY,
-        stack_count    = DIRT_STACK_CAPACITY,
+        block_type     = .ROCK,
+        stack_capacity = ROCK_STACK_CAPACITY,
+        stack_count    = ROCK_STACK_CAPACITY,
     };
 
     return player;
@@ -1369,7 +1371,18 @@ ReturnStatus :: enum u16 {
     NOT_FOUND;
 }
 
+// @TODO: return not_found for no item or whatever
 get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: u16 {
-    print_vars(inventory.item_stacks[inventory.selected_item_stack]);
     return inventory.item_stacks[inventory.selected_item_stack], xx ReturnStatus.SUCCESS;
+}
+
+get_block_max_health :: (block_type: BlockType) -> s32 {
+    if block_type == {
+        case .DIRT;  return DIRT_HEALTH_MAX;
+        case .GRASS; return GRASS_HEALTH_MAX;
+        case .ROCK;  return ROCK_HEALTH_MAX;
+        case;
+            assert(false, "You forgot a block type in your switch statement");
+            return -1;
+    }
 }
