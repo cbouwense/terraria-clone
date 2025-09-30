@@ -285,20 +285,32 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    GROUND_HEIGHT  := GetScreenHeight() / 4;
-    BEDROCK_HEIGHT := GROUND_HEIGHT * 2;
+    // @TODO: clean this up
+    const_1 :: DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS / 2.0;
+    const_2 := GetScreenWidth() / 2.0;
+    const_3 := const_1 + const_2;
+
+    initial_x := (DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0;;
+    print_vars(initial_x);
 
     // Initialize blocks
-    for col: 0..(WORLD_GRID_COLS - 1) {
-        
+    columns_generated := 0;
+    x := initial_x;
+
+    while columns_generated < WORLD_GRID_COLS {
+        col := columns_generated;
+        y   := 0;
+
         // Generate hills
-        hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
-        for height: 1..hill_dirt_blocks {
+        hill_dirt_blocks    := cast(int) abs(dirt_heights[col]);
+        hill_rows_generated := 0;
+
+        while hill_rows_generated <= hill_dirt_blocks {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS / 2.0) * DIRT_WORLD_TILE_WIDTH) + (GetScreenWidth() / 2.0),
-                y      = GROUND_HEIGHT - cast(float) (DIRT_WORLD_TILE_HEIGHT * height),
-                width  = DIRT_WORLD_TILE_WIDTH,
-                height = DIRT_WORLD_TILE_HEIGHT,
+                xx x,
+                xx y,
+                xx DIRT_WORLD_TILE_WIDTH,
+                xx DIRT_WORLD_TILE_HEIGHT,
             };
 
             // @TODO: post increment macro or something?
@@ -315,19 +327,25 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = DIRT_HEALTH_MAX,
                     health_curr   = DIRT_HEALTH_MAX,
-                    block_type    = ifx height == hill_dirt_blocks then .GRASS else .DIRT,
+                    block_type    = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
                 }
             );
+
+            y -= DIRT_WORLD_TILE_HEIGHT;
+            hill_rows_generated += 1;
         }
 
         // Generate ground dirt
-        ground_dirt_blocks := cast(int) abs(rock_depths[col]);
-        for height: 0..ground_dirt_blocks {
+        ground_dirt_blocks    := cast(int) abs(rock_depths[col]);
+        ground_rows_generated := 0;
+        y = 0;
+
+        while ground_rows_generated < ground_dirt_blocks {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS/2.0) * DIRT_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GROUND_HEIGHT + cast(float)(DIRT_WORLD_TILE_HEIGHT * height),
-                width  = DIRT_WORLD_TILE_WIDTH,
-                height = DIRT_WORLD_TILE_HEIGHT,
+                xx x,
+                xx y,
+                xx DIRT_WORLD_TILE_WIDTH,
+                xx DIRT_WORLD_TILE_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
@@ -347,17 +365,25 @@ main :: () {
                     block_type    = .DIRT,
                 }
             );
+
+            ground_rows_generated += 1;
+            y += DIRT_WORLD_TILE_HEIGHT;
         }
 
         // Generate rock
         rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
-        for height: 0..(100 - ground_dirt_blocks) {
+        rock_rows_generated := 0;
+        
+        while rock_rows_generated < (100 - ground_dirt_blocks) {
+        // for height: 0..(100 - ground_dirt_blocks) {
             rect := Rectangle.{
-                x      = ((col - WORLD_GRID_COLS/2.0) * ROCK_WORLD_TILE_WIDTH) + GetScreenWidth()/2.0,
-                y      = GROUND_HEIGHT + cast(float)(ROCK_WORLD_TILE_HEIGHT * (ground_dirt_blocks + height)),
-                width  = ROCK_WORLD_TILE_WIDTH,
-                height = ROCK_WORLD_TILE_HEIGHT,
+                xx x,
+                xx y,
+                xx DIRT_WORLD_TILE_WIDTH,
+                xx DIRT_WORLD_TILE_HEIGHT,
             };
+
+            // cast(float)(ROCK_WORLD_TILE_HEIGHT * (ground_dirt_blocks + height))
 
             // @TODO: post incrememnt macro or something?
             chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
@@ -376,7 +402,13 @@ main :: () {
                     block_type    = .ROCK,
                 }
             );
+
+            rock_rows_generated += 1;
+            y += ROCK_WORLD_TILE_HEIGHT;
         }
+
+        columns_generated += 1;
+        x += DIRT_WORLD_TILE_WIDTH;
     }
     
     for *chunks {
@@ -800,7 +832,7 @@ main :: () {
                             }
                         }
 
-                        DrawLineEx(Vector2.{-WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, xx GROUND_HEIGHT }, Vector2.{ WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, xx GROUND_HEIGHT }, 2.0, RED);
+                        DrawLineEx(Vector2.{-WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, 0.0 }, 2.0, RED);
                     }
                 }
 
@@ -1218,20 +1250,32 @@ update_camera_center_smooth_follow :: (camera: *Camera2D, player: *Player, delta
 }
 
 create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: s32) -> Rectangle {
-    x := pos.x - (xx pos.x % tile_width);
-    y := pos.y - (xx pos.y % tile_height);
+    // First of all, chop off any decimal info from the pos. Placing blocks should only ever occur with on int coords.
+    int_pos_x : int = cast(int) floor(pos.x);
+    int_pos_y : int = cast(int) floor(pos.y);
 
-    if pos.x < 0 { x -= tile_width - 1; }
+    // Next calculate the amount we need to subtract to the position to get axis aligned.
+    // In this diagram, dX is the amount to shift the pos to the left, and dY is the amount to shift up.
+    //  +-----------+
+    //  |   ^       |
+    //  |   |       |
+    //  |   |       |
+    //  |<~~o       |
+    //  |           |
+    //  +-----------+
+    d_x := int_pos_x % tile_width;
+    d_y := int_pos_y % tile_width;
 
-    // I don't exactly understand why I have to add this 8, but it makes it placed correctly, so...
-    // I have a funny feeling that I'll have to redo the tiling system anyways if I need to have a more
-    // robust thing.
+    x := int_pos_x - d_x;
+    y := int_pos_y - d_y;
+
     new_rect := Rectangle.{
-        x      = floor(x),
-        y      = floor(y),
+        x      = xx x,
+        y      = xx y,
         width  = xx tile_width,
         height = xx tile_height,
     };
+
     return new_rect;
 }
 

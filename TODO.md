@@ -22,6 +22,7 @@
 - trees
 - background image
 - background parallax
+- grass regrow
 
 # Tech
 - hot reloading
