@@ -290,22 +290,19 @@ main :: () {
     const_2 := GetScreenWidth() / 2.0;
     const_3 := const_1 + const_2;
 
-    initial_x := (DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0;;
+    initial_x := (DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0;
     print_vars(initial_x);
 
     // Initialize blocks
-    columns_generated := 0;
     x := initial_x;
 
-    while columns_generated < WORLD_GRID_COLS {
+    for columns_generated: 0..WORLD_GRID_COLS {
         col := columns_generated;
         y   := 0;
 
         // Generate hills
         hill_dirt_blocks    := cast(int) abs(dirt_heights[col]);
-        hill_rows_generated := 0;
-
-        while hill_rows_generated <= hill_dirt_blocks {
+        for hill_rows_generated: 0..hill_dirt_blocks {
             rect := Rectangle.{
                 xx x,
                 xx y,
@@ -332,15 +329,13 @@ main :: () {
             );
 
             y -= DIRT_WORLD_TILE_HEIGHT;
-            hill_rows_generated += 1;
         }
 
         // Generate ground dirt
-        ground_dirt_blocks    := cast(int) abs(rock_depths[col]);
-        ground_rows_generated := 0;
+        ground_dirt_blocks := cast(int) abs(rock_depths[col]);
         y = 0;
 
-        while ground_rows_generated < ground_dirt_blocks {
+        for ground_rows_generated: 0..ground_dirt_blocks {
             rect := Rectangle.{
                 xx x,
                 xx y,
@@ -366,16 +361,13 @@ main :: () {
                 }
             );
 
-            ground_rows_generated += 1;
             y += DIRT_WORLD_TILE_HEIGHT;
         }
 
         // Generate rock
         rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
-        rock_rows_generated := 0;
-        
-        while rock_rows_generated < (100 - ground_dirt_blocks) {
-        // for height: 0..(100 - ground_dirt_blocks) {
+
+        for rock_rows_generated: 0..(100 - ground_dirt_blocks) {
             rect := Rectangle.{
                 xx x,
                 xx y,
@@ -403,11 +395,9 @@ main :: () {
                 }
             );
 
-            rock_rows_generated += 1;
             y += ROCK_WORLD_TILE_HEIGHT;
         }
 
-        columns_generated += 1;
         x += DIRT_WORLD_TILE_WIDTH;
     }
     
@@ -602,13 +592,14 @@ main :: () {
                             }
 
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
+                            print_vars(new_rect);
 
                             // Check if the new block would be placed on the player
                             if CheckCollisionRecs(new_rect, player.bounding_rect) {
                                 would_be_on_existing_entity = true;
                             }
 
-                            can_place_block := is_within_reach && !would_be_on_existing_entity;
+                            can_place_block := debug_mode || (is_within_reach && !would_be_on_existing_entity);
                             
                             if can_place_block {
                                 defer global_id_counter += 1;
