@@ -285,13 +285,7 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    // @TODO: clean this up
-    const_1 :: DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS / 2.0;
-    const_2 := GetScreenWidth() / 2.0;
-    const_3 := const_1 + const_2;
-
-    initial_x := (DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0;
-    print_vars(initial_x);
+    initial_x := ((DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
     // Initialize blocks
     x := initial_x;
@@ -301,7 +295,7 @@ main :: () {
         y   := 0;
 
         // Generate hills
-        hill_dirt_blocks    := cast(int) abs(dirt_heights[col]);
+        hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for hill_rows_generated: 0..hill_dirt_blocks {
             rect := Rectangle.{
                 xx x,
@@ -429,6 +423,8 @@ main :: () {
     controls.attack[0]            = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_LEFT   };
     controls.interact[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_RIGHT  };
     controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE };
+
+    TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
     while !WindowShouldClose() {
         defer reset_temporary_storage();
@@ -774,6 +770,8 @@ main :: () {
                         block_map : Texture;
                         source    : Rectangle;
 
+                        // print_vars(it);
+
                         if it.block_type == {
                             case .DIRT;
                                 block_map = dirt_map;
@@ -802,7 +800,6 @@ main :: () {
                         show_block_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
                         if show_block_hover {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
                             }
                         }
@@ -854,6 +851,11 @@ main :: () {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
                         DrawCircleV(player.pos, 4.0, RED);
                     }
+                }
+
+                // Draw cursor
+                if debug_mode {
+                    DrawRectangleRec(create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT), TRANSPARENT_WHITE);
                 }
             }
 
@@ -1254,11 +1256,16 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     //  |<~~o       |
     //  |           |
     //  +-----------+
-    d_x := int_pos_x % tile_width;
-    d_y := int_pos_y % tile_width;
+    d_x : int = int_pos_x % tile_width;
+    d_y : int = int_pos_y % tile_height;
+
+    if d_x < 0 { d_x += tile_width;  };
+    if d_y < 0 { d_y += tile_height; };
 
     x := int_pos_x - d_x;
     y := int_pos_y - d_y;
+
+    print_vars(int_pos_x, int_pos_y, d_x, d_y, x, y);
 
     new_rect := Rectangle.{
         x      = xx x,

@@ -1,8 +1,9 @@
 # In progress
-- inventory
+- segfault placing blocks down
 
 # Gameplay features
 
+- inventory
 - lighting: world day / night cycle
 - lighting: block fog of war
 - menus: make player color customizable
