@@ -35,3 +35,4 @@
 - player looks one pixel off the ground
 - rocks can have their pink border sampled
 - player can spawn inside ground
+- linux build doesn't work

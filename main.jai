@@ -445,20 +445,7 @@ main :: () {
         active_blocks.allocator = temp;
 
         // @TODO: Having a notion of active chunks and active blocks is probably still too slow, but it's a step in the right direction.
-        for chunks {
-            // The last block in a chunk will always be the right-most with the current method for world generation.
-            if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH continue;
-            
-            // The first block in a chunk will always be the left-most with the current method for world generation.
-            if it.blocks[0].pos.x > window_end.x continue;
-
-            array_add(*active_chunks, it);
-            
-            // @TODO: draw active blocks, but simulate active chunks. Or something.
-            for block: it.blocks {
-                array_add(*active_blocks, *block);
-            }
-        }
+        derive_active_chunks_and_active_blocks(chunks, *active_chunks, *active_blocks, window_start, window_end);
 
         // Reset controls that need to be.
         try_to_jump     = false;
@@ -568,14 +555,16 @@ main :: () {
 
                 // For now this just places down dirt blocks
                 if try_to_interact {
+
                     is_on_cooldown := player.cooldown_interact_current_ms > 0;
 
                     if !is_on_cooldown {
 
-                        // @TODO: this will probably need some sort of logic to distinguish between blocks and tools
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_item_stack_selected := result == xx ReturnStatus.SUCCESS;
+                        
                         if has_item_stack_selected {
+
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                             would_be_on_existing_entity := false;
 
@@ -588,7 +577,6 @@ main :: () {
                             }
 
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
-                            print_vars(new_rect);
 
                             // Check if the new block would be placed on the player
                             if CheckCollisionRecs(new_rect, player.bounding_rect) {
@@ -618,7 +606,7 @@ main :: () {
                                     
                                     found_chunk = true;
                                     new_block.chunk_id = it.id;
-                                    array_add(*chunks[it.id].blocks, new_block);
+                                    add_block_to_chunk(it.id, new_block, *chunks, *active_chunks, *active_blocks, window_start, window_end);
 
                                     break;
                                 }
@@ -769,8 +757,6 @@ main :: () {
                     for active_blocks {
                         block_map : Texture;
                         source    : Rectangle;
-
-                        // print_vars(it);
 
                         if it.block_type == {
                             case .DIRT;
@@ -1265,8 +1251,6 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     x := int_pos_x - d_x;
     y := int_pos_y - d_y;
 
-    print_vars(int_pos_x, int_pos_y, d_x, d_y, x, y);
-
     new_rect := Rectangle.{
         x      = xx x,
         y      = xx y,
@@ -1426,5 +1410,31 @@ get_block_max_health :: (block_type: BlockType) -> s32 {
         case;
             assert(false, "You forgot a block type in your switch statement");
             return -1;
+    }
+}
+
+// @TODO: this feels wrong that I have to remember the derived state to pass to this function
+add_block_to_chunk :: (chunk_id: u32, new_block: Block, chunks: *[..] Chunk, active_chunks: *[..] Chunk, active_blocks: *[..] *Block, window_start: Vector2, window_end: Vector2) {
+    array_add(*((chunks.*)[chunk_id].blocks), new_block);
+    derive_active_chunks_and_active_blocks(chunks.*, active_chunks, active_blocks, window_start, window_end);
+}
+
+derive_active_chunks_and_active_blocks :: (chunks: [..] Chunk, active_chunks: *[..] Chunk, active_blocks: *[..] *Block, window_start: Vector2, window_end: Vector2) {
+    array_reset(active_chunks);
+    array_reset(active_blocks);
+    
+    for chunks {
+        // The last block in a chunk will always be the right-most with the current method for world generation.
+        if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH continue;
+        
+        // The first block in a chunk will always be the left-most with the current method for world generation.
+        if it.blocks[0].pos.x > window_end.x continue;
+
+        array_add(active_chunks, it);
+        
+        // @TODO: draw active blocks, but simulate active chunks. Or something.
+        for block: it.blocks {
+            array_add(active_blocks, *block);
+        }
     }
 }
