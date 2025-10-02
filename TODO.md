@@ -1,5 +1,4 @@
 # In progress
-- segfault placing blocks down
 
 # Gameplay features
 
