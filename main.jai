@@ -561,9 +561,9 @@ main :: () {
                     if !is_on_cooldown {
 
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
-                        has_item_stack_selected := result == xx ReturnStatus.SUCCESS;
+                        has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
                         
-                        if has_item_stack_selected {
+                        if has_an_item_selected {
 
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                             would_be_on_existing_entity := false;
@@ -612,11 +612,15 @@ main :: () {
                                 }
                                 assert(found_chunk);
 
+                                player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
+
                                 player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
                             }
                         }
                     }
                 }
+
+                print_vars(player.inventory);
 
                 // @TODO: this feels not great. I have to remember to add these here.
                 // Update animations
@@ -1340,6 +1344,15 @@ spawn_player :: () -> Player {
         stack_capacity = ROCK_STACK_CAPACITY,
         stack_count    = ROCK_STACK_CAPACITY,
     };
+
+    // Fill in the rest of the item stacks with invalid data
+    for i: 1..player.inventory.item_stacks.count-1 {
+        player.inventory.item_stacks[i] = ItemStack.{
+            block_type     = 13371738,
+            stack_capacity = 13371738,
+            stack_count    = 13371738,
+        };
+    }
 
     return player;
 }

@@ -1,8 +1,9 @@
 # In progress
 
+- inventory
+
 # Gameplay features
 
-- inventory
 - lighting: world day / night cycle
 - lighting: block fog of war
 - menus: make player color customizable
@@ -25,12 +26,14 @@
 - grass regrow
 
 # Tech
+
 - hot reloading
 - single mesh for chunks / entire mass of blocks
 - simulate chunks by player position
 - cull blocks by viewport
 
 # Bugs
+
 - player looks one pixel off the ground
 - rocks can have their pink border sampled
 - player can spawn inside ground
