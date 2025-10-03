@@ -24,6 +24,9 @@ try_to_jump       : bool;
 try_to_attack     : bool;
 try_to_interact   : bool;
 drag_cam          : bool;
+scroll_as_zoom    : bool;
+hotbar_swap_next  : bool;
+hotbar_swap_prev  : bool;
 
 // Texture maps
 player_head_map           : Texture;
@@ -106,6 +109,10 @@ PLAYER_COLOR_UNDERSHIRT :: PINK;
 PLAYER_COLOR_PANTS      :: BLUE;
 PLAYER_COLOR_SHOES      :: RED;
 
+INVENTORY_EMPTY_SLOT :: -1;
+INVENTORY_SLOTS      :: 32;
+HOTBAR_SLOTS         :: 8;
+
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
 DIRT_MAP_COLS :: 16;
@@ -184,12 +191,14 @@ AnimatedSprite :: struct {
 
 ItemStack :: struct {
     block_type     : BlockType;
-    stack_capacity : u32;
-    stack_count    : u32;
+    stack_capacity : s32;
+    stack_count    : s32;
 }
 
+EMPTY_ITEM_SLOT :: ItemStack.{ -1, -1, -1 };
+
 Inventory :: struct {
-    item_stacks         : [32] ItemStack;
+    item_stacks         : [INVENTORY_SLOTS] ItemStack;
     selected_item_stack : u32;
 }
 
@@ -237,6 +246,7 @@ Controls :: struct {
     attack            : [3] Control;
     interact          : [3] Control;
     drag_cam          : [3] Control;
+    scroll_as_zoom    : [3] Control;
 }
 
 data_folder: string; 
@@ -423,6 +433,9 @@ main :: () {
     controls.attack[0]            = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_LEFT   };
     controls.interact[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_RIGHT  };
     controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE };
+    controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
+    controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
+    // @NOTE: It actually looks like mouse scrolls aren't simple controls in raylib... makes sense... but sad
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
@@ -431,7 +444,6 @@ main :: () {
 
         time := GetTime();
         dt   := GetFrameTime();
-        mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
 
         player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
 
@@ -447,18 +459,23 @@ main :: () {
         // @TODO: Having a notion of active chunks and active blocks is probably still too slow, but it's a step in the right direction.
         derive_active_chunks_and_active_blocks(chunks, *active_chunks, *active_blocks, window_start, window_end);
 
+        mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
+        mouse_wheel_move   := GetMouseWheelMove();
+
         // Reset controls that need to be.
         try_to_jump     = false;
         try_to_attack   = false;
         try_to_interact = false;
+        scroll_as_zoom  = false;
 
         //
         // Input
         //
         {
-            if IsKeyPressed(.KEY_P) paused = !paused;
+            // @TODO: should I move this out of here? feels like these don't belong with the raw input fetching.
+            if IsKeyPressed(.KEY_P) paused     = !paused;
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
-            if IsKeyPressed(.KEY_R) player = spawn_player();
+            if IsKeyPressed(.KEY_R) player     = spawn_player();
 
             move_player_left  = control_down(controls.move_player_left);
             move_player_right = control_down(controls.move_player_right);
@@ -466,6 +483,9 @@ main :: () {
             try_to_attack     = control_down(controls.attack);
             try_to_interact   = control_down(controls.interact); // place blocks, open doors, etc.
             drag_cam          = control_down(controls.drag_cam);
+            scroll_as_zoom    = control_down(controls.scroll_as_zoom); // modifier to hold down to use scroll wheel as zoom.
+            hotbar_swap_next  = mouse_wheel_move > 0 && !scroll_as_zoom;
+            hotbar_swap_prev  = mouse_wheel_move < 0 && !scroll_as_zoom;
         }
 
         //
@@ -474,50 +494,53 @@ main :: () {
         if !paused {
             // Update player
             {
-                player.vel.x = 0;
+                // Movement
+                {
+                    player.vel.x = 0;
 
-                if move_player_left {
-                    player.vel.x -= PLAYER_SPEED_MOVE;
-                    player.is_facing_left = true;
-                }
+                    if move_player_left {
+                        player.vel.x -= PLAYER_SPEED_MOVE;
+                        player.is_facing_left = true;
+                    }
 
-                if move_player_right {
-                    player.vel.x += PLAYER_SPEED_MOVE;
-                    player.is_facing_left = false;
-                }
+                    if move_player_right {
+                        player.vel.x += PLAYER_SPEED_MOVE;
+                        player.is_facing_left = false;
+                    }
 
-                if try_to_jump && can_jump(player) {
-                    player.vel.y = -PLAYER_SPEED_JUMP;
-                    player.jumps_remaining -= 1;
-                }
+                    if try_to_jump && can_jump(player) {
+                        player.vel.y = -PLAYER_SPEED_JUMP;
+                        player.jumps_remaining -= 1;
+                    }
 
-                if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
-
-                collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true)  != null;
-                collided_vertically   := try_to_move(*player, player.vel.y * dt, active_blocks, false) != null;
-
-                if collided_horizontally player.vel.x = 0;
-                if collided_vertically {
-                    player.vel.y = 0;
-                } else {
                     if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
-                }
 
-                // Respawn player if they fall through the world
-                if player.pos.y > 500000 {
-                    player = spawn_player();
-                }
+                    collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true)  != null;
+                    collided_vertically   := try_to_move(*player, player.vel.y * dt, active_blocks, false) != null;
 
-                // Update position-dependent fields on player entity
-                player.bounding_rect.x    = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  / 2.0;
-                player.bounding_rect.y    = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT / 2.0 + 10;
-                player.sprite_rect.x = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
-                player.sprite_rect.y = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
+                    if collided_horizontally player.vel.x = 0;
+                    if collided_vertically {
+                        player.vel.y = 0;
+                    } else {
+                        if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+                    }
 
-                player_is_grounded = is_grounded(player, active_blocks);
-                if player_is_grounded {
-                    player.jumps_remaining = player.jumps_capacity;
-                    player.vel.y = 0;
+                    // Respawn player if they fall through the world
+                    if player.pos.y > 500000 {
+                        player = spawn_player();
+                    }
+
+                    // Update position-dependent fields on player entity
+                    player.bounding_rect.x = player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH     / 2.0;
+                    player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT    / 2.0 + 10;
+                    player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
+                    player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
+
+                    player_is_grounded = is_grounded(player, active_blocks);
+                    if player_is_grounded {
+                        player.jumps_remaining = player.jumps_capacity;
+                        player.vel.y = 0;
+                    }
                 }
 
                 if try_to_attack {
@@ -563,6 +586,8 @@ main :: () {
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
                         
+                        print_vars(selected_item_stack, result);
+
                         if has_an_item_selected {
 
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
@@ -619,8 +644,6 @@ main :: () {
                         }
                     }
                 }
-
-                print_vars(player.inventory);
 
                 // @TODO: this feels not great. I have to remember to add these here.
                 // Update animations
@@ -718,6 +741,19 @@ main :: () {
                         player.cooldown_interact_current_ms -= xx (dt * 1000);
                     }
                 }
+
+                // Update inventory
+                {
+                    if hotbar_swap_next {
+                        using player.inventory;
+                        selected_item_stack = (selected_item_stack + 1) % HOTBAR_SLOTS;
+                    }
+
+                    if hotbar_swap_prev {
+                        using player.inventory;
+                        selected_item_stack = (selected_item_stack - 1) % HOTBAR_SLOTS;
+                    }
+                }
             }
 
             // Update camera
@@ -726,7 +762,9 @@ main :: () {
                     free_cam_pos = Vector2Add(free_cam_pos, Vector2Scale(GetMouseDelta(), -1.0 * DEBUG_CAM_SPEED));
                 }
 
-                camera.zoom += GetMouseWheelMove() * 0.1;
+                if scroll_as_zoom {
+                    camera.zoom += mouse_wheel_move * 0.1;
+                }
 
                 if camera.zoom > 3.0 camera.zoom = 3.0;
                 else if debug_mode && camera.zoom < 0.01 camera.zoom = 0.01;
@@ -1347,11 +1385,7 @@ spawn_player :: () -> Player {
 
     // Fill in the rest of the item stacks with invalid data
     for i: 1..player.inventory.item_stacks.count-1 {
-        player.inventory.item_stacks[i] = ItemStack.{
-            block_type     = 13371738,
-            stack_capacity = 13371738,
-            stack_count    = 13371738,
-        };
+        player.inventory.item_stacks[i] = EMPTY_ITEM_SLOT;
     }
 
     return player;
@@ -1410,9 +1444,17 @@ ReturnStatus :: enum u16 {
     NOT_FOUND;
 }
 
-// @TODO: return not_found for no item or whatever
 get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: u16 {
-    return inventory.item_stacks[inventory.selected_item_stack], xx ReturnStatus.SUCCESS;
+    item_stack := inventory.item_stacks[inventory.selected_item_stack];
+
+    item_stack_is_empty := (
+        item_stack.block_type     == EMPTY_ITEM_SLOT.block_type && 
+        item_stack.stack_capacity == EMPTY_ITEM_SLOT.stack_capacity &&
+        item_stack.stack_count    == EMPTY_ITEM_SLOT.stack_count
+    );
+    return_status := ifx item_stack_is_empty then ReturnStatus.NOT_FOUND else ReturnStatus.SUCCESS;
+
+    return item_stack, xx return_status;
 }
 
 get_block_max_health :: (block_type: BlockType) -> s32 {
