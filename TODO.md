@@ -1,9 +1,9 @@
 # In progress
-
-- only place blocks on other blocks
+- UI: hotbar
 
 # Gameplay features
 
+- UI: inventory
 - tools
 - little block pops out on destroying
 - lighting: world day / night cycle
@@ -14,8 +14,6 @@
 - menus: death menu
 - sound effects: placing blocks
 - sound effects: attacking blocks
-- UI: hotbar
-- UI: inventory
 - world gen: cave gen
 - world gen: ore gen
 - world gen: ramps

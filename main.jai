@@ -571,7 +571,6 @@ main :: () {
                                         removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                         // @TODO: do we need to report if it worked or not? I guess not?...
                                         status : TryToAddToInventoryReturnStatus = try_to_add_to_inventory(*player.inventory, block_type);
-                                        print_vars(status, player.inventory);
                                     }
                                 }
                             }
@@ -581,7 +580,7 @@ main :: () {
                     }
                 }
 
-                // For now this just places down dirt blocks
+                // @TODO: This should actually not place down blocks, but interact with interactable items like doors.
                 if try_to_interact {
 
                     is_on_cooldown := player.cooldown_interact_current_ms > 0;
@@ -590,8 +589,6 @@ main :: () {
 
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
-                        
-                        // print_vars(selected_item_stack, result);
 
                         if has_an_item_selected {
 
@@ -607,13 +604,47 @@ main :: () {
                             }
 
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
+                            new_pos := get_rect_center(new_rect);
+
+                            print_vars(new_rect, new_pos);
 
                             // Check if the new block would be placed on the player
                             if CheckCollisionRecs(new_rect, player.bounding_rect) {
                                 would_be_on_existing_entity = true;
                             }
 
-                            can_place_block := debug_mode || (is_within_reach && !would_be_on_existing_entity);
+                            has_neighbor_block := false;
+                            for active_blocks {
+                                if it_index == 0 {
+                                    print_vars(it.pos, new_pos);
+                                }
+
+                                // above?
+                                if it.pos.x == new_pos.x && it.pos.y == new_pos.y - DIRT_WORLD_TILE_HEIGHT {
+                                    has_neighbor_block = true;
+                                    break;
+                                }
+
+                                // below?
+                                if it.pos.x == new_pos.x && it.pos.y == new_pos.y + DIRT_WORLD_TILE_HEIGHT {
+                                    has_neighbor_block = true;
+                                    break;
+                                }
+
+                                // left?
+                                if it.pos.x == new_pos.x - DIRT_WORLD_TILE_WIDTH && it.pos.y == new_pos.y {
+                                    has_neighbor_block = true;
+                                    break;
+                                }
+
+                                // right?
+                                if it.pos.x == new_pos.x + DIRT_WORLD_TILE_WIDTH && it.pos.y == new_pos.y {
+                                    has_neighbor_block = true;
+                                    break;
+                                }
+                            }
+
+                            can_place_block := debug_mode || (is_within_reach && !would_be_on_existing_entity && has_neighbor_block);
                             
                             if can_place_block {
                                 defer global_id_counter += 1;
@@ -757,8 +788,6 @@ main :: () {
                         player.inventory.selected_item_stack = (player.inventory.selected_item_stack - 1) % HOTBAR_SLOTS;
                     }
                 }
-
-                // print_vars(player.inventory.selected_item_stack);
             }
 
             // Update camera
@@ -894,8 +923,23 @@ main :: () {
 
             // Draw UI
             {
-                DrawFPS(10, 10);
-                
+                DrawFPS(GetScreenWidth() - 100, 10);
+
+                // Hotbar
+                HOTBAR_PANE_LENGTH    :: 50;
+                HOTBAR_PANE_THICKNESS :: 3.0;
+                for 0..7 {
+                    hotbar_pane_rect := Rectangle.{
+                        it * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_THICKNESS,
+                        0 + HOTBAR_PANE_THICKNESS,
+                        HOTBAR_PANE_LENGTH,
+                        HOTBAR_PANE_LENGTH,
+                    };
+                    hotbar_pane_color := ifx player.inventory.selected_item_stack == it then LIME else WHITE;
+                    
+                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+                }
+
                 if debug_mode {
                     DrawText(tprint("(%, %)\0", mouse_pos_in_world.x, mouse_pos_in_world.y).data, 10, 30, 18, LIME);
                 }
