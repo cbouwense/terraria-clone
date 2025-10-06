@@ -484,8 +484,8 @@ main :: () {
             try_to_interact   = control_down(controls.interact); // place blocks, open doors, etc.
             drag_cam          = control_down(controls.drag_cam);
             scroll_as_zoom    = control_down(controls.scroll_as_zoom); // modifier to hold down to use scroll wheel as zoom.
-            hotbar_swap_next  = mouse_wheel_move > 0 && !scroll_as_zoom;
-            hotbar_swap_prev  = mouse_wheel_move < 0 && !scroll_as_zoom;
+            hotbar_swap_next  = mouse_wheel_move < 0 && !scroll_as_zoom; // scroll down to shift one up (think shifting right on minecraft hotbar).
+            hotbar_swap_prev  = mouse_wheel_move > 0 && !scroll_as_zoom; // scroll up to shift one down (think shifting left on minecraft hotbar).
         }
 
         //
@@ -549,7 +549,7 @@ main :: () {
                             // @TODO: it would be nice to have the chunk the mouse is pointing in, as well as the chunk the player is in.
                             block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, it.blocks);
                             if block_mouse_is_over != null {
-                                removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                 break;
                             }
                         }
@@ -560,13 +560,18 @@ main :: () {
                             if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                                 // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block? 
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
+
                                 if block_mouse_is_over != null {
+                                    block_type := block_mouse_is_over.block_type;
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
                                     // @TODO: when there is an inventory, this 1 will have to be whatever attack stat the equipped weapon has.
                                     block_mouse_is_over.health_curr -= 1;
                                     if block_mouse_is_over.health_curr <= 0 {
-                                        removed := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                        removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                        // @TODO: do we need to report if it worked or not? I guess not?...
+                                        status : TryToAddToInventoryReturnStatus = try_to_add_to_inventory(*player.inventory, block_type);
+                                        print_vars(status, player.inventory);
                                     }
                                 }
                             }
@@ -586,7 +591,7 @@ main :: () {
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
                         
-                        print_vars(selected_item_stack, result);
+                        // print_vars(selected_item_stack, result);
 
                         if has_an_item_selected {
 
@@ -745,15 +750,15 @@ main :: () {
                 // Update inventory
                 {
                     if hotbar_swap_next {
-                        using player.inventory;
-                        selected_item_stack = (selected_item_stack + 1) % HOTBAR_SLOTS;
+                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % HOTBAR_SLOTS;
                     }
 
                     if hotbar_swap_prev {
-                        using player.inventory;
-                        selected_item_stack = (selected_item_stack - 1) % HOTBAR_SLOTS;
+                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack - 1) % HOTBAR_SLOTS;
                     }
                 }
+
+                // print_vars(player.inventory.selected_item_stack);
             }
 
             // Update camera
@@ -1376,17 +1381,27 @@ spawn_player :: () -> Player {
     };
 
     // Initialize inventory
-    player.inventory.selected_item_stack = 0;
-    player.inventory.item_stacks[0]      = ItemStack.{
-        block_type     = .ROCK,
-        stack_capacity = ROCK_STACK_CAPACITY,
-        stack_count    = ROCK_STACK_CAPACITY,
-    };
+    {
+        // Fill in the rest of the item stacks with invalid data
+        for *player.inventory.item_stacks {
+            it.* = EMPTY_ITEM_SLOT;
+        }
 
-    // Fill in the rest of the item stacks with invalid data
-    for i: 1..player.inventory.item_stacks.count-1 {
-        player.inventory.item_stacks[i] = EMPTY_ITEM_SLOT;
+        player.inventory.selected_item_stack = 0;
+        
+        player.inventory.item_stacks[0] = ItemStack.{
+            block_type     = .DIRT,
+            stack_capacity = DIRT_STACK_CAPACITY,
+            stack_count    = DIRT_STACK_CAPACITY,
+        };
+        player.inventory.item_stacks[1] = ItemStack.{
+            block_type     = .ROCK,
+            stack_capacity = ROCK_STACK_CAPACITY,
+            stack_count    = ROCK_STACK_CAPACITY,
+        };
     }
+
+    
 
     return player;
 }
@@ -1444,17 +1459,12 @@ ReturnStatus :: enum u16 {
     NOT_FOUND;
 }
 
-get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: u16 {
+get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: ReturnStatus {
     item_stack := inventory.item_stacks[inventory.selected_item_stack];
 
-    item_stack_is_empty := (
-        item_stack.block_type     == EMPTY_ITEM_SLOT.block_type && 
-        item_stack.stack_capacity == EMPTY_ITEM_SLOT.stack_capacity &&
-        item_stack.stack_count    == EMPTY_ITEM_SLOT.stack_count
-    );
-    return_status := ifx item_stack_is_empty then ReturnStatus.NOT_FOUND else ReturnStatus.SUCCESS;
+    return_status := ifx item_stack_is_empty(item_stack) then ReturnStatus.NOT_FOUND else ReturnStatus.SUCCESS;
 
-    return item_stack, xx return_status;
+    return item_stack, return_status;
 }
 
 get_block_max_health :: (block_type: BlockType) -> s32 {
@@ -1493,3 +1503,57 @@ derive_active_chunks_and_active_blocks :: (chunks: [..] Chunk, active_chunks: *[
         }
     }
 }
+
+item_stack_is_empty :: (item_stack: ItemStack) -> bool {
+    return (
+        item_stack.block_type     == EMPTY_ITEM_SLOT.block_type && 
+        item_stack.stack_capacity == EMPTY_ITEM_SLOT.stack_capacity &&
+        item_stack.stack_count    == EMPTY_ITEM_SLOT.stack_count
+    );
+}
+
+get_stack_capacity_by_block_type :: (block_type: BlockType) -> s32 {
+    if block_type == {
+        case .DIRT;  return DIRT_STACK_CAPACITY;
+        case .GRASS; return GRASS_STACK_CAPACITY;
+        case .ROCK;  return ROCK_STACK_CAPACITY;
+        case;
+            assert(false, "Invalid block type");
+            return -1;
+    }
+}
+
+TryToAddToInventoryReturnStatus :: enum u16 {
+    SUCCESS;
+    INVENTORY_FULL;
+}
+
+// @TODO: might need a quantity param
+try_to_add_to_inventory :: (inventory: *Inventory, block_type : BlockType) -> TryToAddToInventoryReturnStatus {
+    // First, try to find an existing stack that has room.
+    for *inventory.item_stacks {
+        if it.block_type == block_type {
+            if it.stack_count < it.stack_capacity {
+                it.stack_count += 1;
+                return TryToAddToInventoryReturnStatus.SUCCESS;
+            }
+        }
+    }
+
+    // If there is no existing stack with space, then just try to find an empty slot.
+    for *inventory.item_stacks {
+        if item_stack_is_empty(it) {
+            it.block_type     = block_type;
+            it.stack_count    = 1;
+            it.stack_capacity = get_stack_capacity_by_block_type(block_type);
+
+            return TryToAddToInventoryReturnStatus.SUCCESS;
+        }
+    }
+
+    // If there are neither existing stacks with space nor empty slots, we can't add the
+    // block to the inventory.
+    return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
+}
+
+    
