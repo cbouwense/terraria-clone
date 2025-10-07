@@ -606,8 +606,6 @@ main :: () {
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
                             new_pos := get_rect_center(new_rect);
 
-                            print_vars(new_rect, new_pos);
-
                             // Check if the new block would be placed on the player
                             if CheckCollisionRecs(new_rect, player.bounding_rect) {
                                 would_be_on_existing_entity = true;
@@ -615,29 +613,25 @@ main :: () {
 
                             has_neighbor_block := false;
                             for active_blocks {
-                                if it_index == 0 {
-                                    print_vars(it.pos, new_pos);
-                                }
-
-                                // above?
+                                // Check for a neighbor above
                                 if it.pos.x == new_pos.x && it.pos.y == new_pos.y - DIRT_WORLD_TILE_HEIGHT {
                                     has_neighbor_block = true;
                                     break;
                                 }
 
-                                // below?
+                                // Check for a neighbor below
                                 if it.pos.x == new_pos.x && it.pos.y == new_pos.y + DIRT_WORLD_TILE_HEIGHT {
                                     has_neighbor_block = true;
                                     break;
                                 }
 
-                                // left?
+                                // Check for a neighbor left
                                 if it.pos.x == new_pos.x - DIRT_WORLD_TILE_WIDTH && it.pos.y == new_pos.y {
                                     has_neighbor_block = true;
                                     break;
                                 }
 
-                                // right?
+                                // Check for a neighbor right
                                 if it.pos.x == new_pos.x + DIRT_WORLD_TILE_WIDTH && it.pos.y == new_pos.y {
                                     has_neighbor_block = true;
                                     break;
@@ -920,7 +914,7 @@ main :: () {
                         HOTBAR_PANE_LENGTH,
                         HOTBAR_PANE_LENGTH,
                     };
-                    hotbar_pane_color := ifx player.inventory.selected_item_stack == it then LIME else WHITE;
+                    hotbar_pane_color := ifx player.inventory.selected_item_stack == it then WHITE else LIGHTGRAY;
                     
                     DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
 
@@ -928,6 +922,13 @@ main :: () {
                     if !item_stack_is_empty(item_stack_in_slot) {
                         block_map_texture, block_map_source := get_block_map_by_block_type(item_stack_in_slot.block_type);
                         DrawTexturePro(block_map_texture, block_map_source, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        DrawText(
+                            tprint("%\0", item_stack_in_slot.stack_count).data,
+                            xx (hotbar_pane_rect.x + HOTBAR_PANE_LENGTH / 2),
+                            xx (hotbar_pane_rect.y + HOTBAR_PANE_LENGTH / 2),
+                            18,
+                            WHITE,
+                        );
                     }
                 }
 
@@ -944,7 +945,6 @@ main :: () {
     }
 }
 
-// @TODO: it would be cool to have a debug mode for this and hot swap the debug sprite sheets.
 init_textures :: () {
     player_head_map           = LoadTexture("data/Player_Head_Release.png");
     player_hair_1_map         = LoadTexture("data/Player_Hair_1_Release.png");

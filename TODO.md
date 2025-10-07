@@ -1,10 +1,10 @@
 # In progress
-- UI: hotbar
+
+- tools
 
 # Gameplay features
 
 - UI: inventory
-- tools
 - little block pops out on destroying
 - lighting: world day / night cycle
 - lighting: block fog of war
