@@ -831,31 +831,16 @@ main :: () {
                 // Draw blocks
                 {
                     for active_blocks {
-                        block_map : Texture;
-                        source    : Rectangle;
+                        block_map_texture, block_map_source := get_block_map_by_block_type(it.block_type);
 
-                        if it.block_type == {
-                            case .DIRT;
-                                block_map = dirt_map;
-                                source    = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
-                            case .GRASS;
-                                block_map = grass_map;
-                                source    = Rectangle.{3 * GRASS_MAP_TILE_WIDTH, 0 * GRASS_MAP_TILE_HEIGHT, GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING, GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING};
-                            case .ROCK;
-                                block_map = rock_map;
-                                source    = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
-                            case;
-                                assert(false, "You forgot a block type in your switch statement");
-                        }
-
-                        DrawTexturePro(block_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 
                         frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
 
                         // Damage overlay (cracks)
                         if it.health_curr < it.health_max {
-                            source = Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
-                            DrawTexturePro(damage_map, source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                            damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
+                            DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                         }
 
                         // Mouse overlay (hover)
@@ -930,14 +915,20 @@ main :: () {
                 HOTBAR_PANE_THICKNESS :: 3.0;
                 for 0..7 {
                     hotbar_pane_rect := Rectangle.{
-                        it * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_THICKNESS,
-                        0 + HOTBAR_PANE_THICKNESS,
+                        it * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + 2 * HOTBAR_PANE_THICKNESS,
+                        0 + 2 * HOTBAR_PANE_THICKNESS,
                         HOTBAR_PANE_LENGTH,
                         HOTBAR_PANE_LENGTH,
                     };
                     hotbar_pane_color := ifx player.inventory.selected_item_stack == it then LIME else WHITE;
                     
                     DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+
+                    item_stack_in_slot := player.inventory.item_stacks[it];
+                    if !item_stack_is_empty(item_stack_in_slot) {
+                        block_map_texture, block_map_source := get_block_map_by_block_type(item_stack_in_slot.block_type);
+                        DrawTexturePro(block_map_texture, block_map_source, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                    }
                 }
 
                 if debug_mode {
@@ -1565,6 +1556,27 @@ get_stack_capacity_by_block_type :: (block_type: BlockType) -> s32 {
             assert(false, "Invalid block type");
             return -1;
     }
+}
+
+get_block_map_by_block_type :: (block_type: BlockType) -> texture: Texture, source: Rectangle {
+    block_map_texture : Texture;
+    block_map_source  : Rectangle;
+    
+    if block_type == {
+        case .DIRT;
+            block_map_texture = dirt_map;
+            block_map_source  = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
+        case .GRASS;
+            block_map_texture = grass_map;
+            block_map_source  = Rectangle.{3 * GRASS_MAP_TILE_WIDTH, 0 * GRASS_MAP_TILE_HEIGHT, GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING, GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING};
+        case .ROCK;
+            block_map_texture = rock_map;
+            block_map_source  = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
+        case;
+            assert(false, "You forgot a block type in your switch statement");
+    }
+
+    return block_map_texture, block_map_source;
 }
 
 TryToAddToInventoryReturnStatus :: enum u16 {
