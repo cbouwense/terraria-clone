@@ -28,7 +28,7 @@ scroll_as_zoom    : bool;
 hotbar_swap_next  : bool;
 hotbar_swap_prev  : bool;
 
-// Texture maps
+// Textures and texture maps
 player_head_map           : Texture;
 player_hair_1_map         : Texture;
 player_eye_white_map      : Texture;
@@ -43,6 +43,7 @@ dirt_map                  : Texture;
 grass_map                 : Texture;
 rock_map                  : Texture;
 damage_map                : Texture;
+pickaxe_texture           : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -152,6 +153,10 @@ DAMAGE_MAP_TILE_HEIGHT :: 16;
 DAMAGE_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
+PICKAXE_TEXTURE_WIDTH  :: 32;
+PICKAXE_TEXTURE_HEIGHT :: 32;
+PICKAXE_STACK_CAPACITY :: -1;
+
 WORLD_GRID_COLS :: 1000;
 
 DEBUG_CAM_SPEED :: 5;
@@ -189,9 +194,16 @@ AnimatedSprite :: struct {
     loops             : bool;
 }
 
+ItemType :: enum {
+    DIRT;
+    GRASS;
+    ROCK;
+    PICKAXE;
+}
+
 ItemStack :: struct {
-    block_type     : BlockType;
-    stack_capacity : s32;
+    item_type      : ItemType;
+    stack_capacity : s32; // -1 means this isn't really a stack, but just an item. e.g. a pickaxe
     stack_count    : s32;
 }
 
@@ -216,15 +228,9 @@ Player :: struct {
     inventory : Inventory;
 }
 
-BlockType :: enum {
-    DIRT;
-    GRASS;
-    ROCK;
-}
-
 Block :: struct {
     #as using entity : Entity;
-    block_type       : BlockType;
+    item_type        : ItemType;
 }
 
 CHUNK_MAX_WIDTH :: 16;
@@ -336,7 +342,7 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = DIRT_HEALTH_MAX,
                     health_curr   = DIRT_HEALTH_MAX,
-                    block_type    = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
+                    item_type    = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
                 }
             );
 
@@ -369,7 +375,7 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = DIRT_HEALTH_MAX,
                     health_curr   = DIRT_HEALTH_MAX,
-                    block_type    = .DIRT,
+                    item_type    = .DIRT,
                 }
             );
 
@@ -403,7 +409,7 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = ROCK_HEALTH_MAX,
                     health_curr   = ROCK_HEALTH_MAX,
-                    block_type    = .ROCK,
+                    item_type    = .ROCK,
                 }
             );
 
@@ -451,7 +457,6 @@ main :: () {
     controls.hotbar_slot_8[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_EIGHT           };
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
-    // @NOTE: It actually looks like mouse scrolls aren't simple controls in raylib... makes sense... but sad
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
@@ -488,7 +493,6 @@ main :: () {
         // Input
         //
         {
-            // @TODO: should I move this out of here? feels like these don't belong with the raw input fetching.
             if IsKeyPressed(.KEY_P) paused     = !paused;
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
             if IsKeyPressed(.KEY_R) player     = spawn_player();
@@ -595,7 +599,7 @@ main :: () {
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
 
                                 if block_mouse_is_over != null {
-                                    block_type := block_mouse_is_over.block_type;
+                                    item_type := block_mouse_is_over.item_type;
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
                                     // @TODO: when there is an inventory, this 1 will have to be whatever attack stat the equipped weapon has.
@@ -603,7 +607,7 @@ main :: () {
                                     if block_mouse_is_over.health_curr <= 0 {
                                         removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                         // @TODO: do we need to report if it worked or not? I guess not?...
-                                        status : TryToAddToInventoryReturnStatus = try_to_add_to_inventory(*player.inventory, block_type);
+                                        status : TryToAddToInventoryReturnStatus = try_to_add_to_inventory(*player.inventory, item_type);
                                     }
                                 }
                             }
@@ -683,9 +687,9 @@ main :: () {
                                     pos           = new_pos,
                                     bounding_rect = new_rect,
                                     sprite_rect   = new_rect,
-                                    block_type    = selected_item_stack.block_type,
-                                    health_max    = get_block_max_health(selected_item_stack.block_type),
-                                    health_curr   = get_block_max_health(selected_item_stack.block_type),
+                                    item_type    = selected_item_stack.item_type,
+                                    health_max    = get_block_max_health(selected_item_stack.item_type),
+                                    health_curr   = get_block_max_health(selected_item_stack.item_type),
                                 };
                                 
                                 found_chunk := false;
@@ -858,7 +862,7 @@ main :: () {
                 // Draw blocks
                 {
                     for active_blocks {
-                        block_map_texture, block_map_source := get_block_map_by_block_type(it.block_type);
+                        block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type);
 
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 
@@ -953,15 +957,23 @@ main :: () {
 
                     item_stack_in_slot := player.inventory.item_stacks[it];
                     if !item_stack_is_empty(item_stack_in_slot) {
-                        block_map_texture, block_map_source := get_block_map_by_block_type(item_stack_in_slot.block_type);
-                        DrawTexturePro(block_map_texture, block_map_source, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                        DrawText(
-                            tprint("%\0", item_stack_in_slot.stack_count).data,
-                            xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
-                            xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
-                            18,
-                            WHITE,
-                        );
+                        if item_type_is_stackable(item_stack_in_slot.item_type) {
+                            item_texture_map, item_source_rect := get_texture_map_by_item_type(item_stack_in_slot.item_type);
+
+                            DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                            DrawText(
+                                tprint("%\0", item_stack_in_slot.stack_count).data,
+                                xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
+                                xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
+                                18,
+                                WHITE,
+                            );
+                        } else {
+                            item_texture := get_texture_map_by_item_type(item_stack_in_slot.item_type);
+                            DrawTexture(item_texture, xx hotbar_pane_rect.x, xx hotbar_pane_rect.y, WHITE);
+                        }
+
+                        
                     }
 
                     DrawText(
@@ -1001,6 +1013,7 @@ init_textures :: () {
     rock_map                  = LoadTexture("data/Tiles_1.png");
     grass_map                 = LoadTexture("data/Tiles_2.png");
     damage_map                = LoadTexture("data/Damage.png");
+    pickaxe_texture           = LoadTexture("data/Pickaxe.png");
 }
 
 init_sprites :: () {
@@ -1466,18 +1479,21 @@ spawn_player :: () -> Player {
         player.inventory.selected_item_stack = 0;
         
         player.inventory.item_stacks[0] = ItemStack.{
-            block_type     = .DIRT,
+            item_type     = .DIRT,
             stack_capacity = DIRT_STACK_CAPACITY,
             stack_count    = DIRT_STACK_CAPACITY,
         };
         player.inventory.item_stacks[1] = ItemStack.{
-            block_type     = .ROCK,
+            item_type     = .ROCK,
             stack_capacity = ROCK_STACK_CAPACITY,
             stack_count    = ROCK_STACK_CAPACITY,
         };
+        player.inventory.item_stacks[2] = ItemStack.{
+            item_type     = .PICKAXE,
+            stack_capacity = PICKAXE_STACK_CAPACITY,
+            stack_count    = PICKAXE_STACK_CAPACITY,
+        };
     }
-
-    
 
     return player;
 }
@@ -1543,13 +1559,14 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, retu
     return item_stack, return_status;
 }
 
-get_block_max_health :: (block_type: BlockType) -> s32 {
-    if block_type == {
+get_block_max_health :: (item_type: ItemType) -> s32 {
+    if item_type == {
         case .DIRT;  return DIRT_HEALTH_MAX;
         case .GRASS; return GRASS_HEALTH_MAX;
         case .ROCK;  return ROCK_HEALTH_MAX;
         case;
-            assert(false, "You forgot a block type in your switch statement");
+            print_vars(item_type);
+            assert(false, "Invalid block type passed to get_block_max_health");
             return -1;
     }
 }
@@ -1582,42 +1599,58 @@ derive_active_chunks_and_active_blocks :: (chunks: [..] Chunk, active_chunks: *[
 
 item_stack_is_empty :: (item_stack: ItemStack) -> bool {
     return (
-        item_stack.block_type     == EMPTY_ITEM_SLOT.block_type && 
+        item_stack.item_type      == EMPTY_ITEM_SLOT.item_type && 
         item_stack.stack_capacity == EMPTY_ITEM_SLOT.stack_capacity &&
         item_stack.stack_count    == EMPTY_ITEM_SLOT.stack_count
     );
 }
 
-get_stack_capacity_by_block_type :: (block_type: BlockType) -> s32 {
-    if block_type == {
+get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
+    if item_type == {
         case .DIRT;  return DIRT_STACK_CAPACITY;
         case .GRASS; return GRASS_STACK_CAPACITY;
         case .ROCK;  return ROCK_STACK_CAPACITY;
         case;
-            assert(false, "Invalid block type");
+            assert(false, "Invalid item type");
             return -1;
     }
 }
 
-get_block_map_by_block_type :: (block_type: BlockType) -> texture: Texture, source: Rectangle {
-    block_map_texture : Texture;
-    block_map_source  : Rectangle;
+get_texture_map_by_item_type :: (item_type: ItemType) -> texture: Texture, source: Rectangle {
+    map_texture : Texture;
+    map_source  : Rectangle;
     
-    if block_type == {
+    if item_type == {
         case .DIRT;
-            block_map_texture = dirt_map;
-            block_map_source  = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
+            map_texture = dirt_map;
+            map_source  = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
         case .GRASS;
-            block_map_texture = grass_map;
-            block_map_source  = Rectangle.{3 * GRASS_MAP_TILE_WIDTH, 0 * GRASS_MAP_TILE_HEIGHT, GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING, GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING};
+            map_texture = grass_map;
+            map_source  = Rectangle.{3 * GRASS_MAP_TILE_WIDTH, 0 * GRASS_MAP_TILE_HEIGHT, GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING, GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING};
         case .ROCK;
-            block_map_texture = rock_map;
-            block_map_source  = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
+            map_texture = rock_map;
+            map_source  = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
+        case .PICKAXE;
+            map_texture = pickaxe_texture;
         case;
-            assert(false, "You forgot a block type in your switch statement");
+            assert(false, "You forgot a item type in your switch statement");
     }
 
-    return block_map_texture, block_map_source;
+    return map_texture, map_source;
+}
+
+item_type_is_stackable :: (item_type: ItemType) -> bool {
+   if item_type == {
+        case .DIRT;    return true;
+        case .GRASS;   return true;
+        case .ROCK;    return true;
+
+        case .PICKAXE; return false;
+
+        case;
+            assert(false, "Forgot an item type in your switch statement");
+            return false; // Unreachable
+    } 
 }
 
 TryToAddToInventoryReturnStatus :: enum u16 {
@@ -1626,10 +1659,10 @@ TryToAddToInventoryReturnStatus :: enum u16 {
 }
 
 // @TODO: might need a quantity param
-try_to_add_to_inventory :: (inventory: *Inventory, block_type : BlockType) -> TryToAddToInventoryReturnStatus {
+try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryToAddToInventoryReturnStatus {
     // First, try to find an existing stack that has room.
     for *inventory.item_stacks {
-        if it.block_type == block_type {
+        if it.item_type == item_type {
             if it.stack_count < it.stack_capacity {
                 it.stack_count += 1;
                 return TryToAddToInventoryReturnStatus.SUCCESS;
@@ -1640,9 +1673,9 @@ try_to_add_to_inventory :: (inventory: *Inventory, block_type : BlockType) -> Tr
     // If there is no existing stack with space, then just try to find an empty slot.
     for *inventory.item_stacks {
         if item_stack_is_empty(it) {
-            it.block_type     = block_type;
+            it.item_type     = item_type;
             it.stack_count    = 1;
-            it.stack_capacity = get_stack_capacity_by_block_type(block_type);
+            it.stack_capacity = get_stack_capacity_by_item_type(item_type);
 
             return TryToAddToInventoryReturnStatus.SUCCESS;
         }
