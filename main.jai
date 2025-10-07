@@ -247,6 +247,14 @@ Controls :: struct {
     interact          : [3] Control;
     drag_cam          : [3] Control;
     scroll_as_zoom    : [3] Control;
+    hotbar_slot_1     : [3] Control;
+    hotbar_slot_2     : [3] Control;
+    hotbar_slot_3     : [3] Control;
+    hotbar_slot_4     : [3] Control;
+    hotbar_slot_5     : [3] Control;
+    hotbar_slot_6     : [3] Control;
+    hotbar_slot_7     : [3] Control;
+    hotbar_slot_8     : [3] Control;
 }
 
 data_folder: string; 
@@ -433,6 +441,14 @@ main :: () {
     controls.attack[0]            = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_LEFT   };
     controls.interact[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_RIGHT  };
     controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE };
+    controls.hotbar_slot_1[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_ONE             };
+    controls.hotbar_slot_2[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_TWO             };
+    controls.hotbar_slot_3[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_THREE           };
+    controls.hotbar_slot_4[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_FOUR            };
+    controls.hotbar_slot_5[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_FIVE            };
+    controls.hotbar_slot_6[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SIX             };
+    controls.hotbar_slot_7[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SEVEN           };
+    controls.hotbar_slot_8[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_EIGHT           };
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
     // @NOTE: It actually looks like mouse scrolls aren't simple controls in raylib... makes sense... but sad
@@ -477,15 +493,32 @@ main :: () {
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
             if IsKeyPressed(.KEY_R) player     = spawn_player();
 
-            move_player_left  = control_down(controls.move_player_left);
-            move_player_right = control_down(controls.move_player_right);
-            try_to_jump       = control_pressed(controls.jump);
-            try_to_attack     = control_down(controls.attack);
-            try_to_interact   = control_down(controls.interact); // place blocks, open doors, etc.
-            drag_cam          = control_down(controls.drag_cam);
-            scroll_as_zoom    = control_down(controls.scroll_as_zoom); // modifier to hold down to use scroll wheel as zoom.
-            hotbar_swap_next  = mouse_wheel_move < 0 && !scroll_as_zoom; // scroll down to shift one up (think shifting right on minecraft hotbar).
-            hotbar_swap_prev  = mouse_wheel_move > 0 && !scroll_as_zoom; // scroll up to shift one down (think shifting left on minecraft hotbar).
+            move_player_left   = control_down(controls.move_player_left);
+            move_player_right  = control_down(controls.move_player_right);
+            try_to_jump        = control_pressed(controls.jump);
+            try_to_attack      = control_down(controls.attack);
+            try_to_interact    = control_down(controls.interact); // place blocks, open doors, etc.
+            drag_cam           = control_down(controls.drag_cam);
+            scroll_as_zoom     = control_down(controls.scroll_as_zoom); // modifier to hold down to use scroll wheel as zoom.
+            hotbar_slot_1     := control_pressed(controls.hotbar_slot_1);
+            hotbar_slot_2     := control_pressed(controls.hotbar_slot_2);
+            hotbar_slot_3     := control_pressed(controls.hotbar_slot_3);
+            hotbar_slot_4     := control_pressed(controls.hotbar_slot_4);
+            hotbar_slot_5     := control_pressed(controls.hotbar_slot_5);
+            hotbar_slot_6     := control_pressed(controls.hotbar_slot_6);
+            hotbar_slot_7     := control_pressed(controls.hotbar_slot_7);
+            hotbar_slot_8     := control_pressed(controls.hotbar_slot_8);
+            hotbar_swap_next   = mouse_wheel_move < 0 && !scroll_as_zoom; // scroll down to shift one up (think shifting right on minecraft hotbar).
+            hotbar_swap_prev   = mouse_wheel_move > 0 && !scroll_as_zoom; // scroll up to shift one down (think shifting left on minecraft hotbar).
+        
+            if hotbar_slot_1 { player.inventory.selected_item_stack = 0; }
+            if hotbar_slot_2 { player.inventory.selected_item_stack = 1; }
+            if hotbar_slot_3 { player.inventory.selected_item_stack = 2; }
+            if hotbar_slot_4 { player.inventory.selected_item_stack = 3; }
+            if hotbar_slot_5 { player.inventory.selected_item_stack = 4; }
+            if hotbar_slot_6 { player.inventory.selected_item_stack = 5; }
+            if hotbar_slot_7 { player.inventory.selected_item_stack = 6; }
+            if hotbar_slot_8 { player.inventory.selected_item_stack = 7; }
         }
 
         //
@@ -924,12 +957,20 @@ main :: () {
                         DrawTexturePro(block_map_texture, block_map_source, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                         DrawText(
                             tprint("%\0", item_stack_in_slot.stack_count).data,
-                            xx (hotbar_pane_rect.x + HOTBAR_PANE_LENGTH / 2),
-                            xx (hotbar_pane_rect.y + HOTBAR_PANE_LENGTH / 2),
+                            xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
+                            xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
                             18,
                             WHITE,
                         );
                     }
+
+                    DrawText(
+                        tprint("%\0", it + 1).data,
+                        xx (hotbar_pane_rect.x + HOTBAR_PANE_THICKNESS * 1.5),
+                        xx (hotbar_pane_rect.y + HOTBAR_PANE_THICKNESS * 1.5),
+                        18,
+                        WHITE,
+                    );
                 }
 
                 if debug_mode {

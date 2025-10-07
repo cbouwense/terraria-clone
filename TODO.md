@@ -26,6 +26,7 @@
 - background image
 - background parallax
 - grass regrow
+- crafting
 
 # Tech
 
