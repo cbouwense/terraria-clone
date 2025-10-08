@@ -164,19 +164,21 @@ DEBUG_CAM_SPEED :: 5;
 global_id_counter: u32 = 0;
 
 Entity :: struct {
-    type          : Type;
+    type           : Type;
 
-    id            : u32; 
-    chunk_id      : u32;
+    id             : u32; 
+    chunk_id       : u32;
 
-    pos           : Vector2;
-    vel           : Vector2;
+    pos            : Vector2;
+    vel            : Vector2;
 
-    bounding_rect : Rectangle; // Used for collision
-    sprite_rect   : Rectangle;
+    is_facing_left : bool;
 
-    health_max    : s32;
-    health_curr   : s32;
+    bounding_rect  : Rectangle; // Used for collision
+    sprite_rect    : Rectangle;
+
+    health_max     : s32;
+    health_curr    : s32;
 }
 
 Sprite :: struct {
@@ -219,8 +221,6 @@ Player :: struct {
 
     jumps_remaining  : int;
     jumps_capacity   : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
-
-    is_facing_left   : bool;
 
     cooldown_attack_current_ms   : s32;
     cooldown_interact_current_ms : s32;
@@ -904,26 +904,8 @@ main :: () {
 
                 // Draw player
                 {
-                    // @TODO: DRY
-                    for player_sprites {
-                        if !it.active continue;
-
-                        frame        := it.first_frame;
-                        source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
-                        source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
-
-                        DrawTexturePro(it.map, source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, it.color);
-                    }
-
-                    for player_animations {
-                        if !it.active continue;
-
-                        frame        := animation_get_current_frame(it);
-                        source_width : float = xx ifx player.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
-                        source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
-
-                        DrawTexturePro(it.map, source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, it.color);
-                    }
+                    for player_sprites    { draw_sprite(it, player); }
+                    for player_animations { draw_sprite(it, player); }
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
@@ -957,10 +939,11 @@ main :: () {
 
                     item_stack_in_slot := player.inventory.item_stacks[it];
                     if !item_stack_is_empty(item_stack_in_slot) {
+                        
+                        item_texture_map, item_source_rect := get_texture_map_by_item_type(item_stack_in_slot.item_type);
+                        DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        
                         if item_type_is_stackable(item_stack_in_slot.item_type) {
-                            item_texture_map, item_source_rect := get_texture_map_by_item_type(item_stack_in_slot.item_type);
-
-                            DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                             DrawText(
                                 tprint("%\0", item_stack_in_slot.stack_count).data,
                                 xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
@@ -968,12 +951,7 @@ main :: () {
                                 18,
                                 WHITE,
                             );
-                        } else {
-                            item_texture := get_texture_map_by_item_type(item_stack_in_slot.item_type);
-                            DrawTexture(item_texture, xx hotbar_pane_rect.x, xx hotbar_pane_rect.y, WHITE);
                         }
-
-                        
                     }
 
                     DrawText(
@@ -996,6 +974,16 @@ main :: () {
             }
         }
     }
+}
+
+draw_sprite :: (sprite: $T/Sprite, entity: Entity) {
+    if !sprite.active return;
+
+    frame        := animation_get_current_frame(sprite);
+    source_width : float = xx ifx entity.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
+    source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
+
+    DrawTexturePro(sprite.map, source_rect, entity.sprite_rect, Vector2.{ 0, 0 }, 0.0, sprite.color);
 }
 
 init_textures :: () {
@@ -1425,9 +1413,13 @@ array_unordered_remove_entity_by_id :: inline (array: *[] $Entity, item: Entity,
     return removed;
 }
 
-animation_get_current_frame :: (animation: AnimatedSprite) -> u32 {
-    if animation.frame_duration_ms == 0 return 0;
-    return ((animation.timer_ms / animation.frame_duration_ms) % animation.frame_count) + animation.first_frame;
+animation_get_current_frame :: (sprite: $T/Sprite) -> u32 {
+    #if type_of(sprite) == Sprite {
+        return sprite.first_frame;
+    } else {
+        if sprite.frame_duration_ms == 0 return 0;
+        return ((sprite.timer_ms / sprite.frame_duration_ms) % sprite.frame_count) + sprite.first_frame;
+    }
 }
 
 // Returns the duration of one full playing of the animation. So, if there are 10 frames, each 50 ms long, the
@@ -1632,6 +1624,7 @@ get_texture_map_by_item_type :: (item_type: ItemType) -> texture: Texture, sourc
             map_source  = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
         case .PICKAXE;
             map_texture = pickaxe_texture;
+            map_source  = Rectangle.{PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT};
         case;
             assert(false, "You forgot a item type in your switch statement");
     }

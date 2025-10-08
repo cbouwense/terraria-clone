@@ -41,3 +41,4 @@
 - rocks can have their pink border sampled
 - player can spawn inside ground
 - linux build doesn't work
+- player can fall into the ground, usually on corners
