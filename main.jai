@@ -76,6 +76,11 @@ player_sprite_shoes_airborne            : Sprite;
 player_sprites    : [..] *Sprite;
 player_animations : [..] *AnimatedSprite;
 
+item_sprite_dirt    : Sprite;
+item_sprite_grass   : Sprite;
+item_sprite_rock    : Sprite;
+item_sprite_pickaxe : Sprite;
+
 SCALE :: 2;
 
 PLAYER_MAP_TILE_WIDTH  :: 40;
@@ -625,7 +630,7 @@ main :: () {
                     if !is_on_cooldown {
 
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
-                        has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
+                        has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
                         if has_an_item_selected {
 
@@ -713,7 +718,7 @@ main :: () {
                 }
 
                 // @TODO: this feels not great. I have to remember to add these here.
-                // Update animations
+                // Update sprites and animations
                 {
                     swinging : bool;
 
@@ -904,8 +909,18 @@ main :: () {
 
                 // Draw player
                 {
-                    for player_sprites    { draw_sprite(it, player); }
-                    for player_animations { draw_sprite(it, player); }
+                    for player_sprites    { draw_sprite(it, player, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT); }
+                    for player_animations { draw_sprite(it, player, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT); }
+
+                    // Render item wielded by player
+                    selected_item_stack, result := get_selected_item_stack(player.inventory);
+                    has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
+                    print_vars(selected_item_stack, result, has_an_item_selected);
+                    if has_an_item_selected {
+                        item_sprite := get_sprite_by_item_type(selected_item_stack.item_type);
+                        item_sprite.active = true;
+                        draw_sprite(item_sprite.*, player, PICKAXE_TEXTURE_WIDTH, PICKAXE_TEXTURE_HEIGHT);
+                    }
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
@@ -976,12 +991,13 @@ main :: () {
     }
 }
 
-draw_sprite :: (sprite: $T/Sprite, entity: Entity) {
+// @TODO: have function for getting width and height
+draw_sprite :: (sprite: $T/Sprite, entity: Entity, texture_map_tile_width: u32, texture_map_tile_height: u32) {
     if !sprite.active return;
 
     frame        := animation_get_current_frame(sprite);
-    source_width : float = xx ifx entity.is_facing_left then -PLAYER_MAP_TILE_WIDTH else PLAYER_MAP_TILE_WIDTH;
-    source_rect  := Rectangle.{xx (frame * PLAYER_MAP_TILE_WIDTH), 0.0, source_width, PLAYER_MAP_TILE_HEIGHT};
+    source_width : float = ifx entity.is_facing_left then cast(float) texture_map_tile_width * -1 else cast(float) texture_map_tile_width;
+    source_rect  := Rectangle.{xx (frame * texture_map_tile_width), 0.0, source_width, xx texture_map_tile_height};
 
     DrawTexturePro(sprite.map, source_rect, entity.sprite_rect, Vector2.{ 0, 0 }, 0.0, sprite.color);
 }
@@ -1229,6 +1245,30 @@ init_sprites :: () {
     array_add(*player_animations, *player_animation_hands_running);
     array_add(*player_animations, *player_animation_hands_swinging);
     array_add(*player_animations, *player_animation_shoes_running);
+
+    item_sprite_dirt = Sprite.{
+        map         = dirt_map,
+        first_frame = 0,
+        color       = WHITE,
+    };
+
+    item_sprite_grass = Sprite.{
+        map         = grass_map,
+        first_frame = 0,
+        color       = WHITE,
+    };
+
+    item_sprite_rock = Sprite.{
+        map         = rock_map,
+        first_frame = 0,
+        color       = WHITE,
+    };
+
+    item_sprite_pickaxe = Sprite.{
+        map         = pickaxe_texture,
+        first_frame = 0,
+        color       = WHITE,
+    };
 }
 
 control_down :: (haystack: [] Control) -> bool {
@@ -1626,10 +1666,23 @@ get_texture_map_by_item_type :: (item_type: ItemType) -> texture: Texture, sourc
             map_texture = pickaxe_texture;
             map_source  = Rectangle.{PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT};
         case;
-            assert(false, "You forgot a item type in your switch statement");
+            assert(false, "You forgot an item type in your switch statement");
     }
 
     return map_texture, map_source;
+}
+
+
+get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
+    if item_type == {
+        case .DIRT;    return *item_sprite_dirt;
+        case .GRASS;   return *item_sprite_grass;
+        case .ROCK;    return *item_sprite_rock;
+        case .PICKAXE; return *item_sprite_pickaxe;
+        case;
+            assert(false, "You forgot an item type in your switch statement");
+            return null;
+    }
 }
 
 item_type_is_stackable :: (item_type: ItemType) -> bool {
@@ -1678,5 +1731,3 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     // block to the inventory.
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
 }
-
-    
