@@ -473,6 +473,7 @@ main :: () {
         dt   := GetFrameTime();
 
         player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
+        player_is_swinging           : bool;
 
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
@@ -578,7 +579,7 @@ main :: () {
                     player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT    / 2.0 + 10;
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
-                    player.item_rect.x     = player.pos.x;
+                    player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - player.item_rect.width;
                     player.item_rect.y     = player.pos.y;
 
                     player_is_grounded = is_grounded(player, active_blocks);
@@ -632,10 +633,11 @@ main :: () {
 
                     if !is_on_cooldown {
 
-                        selected_item_stack, result := get_selected_item_stack(player.inventory);
-                        has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+                        selected_item_stack, result      := get_selected_item_stack(player.inventory);
+                        has_an_item_selected             := result == xx ReturnStatus.SUCCESS;
+                        item_can_be_placed_down := can_item_be_placed_down(selected_item_stack.item_type);
 
-                        if has_an_item_selected {
+                        if has_an_item_selected && item_can_be_placed_down {
 
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
                             would_be_on_existing_entity := false;
@@ -695,7 +697,7 @@ main :: () {
                                     pos           = new_pos,
                                     bounding_rect = new_rect,
                                     sprite_rect   = new_rect,
-                                    item_type    = selected_item_stack.item_type,
+                                    item_type     = selected_item_stack.item_type,
                                     health_max    = get_block_max_health(selected_item_stack.item_type),
                                     health_curr   = get_block_max_health(selected_item_stack.item_type),
                                 };
@@ -723,8 +725,6 @@ main :: () {
                 // @TODO: this feels not great. I have to remember to add these here.
                 // Update sprites and animations
                 {
-                    swinging : bool;
-
                     trying_to_move_horizontally := move_player_left != move_player_right;
                     trying_to_run               := trying_to_move_horizontally && player_is_grounded;
                     airborne_or_idle            := !trying_to_move_horizontally || !player_is_grounded;
@@ -744,10 +744,10 @@ main :: () {
                         should_start_now := !was_previously_active && player_began_action;
                         should_continue  := was_previously_active && still_playing_out;
                         
-                        swinging = should_start_now || should_continue;
+                        player_is_swinging = should_start_now || should_continue;
 
-                        player_animation_hands_swinging.active      = swinging;
-                        player_animation_undershirt_swinging.active = swinging;
+                        player_animation_hands_swinging.active      = player_is_swinging;
+                        player_animation_undershirt_swinging.active = player_is_swinging;
                     }
 
                     // Idle (or airborne)
@@ -759,8 +759,8 @@ main :: () {
                         player_sprite_pants_idle.active          = idle_on_ground;
                         player_sprite_shoes_idle.active          = idle_on_ground;
                         player_sprite_chest_grounded_idle.active = idle_on_ground || (!player_is_grounded && !falling_quickly);
-                        player_sprite_undershirt_idle.active     = idle_on_ground && !swinging;
-                        player_sprite_hands_idle.active          = idle_on_ground && !swinging;
+                        player_sprite_undershirt_idle.active     = idle_on_ground && !player_is_swinging;
+                        player_sprite_hands_idle.active          = idle_on_ground && !player_is_swinging;
                     }
 
                     // Running
@@ -772,24 +772,29 @@ main :: () {
                         player_animation_chest_grounded_running.active = trying_to_run;
                         player_animation_pants_running.active          = trying_to_run;
                         player_animation_shoes_running.active          = trying_to_run;
-                        player_animation_undershirt_running.active     = trying_to_run && !swinging;
-                        player_animation_hands_running.active          = trying_to_run && !swinging;
+                        player_animation_undershirt_running.active     = trying_to_run && !player_is_swinging;
+                        player_animation_hands_running.active          = trying_to_run && !player_is_swinging;
                     }
 
                     // Airborne
                     {
                         player_sprite_pants_airborne.active      = !player_is_grounded;
                         player_sprite_shoes_airborne.active      = !player_is_grounded;
-                        player_sprite_undershirt_airborne.active = !player_is_grounded && !falling_quickly && !swinging;
-                        player_sprite_hands_airborne.active      = !player_is_grounded && !falling_quickly && !swinging;
+                        player_sprite_undershirt_airborne.active = !player_is_grounded && !falling_quickly && !player_is_swinging;
+                        player_sprite_hands_airborne.active      = !player_is_grounded && !falling_quickly && !player_is_swinging;
                     }
 
                     // Falling
                     {
                         player_sprite_chest_falling.active      = falling_quickly;
-                        player_sprite_undershirt_falling.active = falling_quickly && !swinging;
-                        player_sprite_hands_falling.active      = falling_quickly && !swinging;
+                        player_sprite_undershirt_falling.active = falling_quickly && !player_is_swinging;
+                        player_sprite_hands_falling.active      = falling_quickly && !player_is_swinging;
                     }
+
+                    // Items
+                    // {
+                    //     get_sprite_by_item_type
+                    // }
 
                     for player_animations {
                         if it.active {
@@ -916,13 +921,14 @@ main :: () {
                     for player_animations { draw_sprite(it, player, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT); }
 
                     // Render item wielded by player
-                    selected_item_stack, result := get_selected_item_stack(player.inventory);
-                    has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+                    if player_is_swinging {
+                        selected_item_stack, result := get_selected_item_stack(player.inventory);
+                        has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
-                    print_vars(selected_item_stack, result, has_an_item_selected);
-                    if has_an_item_selected {
-                        item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type);
-                        DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        if has_an_item_selected {
+                            item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
+                            DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        }
                     }
 
                     if debug_mode {
@@ -1598,13 +1604,31 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, retu
 
 get_block_max_health :: (item_type: ItemType) -> s32 {
     if item_type == {
-        case .DIRT;  return DIRT_HEALTH_MAX;
-        case .GRASS; return GRASS_HEALTH_MAX;
-        case .ROCK;  return ROCK_HEALTH_MAX;
+        case .DIRT;    return DIRT_HEALTH_MAX;
+        case .GRASS;   return GRASS_HEALTH_MAX;
+        case .ROCK;    return ROCK_HEALTH_MAX;
+
+        case .PICKAXE; assert(false, "Tried to get the block max health of a pickaxe"); #through;
+
         case;
             print_vars(item_type);
-            assert(false, "Invalid block type passed to get_block_max_health");
+            assert(false, "Invalid block type");
             return -1;
+    }
+}
+
+can_item_be_placed_down :: (item_type: ItemType) -> bool {
+    if item_type == {
+        case .DIRT;    return true;
+        case .GRASS;   return true; // @TODO: false?
+        case .ROCK;    return true;
+
+        case .PICKAXE; return false;
+
+        case;
+            print_vars(item_type);
+            assert(false, "Invalid block type");
+            return false;
     }
 }
 
@@ -1653,23 +1677,51 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
     }
 }
 
-get_texture_map_by_item_type :: (item_type: ItemType) -> texture: Texture, source: Rectangle {
+get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = false) -> texture: Texture, source: Rectangle {
     map_texture : Texture;
     map_source  : Rectangle;
     
     if item_type == {
         case .DIRT;
             map_texture = dirt_map;
-            map_source  = Rectangle.{0, 5 * DIRT_MAP_TILE_HEIGHT, DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING, DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING};
+            map_source  = Rectangle.{
+                0,
+                5 * DIRT_MAP_TILE_HEIGHT,
+                DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING,
+                DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING,
+            };
+
+            if is_facing_left map_source.width *= -1;
         case .GRASS;
             map_texture = grass_map;
-            map_source  = Rectangle.{3 * GRASS_MAP_TILE_WIDTH, 0 * GRASS_MAP_TILE_HEIGHT, GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING, GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING};
+            map_source  = Rectangle.{
+                3 * GRASS_MAP_TILE_WIDTH,
+                0 * GRASS_MAP_TILE_HEIGHT,
+                GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING,
+                GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING,
+            };
+
+            if is_facing_left map_source.width *= -1;
         case .ROCK;
             map_texture = rock_map;
-            map_source  = Rectangle.{1 * ROCK_MAP_TILE_WIDTH, 1 * ROCK_MAP_TILE_HEIGHT, ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING, ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING};
+            map_source  = Rectangle.{
+                1 * ROCK_MAP_TILE_WIDTH,
+                1 * ROCK_MAP_TILE_HEIGHT,
+                ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING,
+                ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING,
+            };
+
+            if is_facing_left map_source.width *= -1;
         case .PICKAXE;
             map_texture = pickaxe_texture;
-            map_source  = Rectangle.{PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT};
+            map_source  = Rectangle.{
+                PICKAXE_TEXTURE_HEIGHT,
+                PICKAXE_TEXTURE_HEIGHT,
+                PICKAXE_TEXTURE_HEIGHT,
+                PICKAXE_TEXTURE_HEIGHT,
+            };
+
+            if is_facing_left map_source.width *= -1;
         case;
             assert(false, "You forgot an item type in your switch statement");
     }
