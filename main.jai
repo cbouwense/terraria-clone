@@ -181,6 +181,7 @@ Entity :: struct {
 
     bounding_rect  : Rectangle; // Used for collision
     sprite_rect    : Rectangle;
+    item_rect      : Rectangle; // Destination rect for wielded items
 
     health_max     : s32;
     health_curr    : s32;
@@ -577,6 +578,8 @@ main :: () {
                     player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT    / 2.0 + 10;
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
+                    player.item_rect.x     = player.pos.x;
+                    player.item_rect.y     = player.pos.y;
 
                     player_is_grounded = is_grounded(player, active_blocks);
                     if player_is_grounded {
@@ -919,7 +922,7 @@ main :: () {
                     print_vars(selected_item_stack, result, has_an_item_selected);
                     if has_an_item_selected {
                         item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type);
-                        DrawTexturePro(item_texture_map, item_source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                     }
 
                     if debug_mode {
@@ -1486,6 +1489,12 @@ spawn_player :: () -> Player {
             pos.y - floor(PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0),
             xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
             xx PLAYER_WORLD_HEAD_SPRITE_HEIGHT,
+        },
+        item_rect = Rectangle.{
+            pos.x,
+            pos.y,
+            PLAYER_WORLD_HEAD_SPRITE_WIDTH / 2.0,
+            PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0,
         },
 
         jumps_capacity  = 2,
