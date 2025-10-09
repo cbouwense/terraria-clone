@@ -914,12 +914,12 @@ main :: () {
 
                     // Render item wielded by player
                     selected_item_stack, result := get_selected_item_stack(player.inventory);
-                    has_an_item_selected := result == xx ReturnStatus.SUCCESS && selected_item_stack.stack_count > 0;
+                    has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+
                     print_vars(selected_item_stack, result, has_an_item_selected);
                     if has_an_item_selected {
-                        item_sprite := get_sprite_by_item_type(selected_item_stack.item_type);
-                        item_sprite.active = true;
-                        draw_sprite(item_sprite.*, player, PICKAXE_TEXTURE_WIDTH, PICKAXE_TEXTURE_HEIGHT);
+                        item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type);
+                        DrawTexturePro(item_texture_map, item_source_rect, player.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                     }
 
                     if debug_mode {
@@ -1022,9 +1022,9 @@ init_textures :: () {
 
 init_sprites :: () {
     player_sprite_head_idle = Sprite.{
-        map         = player_head_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE,
-        color       = PLAYER_COLOR_SKIN,
+        map               = player_head_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE,
+        color             = PLAYER_COLOR_SKIN,
     };
 
     player_animation_head_running = AnimatedSprite.{
@@ -1037,9 +1037,9 @@ init_sprites :: () {
     };
 
     player_sprite_hair_1_idle = Sprite.{
-        map         = player_hair_1_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_HAIR,
+        map               = player_hair_1_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_HAIR,
     };
 
     player_animation_hair_1_running = AnimatedSprite.{
@@ -1052,9 +1052,9 @@ init_sprites :: () {
     };
 
     player_sprite_eye_white_idle = Sprite.{
-        map         = player_eye_white_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = WHITE,
+        map               = player_eye_white_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = WHITE,
     };
 
     player_animation_eye_white_running = AnimatedSprite.{
@@ -1067,9 +1067,9 @@ init_sprites :: () {
     };
     
     player_sprite_eye_iris_idle = Sprite.{
-        map         = player_eye_iris_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_EYE,
+        map               = player_eye_iris_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_EYE,
     };
 
     player_animation_eye_iris_running = AnimatedSprite.{
@@ -1082,9 +1082,9 @@ init_sprites :: () {
     };
 
     player_sprite_chest_grounded_idle = Sprite.{
-        map         = player_chest_grounded_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_CHEST,
+        map               = player_chest_grounded_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_CHEST,
     };
 
     player_animation_chest_grounded_running = AnimatedSprite.{
@@ -1098,15 +1098,15 @@ init_sprites :: () {
 
     // There's not really a need for a running version of this since it's a different sprite sheet.
     player_sprite_chest_falling = Sprite.{
-        map         = player_chest_airborne_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_CHEST,
+        map               = player_chest_airborne_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_CHEST,
     };
 
     player_sprite_undershirt_idle = Sprite.{
-        map         = player_undershirt_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_UNDERSHIRT,
+        map               = player_undershirt_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_UNDERSHIRT,
     };
 
     player_animation_undershirt_running = AnimatedSprite.{
@@ -1119,15 +1119,15 @@ init_sprites :: () {
     };
 
     player_sprite_undershirt_airborne = Sprite.{
-        map         = player_undershirt_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        color       = PLAYER_COLOR_UNDERSHIRT,
+        map               = player_undershirt_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        color             = PLAYER_COLOR_UNDERSHIRT,
     };
 
     player_sprite_undershirt_falling = Sprite.{
-        map         = player_undershirt_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
-        color       = PLAYER_COLOR_UNDERSHIRT,
+        map               = player_undershirt_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
+        color             = PLAYER_COLOR_UNDERSHIRT,
     };
 
     player_animation_undershirt_swinging = AnimatedSprite.{
@@ -1140,9 +1140,9 @@ init_sprites :: () {
     };
 
     player_sprite_pants_idle = Sprite.{
-        map         = player_pants_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
-        color       = PLAYER_COLOR_PANTS,
+        map               = player_pants_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE, 
+        color             = PLAYER_COLOR_PANTS,
     };
 
     player_animation_pants_running = AnimatedSprite.{
@@ -1155,9 +1155,9 @@ init_sprites :: () {
     };
 
     player_sprite_pants_airborne = Sprite.{
-        map         = player_pants_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
-        color       = PLAYER_COLOR_PANTS,
+        map               = player_pants_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_FALLING,
+        color             = PLAYER_COLOR_PANTS,
     };
 
     player_sprite_hands_idle = Sprite.{
@@ -1176,9 +1176,9 @@ init_sprites :: () {
     };
 
     player_sprite_hands_airborne = Sprite.{
-        map         = player_hands_map,
-        first_frame = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
-        color       = PLAYER_COLOR_SKIN,
+        map               = player_hands_map,
+        first_frame       = PLAYER_ANIMATION_FIRST_FRAME_RUNNING,
+        color             = PLAYER_COLOR_SKIN,
     };
 
     player_sprite_hands_falling = Sprite.{
@@ -1247,27 +1247,23 @@ init_sprites :: () {
     array_add(*player_animations, *player_animation_shoes_running);
 
     item_sprite_dirt = Sprite.{
-        map         = dirt_map,
-        first_frame = 0,
-        color       = WHITE,
+        map   = dirt_map,
+        color = WHITE,
     };
 
     item_sprite_grass = Sprite.{
-        map         = grass_map,
-        first_frame = 0,
-        color       = WHITE,
+        map   = grass_map,
+        color = WHITE,
     };
 
     item_sprite_rock = Sprite.{
-        map         = rock_map,
-        first_frame = 0,
-        color       = WHITE,
+        map   = rock_map,
+        color = WHITE,
     };
 
     item_sprite_pickaxe = Sprite.{
-        map         = pickaxe_texture,
-        first_frame = 0,
-        color       = WHITE,
+        map   = pickaxe_texture,
+        color = WHITE,
     };
 }
 
