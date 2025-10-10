@@ -162,6 +162,8 @@ PICKAXE_TEXTURE_WIDTH  :: 32;
 PICKAXE_TEXTURE_HEIGHT :: 32;
 PICKAXE_STACK_CAPACITY :: -1;
 
+ITEM_WORLD_LENGTH :: 65;
+
 WORLD_GRID_COLS :: 1000;
 
 DEBUG_CAM_SPEED :: 5;
@@ -464,6 +466,8 @@ main :: () {
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
 
+    global_swing_timer_ms : u32;
+
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
     while !WindowShouldClose() {
@@ -473,7 +477,7 @@ main :: () {
         dt   := GetFrameTime();
 
         player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
-        player_is_swinging           : bool;
+        player_is_swinging : bool;
 
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
@@ -580,7 +584,7 @@ main :: () {
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
                     player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - player.item_rect.width;
-                    player.item_rect.y     = player.pos.y;
+                    player.item_rect.y     = player.pos.y - ITEM_WORLD_LENGTH;    
 
                     player_is_grounded = is_grounded(player, active_blocks);
                     if player_is_grounded {
@@ -791,22 +795,25 @@ main :: () {
                         player_sprite_hands_falling.active      = falling_quickly && !player_is_swinging;
                     }
 
-                    // Items
-                    // {
-                    //     get_sprite_by_item_type
-                    // }
+                    // Update active animation timers
+                    {
+                        for player_animations {
+                            if it.active {
+                                it.timer_ms += xx (dt * 1000);
 
-                    for player_animations {
-                        if it.active {
-                            it.timer_ms += xx (dt * 1000);
-
-                            if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
+                                if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
+                                    it.timer_ms = 0;
+                                    it.active   = false;
+                                }   
+                            } else {
                                 it.timer_ms = 0;
-                                it.active   = false;
-                            }   
-                        } else {
-                            it.timer_ms = 0;
-                        };
+                            };
+                        }
+
+                        global_swing_timer_ms += xx (dt * 1000);
+                        if global_swing_timer_ms > 4 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                            global_swing_timer_ms = 0;
+                        }
                     }
                 }
 
@@ -921,18 +928,55 @@ main :: () {
                     for player_animations { draw_sprite(it, player, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT); }
 
                     // Render item wielded by player
-                    if player_is_swinging {
+                    if true {
+                    // if player_is_swinging {
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
                         if has_an_item_selected {
                             item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
-                            DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+
+                            offset_x : float;
+                            offset_y : float;
+                            rotation : float;
+                            if global_swing_timer_ms      < 1 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                                rotation = -60.0;
+                                offset_x = 0;
+                                offset_y = 0;
+                            }
+                            else if global_swing_timer_ms < 2 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                                rotation = -45.0;
+                                offset_x = 60.0;
+                                offset_y = 0;
+                            }
+                            else if global_swing_timer_ms < 3 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                                rotation = 0.0;
+                                offset_x = 120.0;
+                                offset_y = 20;
+                            }
+                            else if global_swing_timer_ms < 4 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                                rotation = 30.0;
+                                offset_x = 150.0;
+                                offset_y = 40;
+                            }
+
+                            print_vars(global_swing_timer_ms);
+                            // DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ 0, 0 }, rotation, WHITE);
+                            DrawTexturePro(
+                                item_texture_map,
+                                item_source_rect,
+                                Rectangle.{ player.item_rect.x + offset_x, player.item_rect.y + offset_y, player.item_rect.width, player.item_rect.height },
+                                Vector2.{ player.item_rect.width / 2.0, player.item_rect.height / 2.0 },
+                                rotation,
+                                WHITE,
+                            );
+                            // DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ player.item_rect.width, player.item_rect.height }, rotation, WHITE);
                         }
                     }
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
+                        DrawRectangleLinesEx(player.item_rect, 1.0, LIME);
                         DrawCircleV(player.pos, 4.0, RED);
                     }
                 }
@@ -1498,9 +1542,9 @@ spawn_player :: () -> Player {
         },
         item_rect = Rectangle.{
             pos.x,
-            pos.y,
-            PLAYER_WORLD_HEAD_SPRITE_WIDTH / 2.0,
-            PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0,
+            pos.y - ITEM_WORLD_LENGTH,
+            ITEM_WORLD_LENGTH,
+            ITEM_WORLD_LENGTH,
         },
 
         jumps_capacity  = 2,
