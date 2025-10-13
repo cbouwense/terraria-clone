@@ -106,7 +106,7 @@ PLAYER_ANIMATION_WIELD_DURATION_MS :: PLAYER_ANIMATION_SWING_DURATION_MS / 3;
 PLAYER_ANIMATION_FIRST_FRAME_IDLE     :: 0;
 PLAYER_ANIMATION_FIRST_FRAME_RUNNING  :: 6;
 PLAYER_ANIMATION_FIRST_FRAME_FALLING  :: 5;
-PLAYER_ANIMATION_FIRST_FRAME_SWINGING :: 3;
+PLAYER_ANIMATION_FIRST_FRAME_SWINGING :: 1;
 
 PLAYER_COLOR_SKIN       :: BEIGE;
 PLAYER_COLOR_HAIR       :: ORANGE;
@@ -799,7 +799,7 @@ main :: () {
                     }
 
                     // Update active animation timers
-                    #if false {   
+                    #if true {   
                         for player_animations {
                             if it.active {
                                 it.timer_ms += xx (dt * 1000);
@@ -814,8 +814,8 @@ main :: () {
                         }
                     }
 
-                    #if false {
-                        global_swing_timer_ms += xx (dt * 400);
+                    #if true {
+                        global_swing_timer_ms += xx (dt * 1000);
                         if global_swing_timer_ms > 9 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                             global_swing_timer_ms = 0;
                         }
