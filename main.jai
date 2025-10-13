@@ -106,7 +106,7 @@ PLAYER_ANIMATION_WIELD_DURATION_MS :: PLAYER_ANIMATION_SWING_DURATION_MS / 3;
 PLAYER_ANIMATION_FIRST_FRAME_IDLE     :: 0;
 PLAYER_ANIMATION_FIRST_FRAME_RUNNING  :: 6;
 PLAYER_ANIMATION_FIRST_FRAME_FALLING  :: 5;
-PLAYER_ANIMATION_FIRST_FRAME_SWINGING :: 1;
+PLAYER_ANIMATION_FIRST_FRAME_SWINGING :: 3;
 
 PLAYER_COLOR_SKIN       :: BEIGE;
 PLAYER_COLOR_HAIR       :: ORANGE;
@@ -467,7 +467,7 @@ main :: () {
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
 
-    global_swing_timer_ms : u32;
+    global_swing_timer_ms : u32 = PLAYER_ANIMATION_WIELD_DURATION_MS * 6 + 1;
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
@@ -584,8 +584,8 @@ main :: () {
                     player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT    / 2.0 + 10;
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
-                    player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - ITEM_WORLD_LENGTH;
-                    player.item_rect.y     = player.pos.y - ITEM_WORLD_LENGTH;
+                    // player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - ITEM_WORLD_LENGTH;
+                    // player.item_rect.y     = player.pos.y - ITEM_WORLD_LENGTH;
 
                     player_is_grounded = is_grounded(player, active_blocks);
                     if player_is_grounded {
@@ -799,24 +799,24 @@ main :: () {
                     }
 
                     // Update active animation timers
-                    {
-                        #if false {
-                            for player_animations {
-                                if it.active {
-                                    it.timer_ms += xx (dt * 1000);
+                    #if false {   
+                        for player_animations {
+                            if it.active {
+                                it.timer_ms += xx (dt * 1000);
 
-                                    if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
-                                        it.timer_ms = 0;
-                                        it.active   = false;
-                                    }   
-                                } else {
+                                if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
                                     it.timer_ms = 0;
-                                };
-                            }
+                                    it.active   = false;
+                                }   
+                            } else {
+                                it.timer_ms = 0;
+                            };
                         }
+                    }
 
-                        global_swing_timer_ms += xx (dt * 1000);
-                        if global_swing_timer_ms > 9 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                    #if false {
+                        global_swing_timer_ms += xx (dt * 400);
+                        if global_swing_timer_ms > 9 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                             global_swing_timer_ms = 0;
                         }
                     }
@@ -937,93 +937,97 @@ main :: () {
                     // if player_is_swinging {
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+                        print_vars(has_an_item_selected);
 
                         if has_an_item_selected {
                             item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
 
                             offset_x : float;
                             offset_y : float;
-                            // rotation := -90.0;
-                            rotation := ifx player.is_facing_left
-                                then 45.0 + global_swing_timer_ms / 10
-                                else -45.0 + global_swing_timer_ms / 10;
+                            rotation : float;
+                            destination_rect : Rectangle;
+                            origin   : Vector2;
 
-                            destination_rect := ifx player.is_facing_left
-                                then Rectangle.{
-                                    player.item_rect.x,
-                                    player.item_rect.y + player.item_rect.height,
-                                    player.item_rect.width,
-                                    player.item_rect.height
+                            if player.is_facing_left {
+
+                            } else {
+                                // @TODO: probably DRY this up somehow
+                                if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x - 25.0,
+                                        player.pos.y - 10.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
+
+                                    origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
+                                    
+                                    if global_swing_timer_ms < PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -105.0;
+                                    }
+                                    else if global_swing_timer_ms < 2 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -90.0;
+                                    } else {
+                                        rotation = -75.0;
+                                    }
                                 }
-                                else Rectangle.{
-                                    player.item_rect.x + player.item_rect.width,
-                                    player.item_rect.y + player.item_rect.height,
-                                    player.item_rect.width,
-                                    player.item_rect.height
-                                };
+                                else if global_swing_timer_ms < 6 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x + 5.0,
+                                        player.pos.y - 15.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
 
-                            origin : Vector2 = ifx player.is_facing_left
-                                then Vector2.{ 0.0, player.item_rect.height }
-                                else Vector2.{ player.item_rect.width, player.item_rect.height };
+                                    origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
+                                    
+                                    if global_swing_timer_ms < 4 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -45.0;
+                                    }
+                                    else if global_swing_timer_ms < 5 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -30.0;
+                                    } else {
+                                        rotation = 0.0;
+                                    }
+                                }
+                                else if global_swing_timer_ms < 9 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x + 15.0,
+                                        player.pos.y + 10.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
 
-                            // if global_swing_timer_ms < PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = 45.0;
-                            //     offset_x = 10.0;
-                            //     offset_y = 15.0;
-                            // }
-                            // else if global_swing_timer_ms < 2 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = -60.0;
-                            //     offset_x = 35.0;
-                            //     offset_y = 15.0;
-                            // }
-
-                            // else if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = -35.0;
-                            //     offset_x = 85.0;
-                            //     offset_y = 15.0;
-                            // }
-                            // // Done for facing right
-                            // else if global_swing_timer_ms < 4 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = 0.0;
-                            //     offset_x = 105.0;
-                            //     offset_y = 25.0;
-                            // }
-                            // // Done for facing right
-                            // else if global_swing_timer_ms < 5 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = 20.0;
-                            //     offset_x = 120.0;
-                            //     offset_y = 60.0;
-                            // }
-                            // // Done for facing right
-                            // else if global_swing_timer_ms < 6 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = 45.0;
-                            //     offset_x = 120.0;
-                            //     offset_y = 80.0;
-                            // }
-                            // // Done for facing right
-                            // else if global_swing_timer_ms < 7 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            //     rotation = 60.0;
-                            //     offset_x = 120.0;
-                            //     offset_y = 90.0;
-                            // }
+                                    origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
+                                    
+                                    if global_swing_timer_ms < 7 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 15.0;
+                                    }
+                                    else if global_swing_timer_ms < 8 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 45.0;
+                                    } else {
+                                        rotation = 60.0;
+                                    }
+                                }
+                            }
 
                             print_vars(global_swing_timer_ms);
                             DrawTexturePro(
                                 item_texture_map, // texture
                                 item_source_rect, // source
-                                destination_rect, // destination
+                                destination_rect,
                                 origin,
                                 rotation,
                                 WHITE,
                             );
-                            drawn_origin := Vector2.{ player.item_rect.x + origin.x, player.item_rect.y + origin.y };
-                            DrawCircleV(drawn_origin, 3.0, BLUE);
-                            DrawRectangleLinesEx(destination_rect, 1.0, BLUE);
+
+                            DrawRectangleLinesEx(Rectangle.{ destination_rect.x + origin.x, destination_rect.y + origin.y, destination_rect.width, destination_rect.height }, 1.0, BLUE);
+                            DrawRectangleLinesEx(destination_rect, 1.0, LIME);
                         }
                     }
 
                     if debug_mode {
-                        DrawRectangleLinesEx(player.item_rect, 1.0, LIME);
+                        // DrawRectangleLinesEx(player.item_rect, 1.0, LIME);
                         // DrawCircleV(player.pos, 3.0, RED);
                     }
                 }
@@ -1587,12 +1591,12 @@ spawn_player :: () -> Player {
             xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
             xx PLAYER_WORLD_HEAD_SPRITE_HEIGHT,
         },
-        item_rect = Rectangle.{
-            pos.x,
-            pos.y - ITEM_WORLD_LENGTH,
-            ITEM_WORLD_LENGTH,
-            ITEM_WORLD_LENGTH,
-        },
+        // item_rect = Rectangle.{
+        //     pos.x,
+        //     pos.y - ITEM_WORLD_LENGTH,
+        //     ITEM_WORLD_LENGTH,
+        //     ITEM_WORLD_LENGTH,
+        // },
 
         jumps_capacity  = 2,
         jumps_remaining = 2,
@@ -1610,7 +1614,7 @@ spawn_player :: () -> Player {
             it.* = EMPTY_ITEM_SLOT;
         }
 
-        player.inventory.selected_item_stack = 0;
+        player.inventory.selected_item_stack = 2;
         
         player.inventory.item_stacks[0] = ItemStack.{
             item_type     = .DIRT,
