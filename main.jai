@@ -101,6 +101,7 @@ PLAYER_COOLDOWN_INTERACT_DURATION_MS :: 100;
 
 PLAYER_ANIMATION_RUN_DURATION_MS   :: 25;
 PLAYER_ANIMATION_SWING_DURATION_MS :: 75;
+PLAYER_ANIMATION_WIELD_DURATION_MS :: PLAYER_ANIMATION_SWING_DURATION_MS / 3;
 
 PLAYER_ANIMATION_FIRST_FRAME_IDLE     :: 0;
 PLAYER_ANIMATION_FIRST_FRAME_RUNNING  :: 6;
@@ -583,8 +584,8 @@ main :: () {
                     player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT    / 2.0 + 10;
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
-                    player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - player.item_rect.width;
-                    player.item_rect.y     = player.pos.y - ITEM_WORLD_LENGTH;    
+                    player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - ITEM_WORLD_LENGTH;
+                    player.item_rect.y     = player.pos.y - ITEM_WORLD_LENGTH;
 
                     player_is_grounded = is_grounded(player, active_blocks);
                     if player_is_grounded {
@@ -750,8 +751,10 @@ main :: () {
                         
                         player_is_swinging = should_start_now || should_continue;
 
-                        player_animation_hands_swinging.active      = player_is_swinging;
-                        player_animation_undershirt_swinging.active = player_is_swinging;
+                        // player_animation_hands_swinging.active      = player_is_swinging;
+                        player_animation_hands_swinging.active      = true; 
+                        // player_animation_undershirt_swinging.active = player_is_swinging;
+                        player_animation_undershirt_swinging.active = true; 
                     }
 
                     // Idle (or airborne)
@@ -797,21 +800,23 @@ main :: () {
 
                     // Update active animation timers
                     {
-                        for player_animations {
-                            if it.active {
-                                it.timer_ms += xx (dt * 1000);
+                        #if false {
+                            for player_animations {
+                                if it.active {
+                                    it.timer_ms += xx (dt * 1000);
 
-                                if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
+                                    if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
+                                        it.timer_ms = 0;
+                                        it.active   = false;
+                                    }   
+                                } else {
                                     it.timer_ms = 0;
-                                    it.active   = false;
-                                }   
-                            } else {
-                                it.timer_ms = 0;
-                            };
+                                };
+                            }
                         }
 
                         global_swing_timer_ms += xx (dt * 1000);
-                        if global_swing_timer_ms > 4 * PLAYER_ANIMATION_SWING_DURATION_MS {
+                        if global_swing_timer_ms > 9 * PLAYER_ANIMATION_SWING_DURATION_MS {
                             global_swing_timer_ms = 0;
                         }
                     }
@@ -938,46 +943,88 @@ main :: () {
 
                             offset_x : float;
                             offset_y : float;
-                            rotation : float;
-                            if global_swing_timer_ms      < 1 * PLAYER_ANIMATION_SWING_DURATION_MS {
-                                rotation = -60.0;
-                                offset_x = 0;
-                                offset_y = 0;
-                            }
-                            else if global_swing_timer_ms < 2 * PLAYER_ANIMATION_SWING_DURATION_MS {
-                                rotation = -45.0;
-                                offset_x = 60.0;
-                                offset_y = 0;
-                            }
-                            else if global_swing_timer_ms < 3 * PLAYER_ANIMATION_SWING_DURATION_MS {
-                                rotation = 0.0;
-                                offset_x = 120.0;
-                                offset_y = 20;
-                            }
-                            else if global_swing_timer_ms < 4 * PLAYER_ANIMATION_SWING_DURATION_MS {
-                                rotation = 30.0;
-                                offset_x = 150.0;
-                                offset_y = 40;
-                            }
+                            // rotation := -90.0;
+                            rotation := ifx player.is_facing_left
+                                then 45.0 + global_swing_timer_ms / 10
+                                else -45.0 + global_swing_timer_ms / 10;
+
+                            destination_rect := ifx player.is_facing_left
+                                then Rectangle.{
+                                    player.item_rect.x,
+                                    player.item_rect.y + player.item_rect.height,
+                                    player.item_rect.width,
+                                    player.item_rect.height
+                                }
+                                else Rectangle.{
+                                    player.item_rect.x + player.item_rect.width,
+                                    player.item_rect.y + player.item_rect.height,
+                                    player.item_rect.width,
+                                    player.item_rect.height
+                                };
+
+                            origin : Vector2 = ifx player.is_facing_left
+                                then Vector2.{ 0.0, player.item_rect.height }
+                                else Vector2.{ player.item_rect.width, player.item_rect.height };
+
+                            // if global_swing_timer_ms < PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = 45.0;
+                            //     offset_x = 10.0;
+                            //     offset_y = 15.0;
+                            // }
+                            // else if global_swing_timer_ms < 2 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = -60.0;
+                            //     offset_x = 35.0;
+                            //     offset_y = 15.0;
+                            // }
+
+                            // else if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = -35.0;
+                            //     offset_x = 85.0;
+                            //     offset_y = 15.0;
+                            // }
+                            // // Done for facing right
+                            // else if global_swing_timer_ms < 4 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = 0.0;
+                            //     offset_x = 105.0;
+                            //     offset_y = 25.0;
+                            // }
+                            // // Done for facing right
+                            // else if global_swing_timer_ms < 5 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = 20.0;
+                            //     offset_x = 120.0;
+                            //     offset_y = 60.0;
+                            // }
+                            // // Done for facing right
+                            // else if global_swing_timer_ms < 6 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = 45.0;
+                            //     offset_x = 120.0;
+                            //     offset_y = 80.0;
+                            // }
+                            // // Done for facing right
+                            // else if global_swing_timer_ms < 7 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                            //     rotation = 60.0;
+                            //     offset_x = 120.0;
+                            //     offset_y = 90.0;
+                            // }
 
                             print_vars(global_swing_timer_ms);
-                            // DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ 0, 0 }, rotation, WHITE);
                             DrawTexturePro(
-                                item_texture_map,
-                                item_source_rect,
-                                Rectangle.{ player.item_rect.x + offset_x, player.item_rect.y + offset_y, player.item_rect.width, player.item_rect.height },
-                                Vector2.{ player.item_rect.width / 2.0, player.item_rect.height / 2.0 },
+                                item_texture_map, // texture
+                                item_source_rect, // source
+                                destination_rect, // destination
+                                origin,
                                 rotation,
                                 WHITE,
                             );
-                            // DrawTexturePro(item_texture_map, item_source_rect, player.item_rect, Vector2.{ player.item_rect.width, player.item_rect.height }, rotation, WHITE);
+                            drawn_origin := Vector2.{ player.item_rect.x + origin.x, player.item_rect.y + origin.y };
+                            DrawCircleV(drawn_origin, 3.0, BLUE);
+                            DrawRectangleLinesEx(destination_rect, 1.0, BLUE);
                         }
                     }
 
                     if debug_mode {
-                        DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
                         DrawRectangleLinesEx(player.item_rect, 1.0, LIME);
-                        DrawCircleV(player.pos, 4.0, RED);
+                        // DrawCircleV(player.pos, 3.0, RED);
                     }
                 }
 
