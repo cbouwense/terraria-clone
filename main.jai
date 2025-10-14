@@ -163,7 +163,8 @@ PICKAXE_TEXTURE_WIDTH  :: 32;
 PICKAXE_TEXTURE_HEIGHT :: 32;
 PICKAXE_STACK_CAPACITY :: -1;
 
-ITEM_WORLD_LENGTH :: 65;
+WIELDED_TOOL_WORLD_LENGTH  :: 65;
+WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
 WORLD_GRID_COLS :: 1000;
 
@@ -928,16 +929,17 @@ main :: () {
                         if has_an_item_selected {
                             item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
 
+                            length := get_item_world_length(selected_item_stack.item_type);
                             rotation : float;
                             destination_rect : Rectangle;
-                            origin   := Vector2.{ xx ifx player.is_facing_left then ITEM_WORLD_LENGTH else 0, ITEM_WORLD_LENGTH - 10.0 };
+                            origin   := Vector2.{ xx ifx player.is_facing_left then length else 0, length - 10.0 };
 
                             if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                                 destination_rect = Rectangle.{
                                     ifx player.is_facing_left then player.pos.x + 25.0 else player.pos.x - 25.0,
                                     player.pos.y - 10.0,
-                                    ITEM_WORLD_LENGTH,
-                                    ITEM_WORLD_LENGTH,
+                                    length,
+                                    length,
                                 };
                                 
                                 if global_swing_timer_ms < PLAYER_ANIMATION_WIELD_DURATION_MS {
@@ -953,8 +955,8 @@ main :: () {
                                 destination_rect = Rectangle.{
                                     ifx player.is_facing_left then player.pos.x - 5.0 else player.pos.x + 5.0,
                                     player.pos.y - 15.0,
-                                    ITEM_WORLD_LENGTH,
-                                    ITEM_WORLD_LENGTH,
+                                    length,
+                                    length,
                                 };
                                 
                                 if global_swing_timer_ms < 4 * PLAYER_ANIMATION_WIELD_DURATION_MS {
@@ -970,8 +972,8 @@ main :: () {
                                 destination_rect = Rectangle.{
                                     ifx player.is_facing_left then player.pos.x - 15.0 else player.pos.x + 15.0,
                                     player.pos.y + 10.0,
-                                    ITEM_WORLD_LENGTH,
-                                    ITEM_WORLD_LENGTH,
+                                    length,
+                                    length,
                                 };
                                 
                                 if global_swing_timer_ms < 7 * PLAYER_ANIMATION_WIELD_DURATION_MS {
@@ -987,8 +989,8 @@ main :: () {
                                 destination_rect = Rectangle.{
                                     ifx player.is_facing_left then player.pos.x - 20.0 else player.pos.x + 20.0,
                                     player.pos.y + 20.0,
-                                    ITEM_WORLD_LENGTH,
-                                    ITEM_WORLD_LENGTH,
+                                    length,
+                                    length,
                                 };
                                 
                                 if global_swing_timer_ms < 10 * PLAYER_ANIMATION_WIELD_DURATION_MS {
@@ -1811,7 +1813,7 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
 }
 
 item_type_is_stackable :: (item_type: ItemType) -> bool {
-   if item_type == {
+    if item_type == {
         case .DIRT;    return true;
         case .GRASS;   return true;
         case .ROCK;    return true;
@@ -1821,6 +1823,20 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case;
             assert(false, "Forgot an item type in your switch statement");
             return false; // Unreachable
+    } 
+}
+
+get_item_world_length :: (item_type: ItemType) -> float {
+    if item_type == {
+        case .DIRT;    return WIELDED_BLOCK_WORLD_LENGTH;
+        case .GRASS;   return WIELDED_BLOCK_WORLD_LENGTH;
+        case .ROCK;    return WIELDED_BLOCK_WORLD_LENGTH;
+
+        case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
+
+        case;
+            assert(false, "Forgot an item type in your switch statement");
+            return 0; // Unreachable
     } 
 }
 
