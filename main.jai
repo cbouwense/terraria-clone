@@ -799,6 +799,7 @@ main :: () {
                     }
 
                     // Update active animation timers
+// #if false {
                     for player_animations {
                         if it.active {
                             it.timer_ms += xx (dt * 1000);
@@ -816,6 +817,7 @@ main :: () {
                     if global_swing_timer_ms > 12 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                         global_swing_timer_ms = 0;
                     }
+// }
                 }
 
                 // Update player cooldowns
@@ -945,11 +947,80 @@ main :: () {
                             origin   : Vector2;
 
                             if player.is_facing_left {
+                                origin = Vector2.{ ITEM_WORLD_LENGTH, ITEM_WORLD_LENGTH - 10.0 };
 
+                                if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x + 25.0,
+                                        player.pos.y - 10.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
+                                    
+                                    if global_swing_timer_ms < PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 105.0;
+                                    }
+                                    else if global_swing_timer_ms < 2 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 90.0;
+                                    } else {
+                                        rotation = 75.0;
+                                    }
+                                }
+                                else if global_swing_timer_ms < 6 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x - 5.0,
+                                        player.pos.y - 15.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
+                                    
+                                    if global_swing_timer_ms < 4 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 45.0;
+                                    }
+                                    else if global_swing_timer_ms < 5 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 30.0;
+                                    } else {
+                                        rotation = 0.0;
+                                    }
+                                }
+                                else if global_swing_timer_ms < 9 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x - 15.0,
+                                        player.pos.y + 10.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
+                                    
+                                    if global_swing_timer_ms < 7 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -15.0;
+                                    }
+                                    else if global_swing_timer_ms < 8 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -45.0;
+                                    } else {
+                                        rotation = -60.0;
+                                    }
+                                }
+                                else if global_swing_timer_ms < 12 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x - 20.0,
+                                        player.pos.y + 20.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
+                                    
+                                    if global_swing_timer_ms < 10 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -75.0;
+                                    }
+                                    else if global_swing_timer_ms < 11 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = -90.0;
+                                    } else {
+                                        rotation = -105.0;
+                                    }
+                                }
                             } else {
                                 origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
-
-                                // @TODO: probably DRY this up somehow
+                                
+                                // @TODO: probably DRY this up more maybe?
                                 if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                                     destination_rect = Rectangle.{
                                         player.pos.x - 25.0,
@@ -1020,7 +1091,7 @@ main :: () {
                                 }
                             }
 
-                            print_vars(global_swing_timer_ms);
+                            // print_vars(global_swing_timer_ms);
                             DrawTexturePro(
                                 item_texture_map, // texture
                                 item_source_rect, // source
