@@ -467,7 +467,7 @@ main :: () {
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
 
-    global_swing_timer_ms : u32 = PLAYER_ANIMATION_WIELD_DURATION_MS * 6 + 1;
+    global_swing_timer_ms : u32;
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
@@ -799,26 +799,22 @@ main :: () {
                     }
 
                     // Update active animation timers
-                    #if true {   
-                        for player_animations {
-                            if it.active {
-                                it.timer_ms += xx (dt * 1000);
+                    for player_animations {
+                        if it.active {
+                            it.timer_ms += xx (dt * 1000);
 
-                                if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
-                                    it.timer_ms = 0;
-                                    it.active   = false;
-                                }   
-                            } else {
+                            if !it.loops && it.timer_ms > animation_get_total_duration_ms(it.*) {
                                 it.timer_ms = 0;
-                            };
-                        }
+                                it.active   = false;
+                            }   
+                        } else {
+                            it.timer_ms = 0;
+                        };
                     }
 
-                    #if true {
-                        global_swing_timer_ms += xx (dt * 1000);
-                        if global_swing_timer_ms > 9 * PLAYER_ANIMATION_WIELD_DURATION_MS {
-                            global_swing_timer_ms = 0;
-                        }
+                    global_swing_timer_ms += xx (dt * 1000);
+                    if global_swing_timer_ms > 12 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                        global_swing_timer_ms = 0;
                     }
                 }
 
@@ -951,6 +947,8 @@ main :: () {
                             if player.is_facing_left {
 
                             } else {
+                                origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
+
                                 // @TODO: probably DRY this up somehow
                                 if global_swing_timer_ms < 3 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                                     destination_rect = Rectangle.{
@@ -959,8 +957,6 @@ main :: () {
                                         ITEM_WORLD_LENGTH,
                                         ITEM_WORLD_LENGTH,
                                     };
-
-                                    origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
                                     
                                     if global_swing_timer_ms < PLAYER_ANIMATION_WIELD_DURATION_MS {
                                         rotation = -105.0;
@@ -978,8 +974,6 @@ main :: () {
                                         ITEM_WORLD_LENGTH,
                                         ITEM_WORLD_LENGTH,
                                     };
-
-                                    origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
                                     
                                     if global_swing_timer_ms < 4 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                                         rotation = -45.0;
@@ -997,8 +991,6 @@ main :: () {
                                         ITEM_WORLD_LENGTH,
                                         ITEM_WORLD_LENGTH,
                                     };
-
-                                    origin = Vector2.{ 0, ITEM_WORLD_LENGTH - 10.0 };
                                     
                                     if global_swing_timer_ms < 7 * PLAYER_ANIMATION_WIELD_DURATION_MS {
                                         rotation = 15.0;
@@ -1007,6 +999,23 @@ main :: () {
                                         rotation = 45.0;
                                     } else {
                                         rotation = 60.0;
+                                    }
+                                }
+                                else if global_swing_timer_ms < 12 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                    destination_rect = Rectangle.{
+                                        player.pos.x + 20.0,
+                                        player.pos.y + 20.0,
+                                        ITEM_WORLD_LENGTH,
+                                        ITEM_WORLD_LENGTH,
+                                    };
+                                    
+                                    if global_swing_timer_ms < 10 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 75.0;
+                                    }
+                                    else if global_swing_timer_ms < 11 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                                        rotation = 90.0;
+                                    } else {
+                                        rotation = 105.0;
                                     }
                                 }
                             }
