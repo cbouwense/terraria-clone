@@ -184,7 +184,6 @@ Entity :: struct {
 
     bounding_rect  : Rectangle; // Used for collision
     sprite_rect    : Rectangle;
-    item_rect      : Rectangle; // Destination rect for wielded items
 
     health_max     : s32;
     health_curr    : s32;
@@ -584,8 +583,6 @@ main :: () {
                     player.bounding_rect.y = player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT    / 2.0 + 10;
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
-                    // player.item_rect.x     = ifx player.is_facing_left then player.pos.x else player.pos.x - ITEM_WORLD_LENGTH;
-                    // player.item_rect.y     = player.pos.y - ITEM_WORLD_LENGTH;
 
                     player_is_grounded = is_grounded(player, active_blocks);
                     if player_is_grounded {
@@ -739,22 +736,16 @@ main :: () {
                     // Arms swinging
                     {
                         was_previously_active := player_animation_hands_swinging.active;
-                        // @NOTE: this check relies on the assumption that the interaction cooldown will always be reset when
-                        // a player does something. This seems like a fairly reasonable assumption, but it's possible that this
-                        // will not always be the case. A more explicit record of what the player actually did this frame and the
-                        // previous frame is what is probably needed to bulletproof this.
-                        player_began_action   := player.cooldown_interact_current_ms == PLAYER_COOLDOWN_INTERACT_DURATION_MS ||
-                                                 player.cooldown_attack_current_ms   == PLAYER_COOLDOWN_ATTACK_DURATION_MS;
-                        still_playing_out     := player_animation_hands_swinging.timer_ms <= animation_get_total_duration_ms(player_animation_hands_swinging);
-                        should_start_now := !was_previously_active && player_began_action;
+                        player_began_action   := (try_to_attack || try_to_interact) && !was_previously_active;
+                        still_playing_out     := player_animation_hands_swinging.timer_ms <= animation_get_total_duration_ms(player_animation_hands_swinging) &&
+                                                 player_animation_hands_swinging.timer_ms > 0;
+                        should_start_now := player_began_action;
                         should_continue  := was_previously_active && still_playing_out;
                         
                         player_is_swinging = should_start_now || should_continue;
 
-                        // player_animation_hands_swinging.active      = player_is_swinging;
-                        player_animation_hands_swinging.active      = true; 
-                        // player_animation_undershirt_swinging.active = player_is_swinging;
-                        player_animation_undershirt_swinging.active = true; 
+                        player_animation_hands_swinging.active      = player_is_swinging;
+                        player_animation_undershirt_swinging.active = player_is_swinging;
                     }
 
                     // Idle (or airborne)
@@ -812,8 +803,9 @@ main :: () {
                         };
                     }
 
-                    global_swing_timer_ms += xx (dt * 1000);
-                    if global_swing_timer_ms > 12 * PLAYER_ANIMATION_WIELD_DURATION_MS {
+                    if player_is_swinging {
+                        global_swing_timer_ms += xx (dt * 1000);
+                    } else {
                         global_swing_timer_ms = 0;
                     }
                 }
@@ -928,12 +920,10 @@ main :: () {
                     for player_sprites    { draw_sprite(it, player, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT); }
                     for player_animations { draw_sprite(it, player, PLAYER_MAP_TILE_WIDTH, PLAYER_MAP_TILE_HEIGHT); }
 
-                    // Render item wielded by player
-                    if true {
-                    // if player_is_swinging {
+                    // Draw item wielded by player
+                    if player_is_swinging {
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS;
-                        print_vars(has_an_item_selected);
 
                         if has_an_item_selected {
                             item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
@@ -1016,7 +1006,7 @@ main :: () {
                     }
 
                     if debug_mode {
-                        DrawRectangleLinesEx(player.item_rect, 1.0, LIME);
+                        DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
                         DrawCircleV(player.pos, 3.0, RED);
                     }
                 }
@@ -1229,7 +1219,7 @@ init_sprites :: () {
         frame_count       = 4,
         frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
         color             = PLAYER_COLOR_UNDERSHIRT,
-        loops             = false,
+        loops             = true,
     };
 
     player_sprite_pants_idle = Sprite.{
@@ -1286,7 +1276,7 @@ init_sprites :: () {
         frame_count       = 4,
         frame_duration_ms = PLAYER_ANIMATION_SWING_DURATION_MS,
         color             = PLAYER_COLOR_SKIN,
-        loops             = false,
+        loops             = true,
     };
 
     player_sprite_shoes_idle = Sprite.{
@@ -1580,12 +1570,6 @@ spawn_player :: () -> Player {
             xx PLAYER_WORLD_HEAD_SPRITE_WIDTH,
             xx PLAYER_WORLD_HEAD_SPRITE_HEIGHT,
         },
-        // item_rect = Rectangle.{
-        //     pos.x,
-        //     pos.y - ITEM_WORLD_LENGTH,
-        //     ITEM_WORLD_LENGTH,
-        //     ITEM_WORLD_LENGTH,
-        // },
 
         jumps_capacity  = 2,
         jumps_remaining = 2,

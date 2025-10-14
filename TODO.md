@@ -16,8 +16,8 @@
 - sound effects: attacking blocks
 - world gen: cave gen
 - world gen: ore gen
-- world gen: ramps
 - world gen: randomize tiles for specific type
+- be able to walk up ramps
 - game saves
 - Celeste movement juice
 - multiplayer
