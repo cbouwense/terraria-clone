@@ -44,6 +44,7 @@ grass_map                 : Texture;
 rock_map                  : Texture;
 damage_map                : Texture;
 pickaxe_texture           : Texture;
+axe_texture               : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -80,6 +81,7 @@ item_sprite_dirt    : Sprite;
 item_sprite_grass   : Sprite;
 item_sprite_rock    : Sprite;
 item_sprite_pickaxe : Sprite;
+item_sprite_axe     : Sprite;
 
 SCALE :: 2;
 
@@ -166,6 +168,11 @@ PICKAXE_TEXTURE_HEIGHT    :: 32;
 PICKAXE_STACK_CAPACITY    :: -1;
 PICKAXE_MINING_MULTIPLIER :: 2;
 
+AXE_TEXTURE_WIDTH     :: 32;
+AXE_TEXTURE_HEIGHT    :: 32;
+AXE_STACK_CAPACITY    :: -1;
+AXE_MINING_MULTIPLIER :: 1.5;
+
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
@@ -215,6 +222,7 @@ ItemType :: enum {
     GRASS;
     ROCK;
     PICKAXE;
+    AXE;
 }
 
 ItemStack :: struct {
@@ -1128,6 +1136,7 @@ init_textures :: () {
     grass_map                 = LoadTexture("data/Tiles_2.png");
     damage_map                = LoadTexture("data/Damage.png");
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
+    axe_texture               = LoadTexture("data/Axe.png");
 }
 
 init_sprites :: () {
@@ -1373,6 +1382,11 @@ init_sprites :: () {
 
     item_sprite_pickaxe = Sprite.{
         map   = pickaxe_texture,
+        color = WHITE,
+    };
+
+    item_sprite_axe = Sprite.{
+        map   = axe_texture,
         color = WHITE,
     };
 }
@@ -1631,6 +1645,11 @@ spawn_player :: () -> Player {
             stack_capacity = PICKAXE_STACK_CAPACITY,
             stack_count    = PICKAXE_STACK_CAPACITY,
         };
+        player.inventory.item_stacks[3] = ItemStack.{
+            item_type     = .AXE,
+            stack_capacity = AXE_STACK_CAPACITY,
+            stack_count    = AXE_STACK_CAPACITY,
+        };
     }
 
     return player;
@@ -1704,6 +1723,7 @@ get_block_hardness :: (item_type: ItemType) -> float {
         case .ROCK;  return ROCK_HARDNESS;
 
         case .PICKAXE; assert(false, "Tried to get the block hardness of a pickaxe"); #through;
+        case .AXE;     assert(false, "Tried to get the block hardness of an axe"); #through;
 
         case;
             print_vars(item_type);
@@ -1719,6 +1739,7 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .ROCK;    return true;
 
         case .PICKAXE; return false;
+        case .AXE;     return false;
 
         case;
             print_vars(item_type);
@@ -1772,12 +1793,13 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
     }
 }
 
-get_item_breaking_speed :: (item_type: ItemType) -> s32 {
+get_item_breaking_speed :: (item_type: ItemType) -> float32 {
     if item_type == {
         case .DIRT;    return 1;
         case .GRASS;   return 1;
         case .ROCK;    return 1;
         case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
+        case .AXE;     return AXE_MINING_MULTIPLIER;
         case;
             assert(false, "Invalid item type");
             return -1;
@@ -1827,6 +1849,14 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
                 PICKAXE_TEXTURE_HEIGHT,
                 PICKAXE_TEXTURE_HEIGHT,
             };
+        case .AXE;
+            map_texture = axe_texture;
+            map_source  = Rectangle.{
+                AXE_TEXTURE_HEIGHT,
+                AXE_TEXTURE_HEIGHT,
+                AXE_TEXTURE_HEIGHT,
+                AXE_TEXTURE_HEIGHT,
+            };
 
             if is_facing_left map_source.width *= -1;
         case;
@@ -1842,6 +1872,7 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
         case .GRASS;   return *item_sprite_grass;
         case .ROCK;    return *item_sprite_rock;
         case .PICKAXE; return *item_sprite_pickaxe;
+        case .AXE;     return *item_sprite_axe;
         case;
             assert(false, "You forgot an item type in your switch statement");
             return null;
@@ -1855,6 +1886,7 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .ROCK;    return true;
 
         case .PICKAXE; return false;
+        case .AXE;     return false;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -1869,6 +1901,7 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .ROCK;    return WIELDED_BLOCK_WORLD_LENGTH;
 
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
+        case .AXE;     return WIELDED_TOOL_WORLD_LENGTH;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -1883,6 +1916,7 @@ get_block_weak_to_tool :: (item_type: ItemType) -> ItemType {
         case .ROCK;    return .PICKAXE;
 
         case .PICKAXE; assert(false, "Tried to get the tool weakness of a pickaxe."); #through;
+        case .AXE;     assert(false, "Tried to get the tool weakness of an axe."); #through;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
