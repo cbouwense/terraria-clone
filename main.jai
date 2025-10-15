@@ -166,8 +166,6 @@ PICKAXE_TEXTURE_HEIGHT    :: 32;
 PICKAXE_STACK_CAPACITY    :: -1;
 PICKAXE_MINING_MULTIPLIER :: 2;
 
-SHOVEL_MINING_MULTIPLIER :: 1;
-
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
@@ -217,7 +215,6 @@ ItemType :: enum {
     GRASS;
     ROCK;
     PICKAXE;
-    SHOVEL;
 }
 
 ItemStack :: struct {
@@ -1707,7 +1704,6 @@ get_block_hardness :: (item_type: ItemType) -> float {
         case .ROCK;  return ROCK_HARDNESS;
 
         case .PICKAXE; assert(false, "Tried to get the block hardness of a pickaxe"); #through;
-        case .SHOVEL;  assert(false, "Tried to get the block hardness of a shovel");  #through;
 
         case;
             print_vars(item_type);
@@ -1723,7 +1719,6 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .ROCK;    return true;
 
         case .PICKAXE; return false;
-        case .SHOVEL;  return false;
 
         case;
             print_vars(item_type);
@@ -1783,7 +1778,6 @@ get_item_breaking_speed :: (item_type: ItemType) -> s32 {
         case .GRASS;   return 1;
         case .ROCK;    return 1;
         case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
-        case .SHOVEL;  return SHOVEL_MINING_MULTIPLIER;
         case;
             assert(false, "Invalid item type");
             return -1;
@@ -1861,7 +1855,6 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .ROCK;    return true;
 
         case .PICKAXE; return false;
-        case .SHOVEL;  return false;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -1876,7 +1869,6 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .ROCK;    return WIELDED_BLOCK_WORLD_LENGTH;
 
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
-        case .SHOVEL;  return WIELDED_TOOL_WORLD_LENGTH;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -1886,12 +1878,11 @@ get_item_world_length :: (item_type: ItemType) -> float {
 
 get_block_weak_to_tool :: (item_type: ItemType) -> ItemType {
     if item_type == {
-        case .DIRT;    return .SHOVEL;
-        case .GRASS;   return .SHOVEL;
+        case .DIRT;    return .PICKAXE;
+        case .GRASS;   return .PICKAXE;
         case .ROCK;    return .PICKAXE;
 
         case .PICKAXE; assert(false, "Tried to get the tool weakness of a pickaxe."); #through;
-        case .SHOVEL;  assert(false, "Tried to get the tool weakness of a shovel.");  #through;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
