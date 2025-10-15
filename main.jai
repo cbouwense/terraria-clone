@@ -122,7 +122,7 @@ HOTBAR_SLOTS         :: 8;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
-BLOCK_HEALTH_MAX :: 100;
+BLOCK_HEALTH_MAX :: 10;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -188,8 +188,8 @@ Entity :: struct {
     bounding_rect  : Rectangle; // Used for collision
     sprite_rect    : Rectangle;
 
-    health_max     : s32;
-    health_curr    : s32;
+    health_max     : float32;
+    health_curr    : float32;
 }
 
 Sprite :: struct {
@@ -357,10 +357,10 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_curr   = BLOCK_HEALTH_MAX,
+                    health_max    = BLOCK_HEALTH_MAX,
                     health_curr   = BLOCK_HEALTH_MAX,
                     item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
-                    hardness      = DIRT_HARDNESS,
+                    hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS,
                 }
             );
 
@@ -393,7 +393,8 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = BLOCK_HEALTH_MAX,
                     health_curr   = BLOCK_HEALTH_MAX,
-                    item_type    = .DIRT,
+                    item_type     = .DIRT,
+                    hardness      = DIRT_HARDNESS,
                 }
             );
 
@@ -427,7 +428,8 @@ main :: () {
                     sprite_rect   = rect,
                     health_max    = BLOCK_HEALTH_MAX,
                     health_curr   = BLOCK_HEALTH_MAX,
-                    item_type    = .ROCK,
+                    hardness      = ROCK_HARDNESS,
+                    item_type     = .ROCK,
                 }
             );
 
@@ -607,7 +609,7 @@ main :: () {
                             // @TODO: it would be nice to have the chunk the mouse is pointing in, as well as the chunk the player is in.
                             block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, it.blocks);
                             if block_mouse_is_over != null {
-                                removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                 break;
                             }
                         }
@@ -620,18 +622,19 @@ main :: () {
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
 
                                 if block_mouse_is_over != null {
-                                print_vars(block_mouse_is_over.*);
+                                    print_vars(block_mouse_is_over.*);
+                                    block_type := block_mouse_is_over.item_type;
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
                                     selected_item_stack, result      := get_selected_item_stack(player.inventory);
                                     has_an_item_selected             := result == xx ReturnStatus.SUCCESS;
 
-                                    // damage : s32 = xx (1 / block_mouse_is_over.hardness);
-                                    block_mouse_is_over.health_curr -= 1;
+                                    damage := 1 / block_mouse_is_over.hardness;
+                                    block_mouse_is_over.health_curr -= damage;
                                     
                                     if block_mouse_is_over.health_curr <= 0 {
-                                        removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
-                                        try_to_add_to_inventory(*player.inventory, block_mouse_is_over.item_type);
+                                        array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
+                                        try_to_add_to_inventory(*player.inventory, block_type);
                                     }
                                 }
                             }
@@ -892,10 +895,9 @@ main :: () {
 
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 
-                        frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
-
                         // Damage overlay (cracks)
                         if it.health_curr < it.health_max {
+                            frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
                             damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
                             DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                         }
@@ -1859,7 +1861,6 @@ TryToAddToInventoryReturnStatus :: enum u16 {
 
 // @TODO: might need a quantity param
 try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryToAddToInventoryReturnStatus {
-    print_vars(item_type);
     // First, try to find an existing stack that has room.
     for *inventory.item_stacks {
         if it.item_type == item_type {

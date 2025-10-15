@@ -34,6 +34,7 @@
 - single mesh for chunks / entire mass of blocks
 - simulate chunks by player position
 - cull blocks by viewport
+- metaprogram for required fields
 
 # Bugs
 
