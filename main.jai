@@ -122,7 +122,7 @@ HOTBAR_SLOTS         :: 8;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
-BLOCK_HEALTH_MAX :: 10;
+BLOCK_HEALTH_MAX :: 50;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -142,7 +142,7 @@ GRASS_MAP_TILE_PADDING :: 2;
 GRASS_WORLD_TILE_WIDTH  :: 18 * SCALE;
 GRASS_WORLD_TILE_HEIGHT :: 18 * SCALE;
 GRASS_STACK_CAPACITY :: 64;
-GRASS_HARDNESS :: 1.0;
+GRASS_HARDNESS :: 0.5;
 
 ROCK_MAP_COLS :: 16;
 ROCK_MAP_ROWS :: 15;
@@ -152,7 +152,7 @@ ROCK_MAP_TILE_PADDING :: 2;
 ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
 ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
 ROCK_STACK_CAPACITY :: 64;
-ROCK_HARDNESS :: 10.0;
+ROCK_HARDNESS :: 4.0;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -161,9 +161,12 @@ DAMAGE_MAP_TILE_HEIGHT :: 16;
 DAMAGE_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE;
 
-PICKAXE_TEXTURE_WIDTH  :: 32;
-PICKAXE_TEXTURE_HEIGHT :: 32;
-PICKAXE_STACK_CAPACITY :: -1;
+PICKAXE_TEXTURE_WIDTH     :: 32;
+PICKAXE_TEXTURE_HEIGHT    :: 32;
+PICKAXE_STACK_CAPACITY    :: -1;
+PICKAXE_MINING_MULTIPLIER :: 2;
+
+SHOVEL_MINING_MULTIPLIER :: 1;
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
@@ -214,6 +217,7 @@ ItemType :: enum {
     GRASS;
     ROCK;
     PICKAXE;
+    SHOVEL;
 }
 
 ItemStack :: struct {
@@ -361,6 +365,7 @@ main :: () {
                     health_curr   = BLOCK_HEALTH_MAX,
                     item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
                     hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS,
+                    weak_to_tool  = get_block_weak_to_tool(.DIRT),
                 }
             );
 
@@ -395,6 +400,7 @@ main :: () {
                     health_curr   = BLOCK_HEALTH_MAX,
                     item_type     = .DIRT,
                     hardness      = DIRT_HARDNESS,
+                    weak_to_tool  = get_block_weak_to_tool(.DIRT),
                 }
             );
 
@@ -430,6 +436,7 @@ main :: () {
                     health_curr   = BLOCK_HEALTH_MAX,
                     hardness      = ROCK_HARDNESS,
                     item_type     = .ROCK,
+                    weak_to_tool  = get_block_weak_to_tool(.ROCK),
                 }
             );
 
@@ -455,7 +462,7 @@ main :: () {
     camera.target   = player.pos;
     camera.offset   = Vector2.{ GetScreenWidth()/2.0 + player.bounding_rect.width/2.0, GetScreenHeight()/2.0 };
     camera.rotation = 0.0;
-    camera.zoom     = 0.5;
+    camera.zoom     = 1;
 
     // Initialize controls
     controls : Controls;
@@ -626,10 +633,15 @@ main :: () {
                                     block_type := block_mouse_is_over.item_type;
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
-                                    selected_item_stack, result      := get_selected_item_stack(player.inventory);
-                                    has_an_item_selected             := result == xx ReturnStatus.SUCCESS;
+                                    selected_item_stack, result := get_selected_item_stack(player.inventory);
+                                    has_an_item_selected        := result == xx ReturnStatus.SUCCESS;
+                                    tool_type      := selected_item_stack.item_type;
+                                    breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
 
-                                    damage := 1 / block_mouse_is_over.hardness;
+                                    damage := breaking_speed / block_mouse_is_over.hardness;
+                                    if block_mouse_is_over.weak_to_tool == tool_type {
+                                        damage *= 6;
+                                    }
                                     block_mouse_is_over.health_curr -= damage;
                                     
                                     if block_mouse_is_over.health_curr <= 0 {
@@ -718,6 +730,8 @@ main :: () {
                                     item_type     = selected_item_stack.item_type,
                                     health_max    = BLOCK_HEALTH_MAX,
                                     health_curr   = BLOCK_HEALTH_MAX,
+                                    hardness      = get_block_hardness(selected_item_stack.item_type),
+                                    weak_to_tool  = get_block_weak_to_tool(selected_item_stack.item_type),
                                 };
                                 
                                 found_chunk := false;
@@ -1693,6 +1707,7 @@ get_block_hardness :: (item_type: ItemType) -> float {
         case .ROCK;  return ROCK_HARDNESS;
 
         case .PICKAXE; assert(false, "Tried to get the block hardness of a pickaxe"); #through;
+        case .SHOVEL;  assert(false, "Tried to get the block hardness of a shovel");  #through;
 
         case;
             print_vars(item_type);
@@ -1708,6 +1723,7 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .ROCK;    return true;
 
         case .PICKAXE; return false;
+        case .SHOVEL;  return false;
 
         case;
             print_vars(item_type);
@@ -1755,6 +1771,19 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
         case .DIRT;  return DIRT_STACK_CAPACITY;
         case .GRASS; return GRASS_STACK_CAPACITY;
         case .ROCK;  return ROCK_STACK_CAPACITY;
+        case;
+            assert(false, "Invalid item type");
+            return -1;
+    }
+}
+
+get_item_breaking_speed :: (item_type: ItemType) -> s32 {
+    if item_type == {
+        case .DIRT;    return 1;
+        case .GRASS;   return 1;
+        case .ROCK;    return 1;
+        case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
+        case .SHOVEL;  return SHOVEL_MINING_MULTIPLIER;
         case;
             assert(false, "Invalid item type");
             return -1;
@@ -1813,7 +1842,6 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
     return map_texture, map_source;
 }
 
-
 get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
     if item_type == {
         case .DIRT;    return *item_sprite_dirt;
@@ -1833,6 +1861,7 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .ROCK;    return true;
 
         case .PICKAXE; return false;
+        case .SHOVEL;  return false;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -1847,10 +1876,26 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .ROCK;    return WIELDED_BLOCK_WORLD_LENGTH;
 
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
+        case .SHOVEL;  return WIELDED_TOOL_WORLD_LENGTH;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
             return 0; // Unreachable
+    } 
+}
+
+get_block_weak_to_tool :: (item_type: ItemType) -> ItemType {
+    if item_type == {
+        case .DIRT;    return .SHOVEL;
+        case .GRASS;   return .SHOVEL;
+        case .ROCK;    return .PICKAXE;
+
+        case .PICKAXE; assert(false, "Tried to get the tool weakness of a pickaxe."); #through;
+        case .SHOVEL;  assert(false, "Tried to get the tool weakness of a shovel.");  #through;
+
+        case;
+            assert(false, "Forgot an item type in your switch statement");
+            return .ROCK; // Unreachable
     } 
 }
 
