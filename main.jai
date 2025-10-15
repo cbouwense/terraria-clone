@@ -129,8 +129,8 @@ DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_MAP_TILE_PADDING :: 2;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
-DIRT_HEALTH_MAX :: 10;
 DIRT_STACK_CAPACITY :: 64;
+DIRT_HARDNESS :: 1;
 
 GRASS_MAP_COLS :: 16;
 GRASS_MAP_ROWS :: 22;
@@ -139,8 +139,8 @@ GRASS_MAP_TILE_HEIGHT :: 18;
 GRASS_MAP_TILE_PADDING :: 2;
 GRASS_WORLD_TILE_WIDTH  :: 18 * SCALE;
 GRASS_WORLD_TILE_HEIGHT :: 18 * SCALE;
-GRASS_HEALTH_MAX :: 10;
 GRASS_STACK_CAPACITY :: 64;
+GRASS_HARDNESS :: 1;
 
 ROCK_MAP_COLS :: 16;
 ROCK_MAP_ROWS :: 15;
@@ -149,8 +149,8 @@ ROCK_MAP_TILE_HEIGHT :: 18;
 ROCK_MAP_TILE_PADDING :: 2;
 ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
 ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
-ROCK_HEALTH_MAX :: 100;
 ROCK_STACK_CAPACITY :: 64;
+ROCK_HARDNESS :: 10;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -205,6 +205,8 @@ AnimatedSprite :: struct {
     loops             : bool;
 }
 
+// @TODO: it would be cool to have this like in typescript
+// ItemType = BlockType | ToolType;
 ItemType :: enum {
     DIRT;
     GRASS;
@@ -228,8 +230,8 @@ Inventory :: struct {
 Player :: struct {
     #as using entity : Entity;
 
-    jumps_remaining  : int;
-    jumps_capacity   : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
+    jumps_remaining : int;
+    jumps_capacity  : int; // e.g. 2 if an entity can double jump, 6 for kirby in melee, etc.
 
     cooldown_attack_current_ms   : s32;
     cooldown_interact_current_ms : s32;
@@ -239,7 +241,10 @@ Player :: struct {
 
 Block :: struct {
     #as using entity : Entity;
-    item_type        : ItemType;
+    
+    item_type    : ItemType;
+    hardness     : int;
+    weak_to_tool : ItemType;
 }
 
 CHUNK_MAX_WIDTH :: 16;
@@ -342,6 +347,7 @@ main :: () {
             defer global_id_counter += 1;
             array_add(
                 *chunks[chunk_id].blocks,
+                // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
                 Block.{
                     type          = Block,
                     id            = global_id_counter,
@@ -349,9 +355,9 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = DIRT_HEALTH_MAX,
                     health_curr   = DIRT_HEALTH_MAX,
-                    item_type    = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
+                    item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
+                    hardness      = DIRT_HARDNESS,
                 }
             );
 
@@ -618,8 +624,7 @@ main :: () {
                                     block_mouse_is_over.health_curr -= 1;
                                     if block_mouse_is_over.health_curr <= 0 {
                                         removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
-                                        // @TODO: do we need to report if it worked or not? I guess not?...
-                                        status : TryToAddToInventoryReturnStatus = try_to_add_to_inventory(*player.inventory, item_type);
+                                        try_to_add_to_inventory(*player.inventory, item_type);
                                     }
                                 }
                             }
@@ -701,8 +706,8 @@ main :: () {
                                     bounding_rect = new_rect,
                                     sprite_rect   = new_rect,
                                     item_type     = selected_item_stack.item_type,
-                                    health_max    = get_block_max_health(selected_item_stack.item_type),
-                                    health_curr   = get_block_max_health(selected_item_stack.item_type),
+                                    health_max    = get_block_hardness(selected_item_stack.item_type),
+                                    health_curr   = get_block_hardness(selected_item_stack.item_type),
                                 };
                                 
                                 found_chunk := false;
@@ -1672,18 +1677,18 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, retu
     return item_stack, return_status;
 }
 
-get_block_max_health :: (item_type: ItemType) -> s32 {
+get_block_hardness :: (item_type: ItemType) -> s32 {
     if item_type == {
-        case .DIRT;    return DIRT_HEALTH_MAX;
-        case .GRASS;   return GRASS_HEALTH_MAX;
-        case .ROCK;    return ROCK_HEALTH_MAX;
+        case .DIRT;  return DIRT_HARDNESS;
+        case .GRASS; return GRASS_HARDNESS;
+        case .ROCK;  return ROCK_HARDNESS;
 
-        case .PICKAXE; assert(false, "Tried to get the block max health of a pickaxe"); #through;
+        case .PICKAXE; assert(false, "Tried to get the block hardness of a pickaxe"); #through;
 
         case;
             print_vars(item_type);
             assert(false, "Invalid block type");
-            return -1;
+            return -1; // Unreachable
     }
 }
 
@@ -1698,7 +1703,7 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case;
             print_vars(item_type);
             assert(false, "Invalid block type");
-            return false;
+            return false; // Unreachable
     }
 }
 
