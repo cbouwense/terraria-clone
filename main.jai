@@ -122,6 +122,8 @@ HOTBAR_SLOTS         :: 8;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
+BLOCK_HEALTH_MAX :: 100;
+
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
 DIRT_MAP_TILE_WIDTH  :: 18;
@@ -130,7 +132,7 @@ DIRT_MAP_TILE_PADDING :: 2;
 DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
 DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
 DIRT_STACK_CAPACITY :: 64;
-DIRT_HARDNESS :: 1;
+DIRT_HARDNESS :: 0.5;
 
 GRASS_MAP_COLS :: 16;
 GRASS_MAP_ROWS :: 22;
@@ -140,7 +142,7 @@ GRASS_MAP_TILE_PADDING :: 2;
 GRASS_WORLD_TILE_WIDTH  :: 18 * SCALE;
 GRASS_WORLD_TILE_HEIGHT :: 18 * SCALE;
 GRASS_STACK_CAPACITY :: 64;
-GRASS_HARDNESS :: 1;
+GRASS_HARDNESS :: 1.0;
 
 ROCK_MAP_COLS :: 16;
 ROCK_MAP_ROWS :: 15;
@@ -150,7 +152,7 @@ ROCK_MAP_TILE_PADDING :: 2;
 ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
 ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
 ROCK_STACK_CAPACITY :: 64;
-ROCK_HARDNESS :: 10;
+ROCK_HARDNESS :: 10.0;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -243,7 +245,7 @@ Block :: struct {
     #as using entity : Entity;
     
     item_type    : ItemType;
-    hardness     : int;
+    hardness     : float32;
     weak_to_tool : ItemType;
 }
 
@@ -355,7 +357,8 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_curr   = DIRT_HEALTH_MAX,
+                    health_curr   = BLOCK_HEALTH_MAX,
+                    health_curr   = BLOCK_HEALTH_MAX,
                     item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
                     hardness      = DIRT_HARDNESS,
                 }
@@ -388,8 +391,8 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = DIRT_HEALTH_MAX,
-                    health_curr   = DIRT_HEALTH_MAX,
+                    health_max    = BLOCK_HEALTH_MAX,
+                    health_curr   = BLOCK_HEALTH_MAX,
                     item_type    = .DIRT,
                 }
             );
@@ -422,8 +425,8 @@ main :: () {
                     pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
                     bounding_rect = rect,
                     sprite_rect   = rect,
-                    health_max    = ROCK_HEALTH_MAX,
-                    health_curr   = ROCK_HEALTH_MAX,
+                    health_max    = BLOCK_HEALTH_MAX,
+                    health_curr   = BLOCK_HEALTH_MAX,
                     item_type    = .ROCK,
                 }
             );
@@ -617,14 +620,18 @@ main :: () {
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
 
                                 if block_mouse_is_over != null {
-                                    item_type := block_mouse_is_over.item_type;
+                                print_vars(block_mouse_is_over.*);
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
-                                    // @TODO: when there is an inventory, this 1 will have to be whatever attack stat the equipped weapon has.
+                                    selected_item_stack, result      := get_selected_item_stack(player.inventory);
+                                    has_an_item_selected             := result == xx ReturnStatus.SUCCESS;
+
+                                    // damage : s32 = xx (1 / block_mouse_is_over.hardness);
                                     block_mouse_is_over.health_curr -= 1;
+                                    
                                     if block_mouse_is_over.health_curr <= 0 {
                                         removed_id := array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
-                                        try_to_add_to_inventory(*player.inventory, item_type);
+                                        try_to_add_to_inventory(*player.inventory, block_mouse_is_over.item_type);
                                     }
                                 }
                             }
@@ -706,8 +713,8 @@ main :: () {
                                     bounding_rect = new_rect,
                                     sprite_rect   = new_rect,
                                     item_type     = selected_item_stack.item_type,
-                                    health_max    = get_block_hardness(selected_item_stack.item_type),
-                                    health_curr   = get_block_hardness(selected_item_stack.item_type),
+                                    health_max    = BLOCK_HEALTH_MAX,
+                                    health_curr   = BLOCK_HEALTH_MAX,
                                 };
                                 
                                 found_chunk := false;
@@ -1677,7 +1684,7 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, retu
     return item_stack, return_status;
 }
 
-get_block_hardness :: (item_type: ItemType) -> s32 {
+get_block_hardness :: (item_type: ItemType) -> float {
     if item_type == {
         case .DIRT;  return DIRT_HARDNESS;
         case .GRASS; return GRASS_HARDNESS;
@@ -1852,6 +1859,7 @@ TryToAddToInventoryReturnStatus :: enum u16 {
 
 // @TODO: might need a quantity param
 try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryToAddToInventoryReturnStatus {
+    print_vars(item_type);
     // First, try to find an existing stack that has room.
     for *inventory.item_stacks {
         if it.item_type == item_type {
@@ -1865,7 +1873,7 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     // If there is no existing stack with space, then just try to find an empty slot.
     for *inventory.item_stacks {
         if item_stack_is_empty(it) {
-            it.item_type     = item_type;
+            it.item_type      = item_type;
             it.stack_count    = 1;
             it.stack_capacity = get_stack_capacity_by_item_type(item_type);
 
