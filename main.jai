@@ -1,4 +1,5 @@
 #import "Basic";
+#import "Hash_Table";
 #import "Input";
 #import "Math";
 #import "Print_Vars";
@@ -296,13 +297,26 @@ Controls :: struct {
     hotbar_slot_8     : [3] Control;
 }
 
+vector2_equal :: (v1: Vector2, v2: Vector2) -> bool {
+    return v1.x == v2.x && v1.y == v2.y;
+}
+
+vector2_to_string :: (v: Vector2) -> string {
+    key := sprint("%,%", v.x, v.y);
+    return key;
+}
+
 data_folder: string; 
+global_block_pos_to_block: Table(string, *Block);
 
 main :: () {
     //
     // Initialization
     //
     random_seed(123456779);
+
+    init(*global_block_pos_to_block);
+    defer deinit(*global_block_pos_to_block);
 
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
@@ -362,25 +376,24 @@ main :: () {
             };
 
             // @TODO: post increment macro or something?
-            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
-            array_add(
-                *chunks[chunk_id].blocks,
-                // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
-                Block.{
-                    type          = Block,
-                    id            = global_id_counter,
-                    chunk_id      = xx chunk_id,
-                    pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
-                    bounding_rect = rect,
-                    sprite_rect   = rect,
-                    health_max    = BLOCK_HEALTH_MAX,
-                    health_curr   = BLOCK_HEALTH_MAX,
-                    item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT,
-                    hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS,
-                    weak_to_tool  = get_block_weak_to_tool(.DIRT),
-                }
-            );
+            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
+            // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
+            new_block := New(Block);
+            new_block.type          = Block;
+            new_block.id            = global_id_counter;
+            new_block.chunk_id      = xx chunk_id;
+            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+            new_block.bounding_rect = rect;
+            new_block.sprite_rect   = rect;
+            new_block.health_max    = BLOCK_HEALTH_MAX;
+            new_block.health_curr   = BLOCK_HEALTH_MAX;
+            new_block.item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT;
+            new_block.hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS;
+            new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
+
+            array_add(*chunks[chunk_id].blocks, new_block.*);
+            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             y -= DIRT_WORLD_TILE_HEIGHT;
         }
@@ -400,22 +413,21 @@ main :: () {
             // @TODO: post incrememnt macro or something?
             chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division. @TODO: int division function for clarity? like divide_u32, divide_s64, etc.? 
             defer global_id_counter += 1;
-            array_add(
-                *chunks[chunk_id].blocks,
-                Block.{
-                    type          = Block,
-                    id            = global_id_counter,
-                    chunk_id      = xx chunk_id,
-                    pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
-                    bounding_rect = rect,
-                    sprite_rect   = rect,
-                    health_max    = BLOCK_HEALTH_MAX,
-                    health_curr   = BLOCK_HEALTH_MAX,
-                    item_type     = .DIRT,
-                    hardness      = DIRT_HARDNESS,
-                    weak_to_tool  = get_block_weak_to_tool(.DIRT),
-                }
-            );
+            new_block := New(Block);
+            new_block.type          = Block;
+            new_block.id            = global_id_counter;
+            new_block.chunk_id      = xx chunk_id;
+            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+            new_block.bounding_rect = rect;
+            new_block.sprite_rect   = rect;
+            new_block.health_max    = BLOCK_HEALTH_MAX;
+            new_block.health_curr   = BLOCK_HEALTH_MAX;
+            new_block.item_type     = .DIRT;
+            new_block.hardness      = DIRT_HARDNESS;
+            new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
+
+            array_add(*chunks[chunk_id].blocks, new_block.*);
+            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             y += DIRT_WORLD_TILE_HEIGHT;
         }
@@ -436,22 +448,21 @@ main :: () {
             // @TODO: post incrememnt macro or something?
             chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
-            array_add(
-                *chunks[chunk_id].blocks,
-                Block.{
-                    type          = Block,
-                    id            = global_id_counter,
-                    chunk_id      = xx chunk_id,
-                    pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 },
-                    bounding_rect = rect,
-                    sprite_rect   = rect,
-                    health_max    = BLOCK_HEALTH_MAX,
-                    health_curr   = BLOCK_HEALTH_MAX,
-                    hardness      = ROCK_HARDNESS,
-                    item_type     = .ROCK,
-                    weak_to_tool  = get_block_weak_to_tool(.ROCK),
-                }
-            );
+            new_block := New(Block);
+            new_block.type          = Block;
+            new_block.id            = global_id_counter;
+            new_block.chunk_id      = xx chunk_id;
+            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+            new_block.bounding_rect = rect;
+            new_block.sprite_rect   = rect;
+            new_block.health_max    = BLOCK_HEALTH_MAX;
+            new_block.health_curr   = BLOCK_HEALTH_MAX;
+            new_block.hardness      = ROCK_HARDNESS;
+            new_block.item_type     = .ROCK;
+            new_block.weak_to_tool  = get_block_weak_to_tool(.ROCK);
+
+            array_add(*chunks[chunk_id].blocks, new_block.*);
+            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             y += ROCK_WORLD_TILE_HEIGHT;
         }
@@ -702,31 +713,31 @@ main :: () {
                             }
 
                             has_neighbor_block := false;
-                            for active_blocks {
-                                // Check for a neighbor above
-                                if it.pos.x == new_pos.x && it.pos.y == new_pos.y - DIRT_WORLD_TILE_HEIGHT {
-                                    has_neighbor_block = true;
-                                    break;
-                                }
 
-                                // Check for a neighbor below
-                                if it.pos.x == new_pos.x && it.pos.y == new_pos.y + DIRT_WORLD_TILE_HEIGHT {
-                                    has_neighbor_block = true;
-                                    break;
-                                }
+                            // Check for a neighbor above
+                            north_pos := Vector2.{ new_pos.x, new_pos.y - DIRT_WORLD_TILE_HEIGHT };
+                            north_success, north_block := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
+                            has_neighbor_block |= north_success;
 
-                                // Check for a neighbor left
-                                if it.pos.x == new_pos.x - DIRT_WORLD_TILE_WIDTH && it.pos.y == new_pos.y {
-                                    has_neighbor_block = true;
-                                    break;
-                                }
+                            // Check for a neighbor below
+                            south_pos := Vector2.{ new_pos.x, new_pos.y + DIRT_WORLD_TILE_HEIGHT };
+                            south_success, south_block := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
+                            has_neighbor_block |= south_success;
 
-                                // Check for a neighbor right
-                                if it.pos.x == new_pos.x + DIRT_WORLD_TILE_WIDTH && it.pos.y == new_pos.y {
-                                    has_neighbor_block = true;
-                                    break;
-                                }
-                            }
+                            // Check for a neighbor right
+                            east_pos := Vector2.{ new_pos.x + DIRT_WORLD_TILE_WIDTH, new_pos.y };
+                            east_success, east_block := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
+                            has_neighbor_block |= east_success;
+
+                            // Check for a neighbor left
+                            west_pos := Vector2.{ new_pos.x - DIRT_WORLD_TILE_WIDTH, new_pos.y };
+                            west_success, west_block := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
+                            has_neighbor_block |= west_success;
+
+                            if north_block print_vars(north_block.*);
+                            if south_block print_vars(south_block.*);
+                            if east_block print_vars(east_block.*);
+                            if west_block print_vars(west_block.*);
 
                             can_place_block := debug_mode || (is_within_reach && !would_be_on_existing_entity && has_neighbor_block);
                             
@@ -735,17 +746,17 @@ main :: () {
 
                                 new_pos := get_rect_center(new_rect);
 
-                                new_block := Block.{
-                                    id            = global_id_counter,
-                                    pos           = new_pos,
-                                    bounding_rect = new_rect,
-                                    sprite_rect   = new_rect,
-                                    item_type     = selected_item_stack.item_type,
-                                    health_max    = BLOCK_HEALTH_MAX,
-                                    health_curr   = BLOCK_HEALTH_MAX,
-                                    hardness      = get_block_hardness(selected_item_stack.item_type),
-                                    weak_to_tool  = get_block_weak_to_tool(selected_item_stack.item_type),
-                                };
+                                new_block := New(Block);
+                                new_block.type          = Block;
+                                new_block.id            = global_id_counter;
+                                new_block.pos           = new_pos;
+                                new_block.bounding_rect = new_rect;
+                                new_block.sprite_rect   = new_rect;
+                                new_block.item_type     = selected_item_stack.item_type;
+                                new_block.health_max    = BLOCK_HEALTH_MAX;
+                                new_block.health_curr   = BLOCK_HEALTH_MAX;
+                                new_block.hardness      = get_block_hardness(selected_item_stack.item_type);
+                                new_block.weak_to_tool  = get_block_weak_to_tool(selected_item_stack.item_type);
                                 
                                 found_chunk := false;
                                 for active_chunks {
@@ -753,7 +764,8 @@ main :: () {
                                     
                                     found_chunk = true;
                                     new_block.chunk_id = it.id;
-                                    add_block_to_chunk(it.id, new_block, *chunks, *active_chunks, *active_blocks, window_start, window_end);
+                                    add_block_to_chunk(it.id, new_block.*, *chunks, *active_chunks, *active_blocks, window_start, window_end);
+                                    table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
                                     break;
                                 }
