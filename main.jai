@@ -692,54 +692,43 @@ main :: () {
                         item_can_be_placed_down := can_item_be_placed_down(selected_item_stack.item_type);
 
                         if has_an_item_selected && item_can_be_placed_down {
-
-                            is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
-                            would_be_on_existing_entity := false;
-
-                            // Check if the block would be placed on any existing blocks
-                            for active_blocks {
-                                if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                    would_be_on_existing_entity = true;
-                                    break;
-                                }
-                            }
-
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
                             new_pos := get_rect_center(new_rect);
-
+                            
                             // Check if the new block would be placed on the player
-                            if CheckCollisionRecs(new_rect, player.bounding_rect) {
-                                would_be_on_existing_entity = true;
-                            }
+                            would_be_on_player := CheckCollisionRecs(new_rect, player.bounding_rect);
 
-                            has_neighbor_block := false;
+                            // Check if the new block would be placed on an existing block
+                            block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(new_pos));
 
                             // Check for a neighbor above
                             north_pos := Vector2.{ new_pos.x, new_pos.y - DIRT_WORLD_TILE_HEIGHT };
-                            north_success, north_block := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
-                            has_neighbor_block |= north_success;
+                            neighbor_exists_north, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
 
                             // Check for a neighbor below
                             south_pos := Vector2.{ new_pos.x, new_pos.y + DIRT_WORLD_TILE_HEIGHT };
-                            south_success, south_block := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
-                            has_neighbor_block |= south_success;
+                            neighbor_exists_south, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
 
                             // Check for a neighbor right
                             east_pos := Vector2.{ new_pos.x + DIRT_WORLD_TILE_WIDTH, new_pos.y };
-                            east_success, east_block := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
-                            has_neighbor_block |= east_success;
+                            neighbor_exists_east, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
 
                             // Check for a neighbor left
                             west_pos := Vector2.{ new_pos.x - DIRT_WORLD_TILE_WIDTH, new_pos.y };
-                            west_success, west_block := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
-                            has_neighbor_block |= west_success;
+                            neighbor_exists_west, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
 
-                            if north_block print_vars(north_block.*);
-                            if south_block print_vars(south_block.*);
-                            if east_block print_vars(east_block.*);
-                            if west_block print_vars(west_block.*);
+                            is_position_placeable :=
+                                !would_be_on_player &&
+                                !block_already_exists_at_location &&
+                                (
+                                    neighbor_exists_north ||
+                                    neighbor_exists_south ||
+                                    neighbor_exists_east  ||
+                                    neighbor_exists_west
+                                );
+                            is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
-                            can_place_block := debug_mode || (is_within_reach && !would_be_on_existing_entity && has_neighbor_block);
+                            can_place_block := debug_mode || (is_position_placeable && is_within_reach);
                             
                             if can_place_block {
                                 defer global_id_counter += 1;
