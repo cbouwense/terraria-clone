@@ -392,7 +392,7 @@ main :: () {
             new_block.item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT;
             new_block.hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS;
             new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
-            new_block.shadow        = xx (global_id_counter % 256);
+            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
 
             array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
@@ -427,6 +427,7 @@ main :: () {
             new_block.item_type     = .DIRT;
             new_block.hardness      = DIRT_HARDNESS;
             new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
+            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
 
             array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
@@ -462,6 +463,7 @@ main :: () {
             new_block.hardness      = ROCK_HARDNESS;
             new_block.item_type     = .ROCK;
             new_block.weak_to_tool  = get_block_weak_to_tool(.ROCK);
+            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
 
             array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
@@ -471,8 +473,56 @@ main :: () {
 
         x += DIRT_WORLD_TILE_WIDTH;
     }
-    
+
     for *chunks {
+        // Define initial shadows for blocks
+        for *block: it.blocks {
+            north_neighbor_count, south_neighbor_count, east_neighbor_count, west_neighbor_count : int;
+            for i: 1..8 {
+                north_pos := Vector2.{ block.pos.x, block.pos.y - DIRT_WORLD_TILE_HEIGHT * i };
+                neighbor_exists_north, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
+                if neighbor_exists_north {
+                    north_neighbor_count += 1;
+                } else {
+                    break;
+                }
+            }
+
+            for i: 1..8 {
+                south_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT * i };
+                neighbor_exists_south, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
+                if neighbor_exists_south {
+                    south_neighbor_count += 1;
+                } else {
+                    break;
+                }
+            }
+
+            for i: 1..8 {
+                east_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT * i };
+                neighbor_exists_east, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
+                if neighbor_exists_east {
+                    east_neighbor_count += 1;
+                } else {
+                    break;
+                }
+            }
+
+            for i: 1..8 {
+                west_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT * i };
+                neighbor_exists_west, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
+                if neighbor_exists_west {
+                    west_neighbor_count += 1;
+                } else {
+                    break;
+                }
+            }
+
+            min_neighbor_count := min(min(north_neighbor_count, south_neighbor_count), min(east_neighbor_count, west_neighbor_count));
+            block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+        }
+
+        // Define chunk bounding rectangle
         it.bounding_rect = Rectangle.{
             // @TODO: This will actually not work always. What if a chunk has no blocks?
             it.blocks[0].bounding_rect.x,
@@ -491,7 +541,7 @@ main :: () {
     camera.zoom     = 1;
 
     // Initialize controls
-    controls : Controls;
+    controls: Controls;
     controls.move_player_left[0]  = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT            };
     controls.move_player_left[1]  = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_A               };
     controls.move_player_right[0] = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT           };
@@ -919,6 +969,15 @@ main :: () {
                     for active_blocks {
                         block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type);
                         color : Color = Color.{ 255 - it.shadow * 32, 255 - it.shadow * 32, 255 - it.shadow * 32, 255 };
+                        // 0 -> 255
+                        // 1 -> 223
+                        // 2 -> 191
+                        // 3 -> 159
+                        // 4 -> 127
+                        // 5 -> 95
+                        // 6 -> 63
+                        // 7 -> 0
+
 
                         // Draw block texture
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
