@@ -265,6 +265,7 @@ Block :: struct {
     item_type    : ItemType;
     hardness     : float32;
     weak_to_tool : ItemType;
+    shadow       : u8;
 }
 
 CHUNK_MAX_WIDTH :: 16;
@@ -391,6 +392,7 @@ main :: () {
             new_block.item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT;
             new_block.hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS;
             new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
+            new_block.shadow        = xx (global_id_counter % 256);
 
             array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
@@ -640,6 +642,7 @@ main :: () {
                             // @TODO: it would be nice to have the chunk the mouse is pointing in, as well as the chunk the player is in.
                             block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, it.blocks);
                             if block_mouse_is_over != null {
+                                table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
                                 array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                 break;
                             }
@@ -669,6 +672,7 @@ main :: () {
                                     block_mouse_is_over.health_curr -= damage;
                                     
                                     if block_mouse_is_over.health_curr <= 0 {
+                                        table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
                                         array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                         try_to_add_to_inventory(*player.inventory, block_type);
                                     }
@@ -687,11 +691,11 @@ main :: () {
 
                     if !is_on_cooldown {
 
-                        selected_item_stack, result      := get_selected_item_stack(player.inventory);
-                        has_an_item_selected             := result == xx ReturnStatus.SUCCESS;
-                        item_can_be_placed_down := can_item_be_placed_down(selected_item_stack.item_type);
+                        selected_item_stack, result := get_selected_item_stack(player.inventory);
+                        has_an_item_selected        := result == xx ReturnStatus.SUCCESS;
+                        item_can_be_placed_down     := can_item_be_placed_down(selected_item_stack.item_type);
 
-                        if has_an_item_selected && item_can_be_placed_down {
+                        if has_an_item_selected && selected_item_stack.stack_count > 0 && item_can_be_placed_down {
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
                             new_pos := get_rect_center(new_rect);
                             
@@ -720,12 +724,8 @@ main :: () {
                             is_position_placeable :=
                                 !would_be_on_player &&
                                 !block_already_exists_at_location &&
-                                (
-                                    neighbor_exists_north ||
-                                    neighbor_exists_south ||
-                                    neighbor_exists_east  ||
-                                    neighbor_exists_west
-                                );
+                                (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
+
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
                             can_place_block := debug_mode || (is_position_placeable && is_within_reach);
@@ -768,7 +768,6 @@ main :: () {
                     }
                 }
 
-                // @TODO: this feels not great. I have to remember to add these here.
                 // Update sprites and animations
                 {
                     trying_to_move_horizontally := move_player_left != move_player_right;
@@ -855,7 +854,6 @@ main :: () {
                 }
 
                 // Update player cooldowns
-                // @TODO: feels like there's some metaprogramming possibility here, or at least a loop.
                 {
                     if player.cooldown_attack_current_ms > 0 {
                         player.cooldown_attack_current_ms -= xx (dt * 1000);
@@ -920,17 +918,19 @@ main :: () {
                 {
                     for active_blocks {
                         block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type);
+                        color : Color = Color.{ 255 - it.shadow * 32, 255 - it.shadow * 32, 255 - it.shadow * 32, 255 };
 
-                        DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        // Draw block texture
+                        DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
 
-                        // Damage overlay (cracks)
+                        // Damage block overlay (cracks)
                         if it.health_curr < it.health_max {
                             frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
                             damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
                             DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                         }
 
-                        // Mouse overlay (hover)
+                        // Mouse block overlay (hover)
                         show_block_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
                         if show_block_hover {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {

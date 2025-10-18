@@ -1,13 +1,12 @@
 # In progress
 
-- tools
+- lighting: block fog of war
 
 # Gameplay features
 
 - UI: inventory
 - little block pops out on destroying
 - lighting: world day / night cycle
-- lighting: block fog of war
 - menus: make player color customizable
 - menus: main menu
 - menus: settings menu
@@ -27,6 +26,7 @@
 - background parallax
 - grass regrow
 - crafting
+- walls
 
 # Tech
 
