@@ -357,14 +357,12 @@ main :: () {
         }
     }
 
-    // DIRT_PERLIN_NOISE_FREQUENCY :: 1; // How many grid nodes per map
     DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
     DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
     dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
-    // ROCK_PERLIN_NOISE_FREQUENCY :: 1; // How many grid nodes per map
     ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
     ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
     ROCK_PERLIN_NOISE_OCTAVES   :: 2;
@@ -501,10 +499,10 @@ main :: () {
     for *chunks {
         // Define initial shadows for blocks
         for *block: it.blocks {
-            block.neighbor_north_count = get_block_neighbors(block, .NORTH);
-            block.neighbor_south_count = get_block_neighbors(block, .SOUTH);
-            block.neighbor_east_count  = get_block_neighbors(block, .EAST);
-            block.neighbor_west_count  = get_block_neighbors(block, .WEST);
+            block.neighbor_north_count = get_and_recursively_set_block_neighbor_shadows(block, .NORTH);
+            block.neighbor_south_count = get_and_recursively_set_block_neighbor_shadows(block, .SOUTH);
+            block.neighbor_east_count  = get_and_recursively_set_block_neighbor_shadows(block, .EAST);
+            block.neighbor_west_count  = get_and_recursively_set_block_neighbor_shadows(block, .WEST);
 
             min_neighbor_count := min(
                 min(block.neighbor_north_count, block.neighbor_south_count),
@@ -697,7 +695,6 @@ main :: () {
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
 
                                 if block_mouse_is_over != null {
-                                    print_vars(block_mouse_is_over.*);
                                     block_type := block_mouse_is_over.item_type;
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
@@ -713,9 +710,94 @@ main :: () {
                                     block_mouse_is_over.health_curr -= damage;
                                     
                                     if block_mouse_is_over.health_curr <= 0 {
+                                        // Recalculate shadows for its neighbors
+                                        // North neighbors (south counts)
+                                        for i: 1..8 {
+                                            potential_neighbor_pos := Vector2.{ block_mouse_is_over.pos.x, block_mouse_is_over.pos.y + i * DIRT_WORLD_TILE_HEIGHT };
+                                            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+                                            
+
+                                            if neighbor_exists && neighbor.neighbor_south_count > 0 {
+                                                neighbor.neighbor_south_count -= 1;
+                                                print_vars(neighbor.*);
+                                                min_neighbor_count := min(
+                                                    min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
+                                                    min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
+                                                );
+                                                print_vars(min_neighbor_count);
+                                                neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+                                                print_vars(neighbor.shadow);
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        // South neighbors (north counts)
+                                        for i: 1..8 {
+                                            potential_neighbor_pos := Vector2.{ block_mouse_is_over.pos.x, block_mouse_is_over.pos.y - i * DIRT_WORLD_TILE_HEIGHT };
+                                            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+                                            
+                                            
+                                            if neighbor_exists && neighbor.neighbor_north_count > 0 {
+                                                neighbor.neighbor_north_count -= 1;
+                                                print_vars(neighbor.*);
+                                                min_neighbor_count := min(
+                                                    min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
+                                                    min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
+                                                );
+                                                print_vars(min_neighbor_count);
+                                                neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+                                                print_vars(neighbor.shadow);
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        // East neighbors (west counts)
+                                        for i: 1..8 {
+                                            potential_neighbor_pos := Vector2.{ block_mouse_is_over.pos.x + i * DIRT_WORLD_TILE_WIDTH, block_mouse_is_over.pos.y };
+                                            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+                                            
+
+                                            if neighbor_exists && neighbor.neighbor_west_count > 0 {
+                                                neighbor.neighbor_west_count -= 1;
+                                                print_vars(neighbor.*);
+                                                min_neighbor_count := min(
+                                                    min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
+                                                    min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
+                                                );
+                                                print_vars(min_neighbor_count);
+                                                neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+                                                print_vars(neighbor.shadow);
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        // West neighbors (east counts)
+                                        for i: 1..8 {
+                                            potential_neighbor_pos := Vector2.{ block_mouse_is_over.pos.x - i * DIRT_WORLD_TILE_WIDTH, block_mouse_is_over.pos.y };
+                                            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+                                            
+
+                                            if neighbor_exists && neighbor.neighbor_east_count > 0 {
+                                                neighbor.neighbor_east_count -= 1;
+                                                print_vars(neighbor.*);
+                                                min_neighbor_count := min(
+                                                    min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
+                                                    min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
+                                                );
+                                                print_vars(min_neighbor_count);
+                                                neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+                                                print_vars(neighbor.shadow);
+                                            } else {
+                                                break;
+                                            }
+                                        }
+
+                                        // Remove block from its associated collections
                                         table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
                                         array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                         try_to_add_to_inventory(*player.inventory, block_type);
+
+                                        // @TODO: free its memory, probably, right?
                                     }
                                 }
                             }
@@ -799,8 +881,8 @@ main :: () {
                                     
                                     found_chunk = true;
                                     new_block.chunk_id = it.id;
-                                    add_block_to_chunk(it.id, new_block.*, *chunks, *active_chunks, *active_blocks, window_start, window_end);
                                     table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                                    add_block_to_chunk(it.id, new_block.*, *chunks, *active_chunks, *active_blocks, window_start, window_end);
 
                                     break;
                                 }
@@ -968,6 +1050,12 @@ main :: () {
 
                         // Draw block texture
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
+
+                        DEBUG_TEXT_SIZE :: 10;
+                        DrawText(tprint("%\0", it.neighbor_north_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx it.sprite_rect.y, DEBUG_TEXT_SIZE, WHITE);
+                        DrawText(tprint("%\0", it.neighbor_south_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx (it.sprite_rect.y + it.sprite_rect.height - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
+                        DrawText(tprint("%\0", it.neighbor_east_count).data,  xx (it.sprite_rect.x + it.sprite_rect.width - DEBUG_TEXT_SIZE), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
+                        DrawText(tprint("%\0", it.neighbor_west_count).data,  xx (it.sprite_rect.x + DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
 
                         // Damage block overlay (cracks)
                         if it.health_curr < it.health_max {
@@ -2038,7 +2126,7 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
 }
 
-get_block_neighbors :: (block: *Block, direction: Direction) -> s32 {
+get_and_recursively_set_block_neighbor_shadows :: (block: *Block, direction: Direction) -> s32 {
     result: s32;
 
     if direction == {
@@ -2054,7 +2142,7 @@ get_block_neighbors :: (block: *Block, direction: Direction) -> s32 {
                     block.neighbor_north_count = result;
                     return result;
                 } else {
-                    result = get_block_neighbors(neighbor, direction) + 1;
+                    result = get_and_recursively_set_block_neighbor_shadows(neighbor, direction) + 1;
                     block.neighbor_north_count = result;
                     return result;
                 }
@@ -2075,7 +2163,7 @@ get_block_neighbors :: (block: *Block, direction: Direction) -> s32 {
                     block.neighbor_south_count = result;
                     return result;
                 } else {
-                    result = get_block_neighbors(neighbor, direction) + 1;
+                    result = get_and_recursively_set_block_neighbor_shadows(neighbor, direction) + 1;
                     block.neighbor_south_count = result;
                     return result;
                 }
@@ -2096,7 +2184,7 @@ get_block_neighbors :: (block: *Block, direction: Direction) -> s32 {
                     block.neighbor_east_count = result;
                     return result;
                 } else {
-                    result = get_block_neighbors(neighbor, direction) + 1;
+                    result = get_and_recursively_set_block_neighbor_shadows(neighbor, direction) + 1;
                     block.neighbor_east_count = result;
                     return result;
                 }
@@ -2117,7 +2205,7 @@ get_block_neighbors :: (block: *Block, direction: Direction) -> s32 {
                     block.neighbor_west_count = result;
                     return result;
                 } else {
-                    result = get_block_neighbors(neighbor, direction) + 1;
+                    result = get_and_recursively_set_block_neighbor_shadows(neighbor, direction) + 1;
                     block.neighbor_west_count = result;
                     return result;
                 }
