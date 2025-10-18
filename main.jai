@@ -193,8 +193,7 @@ global_id_counter: u32 = 0;
 Entity :: struct {
     type           : Type;
 
-    id             : u32; 
-    chunk_id       : u32;
+    id             : u32;
 
     pos            : Vector2;
     vel            : Vector2;
@@ -280,13 +279,6 @@ Block :: struct {
     neighbor_west_count  : s32; // -1 for uninitialized
 }
 
-CHUNK_MAX_WIDTH :: 16;
-Chunk :: struct {
-    id     : u32;
-    blocks : [..] Block;
-    bounding_rect : Rectangle;
-}
-
 Control :: struct {
     type:  Type;
     value: s32; // KeyboardKey | MouseButton;
@@ -343,20 +335,6 @@ main :: () {
     
     player := spawn_player();
 
-    chunks : [..] Chunk;
-
-    // Initialize chunks
-    chunk: Chunk;
-    for col: 0..(WORLD_GRID_COLS - 1) {
-        chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
-
-        if col % CHUNK_MAX_WIDTH == 0 {
-            chunk = New(Chunk);
-            chunk.id = xx chunk_id;
-            array_add(*chunks, chunk);
-        }
-    }
-
     DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
@@ -390,12 +368,10 @@ main :: () {
 
             // @TODO: post increment macro or something?
             defer global_id_counter += 1;
-            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
             new_block := New(Block);
             new_block.type          = Block;
             new_block.id            = global_id_counter;
-            new_block.chunk_id      = xx chunk_id;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -410,7 +386,6 @@ main :: () {
             new_block.neighbor_east_count     = -1;
             new_block.neighbor_west_count     = -1;
 
-            array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             y -= DIRT_WORLD_TILE_HEIGHT;
@@ -429,12 +404,10 @@ main :: () {
             };
 
             // @TODO: post incrememnt macro or something?
-            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division. @TODO: int division function for clarity? like divide_u32, divide_s64, etc.? 
             defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
             new_block.id            = global_id_counter;
-            new_block.chunk_id      = xx chunk_id;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -449,7 +422,6 @@ main :: () {
             new_block.neighbor_east_count     = -1;
             new_block.neighbor_west_count     = -1;
 
-            array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             y += DIRT_WORLD_TILE_HEIGHT;
@@ -467,12 +439,10 @@ main :: () {
             };
 
             // @TODO: post incrememnt macro or something?
-            chunk_id := col / CHUNK_MAX_WIDTH; // Intentional integer division.
             defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
             new_block.id            = global_id_counter;
-            new_block.chunk_id      = xx chunk_id;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -487,7 +457,6 @@ main :: () {
             new_block.neighbor_east_count     = -1;
             new_block.neighbor_west_count     = -1;
 
-            array_add(*chunks[chunk_id].blocks, new_block.*);
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             y += ROCK_WORLD_TILE_HEIGHT;
@@ -496,30 +465,18 @@ main :: () {
         x += DIRT_WORLD_TILE_WIDTH;
     }
 
-    for *chunks {
-        // Define initial shadows for blocks
-        for *block: it.blocks {
-            block.neighbor_north_count = get_and_recursively_set_block_neighbor_shadows(block, .NORTH);
-            block.neighbor_south_count = get_and_recursively_set_block_neighbor_shadows(block, .SOUTH);
-            block.neighbor_east_count  = get_and_recursively_set_block_neighbor_shadows(block, .EAST);
-            block.neighbor_west_count  = get_and_recursively_set_block_neighbor_shadows(block, .WEST);
+    // Define initial shadows for blocks
+    for block: global_block_pos_to_block {
+        block.neighbor_north_count = get_and_recursively_set_block_neighbor_shadows(block, .NORTH);
+        block.neighbor_south_count = get_and_recursively_set_block_neighbor_shadows(block, .SOUTH);
+        block.neighbor_east_count  = get_and_recursively_set_block_neighbor_shadows(block, .EAST);
+        block.neighbor_west_count  = get_and_recursively_set_block_neighbor_shadows(block, .WEST);
 
-            min_neighbor_count := min(
-                min(block.neighbor_north_count, block.neighbor_south_count),
-                min(block.neighbor_east_count,   block.neighbor_west_count)
-            );
-            block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-        }
-
-        // Define chunk bounding rectangle
-        it.bounding_rect = Rectangle.{
-            // @TODO: This will actually not work always. What if a chunk has no blocks?
-            it.blocks[0].bounding_rect.x,
-            // @TODO: Probably make a constant for this.
-            -500000,
-            it.blocks[it.blocks.count-1].bounding_rect.x - it.blocks[0].bounding_rect.x + it.blocks[0].bounding_rect.width,
-            1000000
-        };
+        min_neighbor_count := min(
+            min(block.neighbor_north_count, block.neighbor_south_count),
+            min(block.neighbor_east_count,   block.neighbor_west_count)
+        );
+        block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
     }
 
     // Initialize camera
@@ -566,14 +523,10 @@ main :: () {
         window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
         window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
 
-        active_chunks: [..]Chunk;
-        active_chunks.allocator = temp;
-
         active_blocks: [..]*Block;
         active_blocks.allocator = temp;
 
-        // @TODO: Having a notion of active chunks and active blocks is probably still too slow, but it's a step in the right direction.
-        derive_active_chunks_and_active_blocks(chunks, *active_chunks, *active_blocks, window_start, window_end);
+        derive_active_blocks(*active_blocks, window_start, window_end);
 
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
         mouse_wheel_move   := GetMouseWheelMove();
@@ -677,14 +630,9 @@ main :: () {
 
                 if try_to_attack {
                     if debug_mode {
-                        for chunks {
-                            // @TODO: it would be nice to have the chunk the mouse is pointing in, as well as the chunk the player is in.
-                            block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, it.blocks);
-                            if block_mouse_is_over != null {
-                                table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
-                                array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
-                                break;
-                            }
+                        for active_blocks {
+                            table_remove(*global_block_pos_to_block, vector2_to_string(it.pos));
+                            break;
                         }
                     } else {
                         is_on_cooldown := player.cooldown_attack_current_ms > 0;
@@ -794,7 +742,6 @@ main :: () {
 
                                         // Remove block from its associated collections
                                         table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
-                                        array_unordered_remove_entity_by_id(*chunks[block_mouse_is_over.chunk_id].blocks, block_mouse_is_over.*, true);
                                         try_to_add_to_inventory(*player.inventory, block_type);
 
                                         // @TODO: free its memory, probably, right?
@@ -870,23 +817,12 @@ main :: () {
                                 new_block.hardness      = get_block_hardness(selected_item_stack.item_type);
                                 new_block.weak_to_tool  = get_block_weak_to_tool(selected_item_stack.item_type);
                                 // @TODO: shadow calculation
-                                new_block.neighbor_north_count    = -1;
-                                new_block.neighbor_south_count    = -1;
-                                new_block.neighbor_east_count     = -1;
-                                new_block.neighbor_west_count     = -1;
+                                new_block.neighbor_north_count = -1;
+                                new_block.neighbor_south_count = -1;
+                                new_block.neighbor_east_count  = -1;
+                                new_block.neighbor_west_count  = -1;
                                 
-                                found_chunk := false;
-                                for active_chunks {
-                                    if !CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) continue;
-                                    
-                                    found_chunk = true;
-                                    new_block.chunk_id = it.id;
-                                    table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-                                    add_block_to_chunk(it.id, new_block.*, *chunks, *active_chunks, *active_blocks, window_start, window_end);
-
-                                    break;
-                                }
-                                assert(found_chunk);
+                                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
                                 player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
@@ -1074,20 +1010,6 @@ main :: () {
                     }
 
                     if debug_mode {
-                        for chunks {
-                            DrawRectangleLinesEx(it.bounding_rect, 2.0, LIME);
-                        }
-
-                        for active_chunks {
-                            center := get_rect_center(it.bounding_rect);
-                            DrawText(tprint("%\0", it.id).data, xx center.x, xx center.y, 25, WHITE);
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                DrawRectangleLinesEx(it.bounding_rect, 2.0, ORANGE);
-                            } else {
-                                DrawRectangleLinesEx(it.bounding_rect, 2.0, WHITE);
-                            }
-                        }
-
                         DrawLineEx(Vector2.{-WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, 0.0 }, 2.0, RED);
                     }
                 }
@@ -1570,15 +1492,15 @@ round_to_int :: (f: float) -> int {
     return i;
 }
 
-is_colliding :: (subject: Entity, collidables: [] $T/interface Entity) -> bool {
-    for collidables {
-        if CheckCollisionRecs(it.bounding_rect, subject.bounding_rect) {
-            return true;
-        }
-    }
+// is_colliding :: (subject: Entity, collidables: [] $T/interface Entity) -> bool {
+//     for collidables {
+//         if CheckCollisionRecs(it.bounding_rect, subject.bounding_rect) {
+//             return true;
+//         }
+//     }
 
-    return false;
-}
+//     return false;
+// }
 
 get_colliding_by_rect :: (subject_rect: Rectangle, collidables: [] $T/interface *Entity) -> *Entity {
     for collidables {
@@ -1905,29 +1827,17 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
     }
 }
 
-// @TODO: this feels wrong that I have to remember the derived state to pass to this function
-add_block_to_chunk :: (chunk_id: u32, new_block: Block, chunks: *[..] Chunk, active_chunks: *[..] Chunk, active_blocks: *[..] *Block, window_start: Vector2, window_end: Vector2) {
-    array_add(*((chunks.*)[chunk_id].blocks), new_block);
-    derive_active_chunks_and_active_blocks(chunks.*, active_chunks, active_blocks, window_start, window_end);
-}
-
-derive_active_chunks_and_active_blocks :: (chunks: [..] Chunk, active_chunks: *[..] Chunk, active_blocks: *[..] *Block, window_start: Vector2, window_end: Vector2) {
-    array_reset(active_chunks);
+derive_active_blocks :: (active_blocks: *[..] *Block, window_start: Vector2, window_end: Vector2) {
     array_reset(active_blocks);
     
-    for chunks {
-        // The last block in a chunk will always be the right-most with the current method for world generation.
-        if it.blocks[it.blocks.count-1].pos.x < window_start.x - DIRT_WORLD_TILE_WIDTH continue;
+    for block: global_block_pos_to_block {
+        if block.pos.x + DIRT_WORLD_TILE_WIDTH < window_start.x continue;
+        if block.pos.x - DIRT_WORLD_TILE_WIDTH > window_end.x continue;
         
-        // The first block in a chunk will always be the left-most with the current method for world generation.
-        if it.blocks[0].pos.x > window_end.x continue;
+        if block.pos.y - DIRT_WORLD_TILE_HEIGHT > window_end.y continue;
+        if block.pos.y + DIRT_WORLD_TILE_HEIGHT < window_start.y continue;
 
-        array_add(active_chunks, it);
-        
-        // @TODO: draw active blocks, but simulate active chunks. Or something.
-        for block: it.blocks {
-            array_add(active_blocks, *block);
-        }
+        array_add(active_blocks, block);
     }
 }
 
