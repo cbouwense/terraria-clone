@@ -665,16 +665,15 @@ main :: () {
                                             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
                                             
 
-                                            if neighbor_exists && neighbor.neighbor_south_count > 0 {
-                                                neighbor.neighbor_south_count -= 1;
-                                                print_vars(neighbor.*);
+                                            if neighbor_exists {
+                                                neighbor.neighbor_south_count = cast(s32) i - 1;
+
                                                 min_neighbor_count := min(
                                                     min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
                                                     min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
                                                 );
-                                                print_vars(min_neighbor_count);
+                                                
                                                 neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-                                                print_vars(neighbor.shadow);
                                             } else {
                                                 break;
                                             }
@@ -685,16 +684,15 @@ main :: () {
                                             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
                                             
                                             
-                                            if neighbor_exists && neighbor.neighbor_north_count > 0 {
-                                                neighbor.neighbor_north_count -= 1;
-                                                print_vars(neighbor.*);
+                                            if neighbor_exists {
+                                                neighbor.neighbor_north_count = cast(s32) i - 1;
+                                                
                                                 min_neighbor_count := min(
                                                     min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
                                                     min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
                                                 );
-                                                print_vars(min_neighbor_count);
+                                                
                                                 neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-                                                print_vars(neighbor.shadow);
                                             } else {
                                                 break;
                                             }
@@ -705,16 +703,15 @@ main :: () {
                                             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
                                             
 
-                                            if neighbor_exists && neighbor.neighbor_west_count > 0 {
-                                                neighbor.neighbor_west_count -= 1;
-                                                print_vars(neighbor.*);
+                                            if neighbor_exists {
+                                                neighbor.neighbor_west_count = cast(s32) i - 1;
+                                                
                                                 min_neighbor_count := min(
                                                     min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
                                                     min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
                                                 );
-                                                print_vars(min_neighbor_count);
+                                                
                                                 neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-                                                print_vars(neighbor.shadow);
                                             } else {
                                                 break;
                                             }
@@ -725,16 +722,15 @@ main :: () {
                                             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
                                             
 
-                                            if neighbor_exists && neighbor.neighbor_east_count > 0 {
-                                                neighbor.neighbor_east_count -= 1;
-                                                print_vars(neighbor.*);
+                                            if neighbor_exists {
+                                                neighbor.neighbor_east_count = cast(s32) i - 1;
+                                                
                                                 min_neighbor_count := min(
                                                     min(neighbor.neighbor_north_count, neighbor.neighbor_south_count),
                                                     min(neighbor.neighbor_east_count,   neighbor.neighbor_west_count)
                                                 );
-                                                print_vars(min_neighbor_count);
+                                                
                                                 neighbor.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-                                                print_vars(neighbor.shadow);
                                             } else {
                                                 break;
                                             }
