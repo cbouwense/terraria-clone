@@ -184,7 +184,7 @@ SWORD_MINING_MULTIPLIER :: 1.5;
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
-WORLD_GRID_COLS :: 1;
+WORLD_GRID_COLS :: 1000;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -357,15 +357,15 @@ main :: () {
         }
     }
 
-    DIRT_PERLIN_NOISE_FREQUENCY :: 1; // How many grid nodes per map
-    // DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
+    // DIRT_PERLIN_NOISE_FREQUENCY :: 1; // How many grid nodes per map
+    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
     DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
     dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
-    ROCK_PERLIN_NOISE_FREQUENCY :: 1; // How many grid nodes per map
-    // ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
+    // ROCK_PERLIN_NOISE_FREQUENCY :: 1; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
     ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
     ROCK_PERLIN_NOISE_OCTAVES   :: 2;
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
@@ -501,55 +501,15 @@ main :: () {
     for *chunks {
         // Define initial shadows for blocks
         for *block: it.blocks {
-            north_neighbor_count, south_neighbor_count, east_neighbor_count, west_neighbor_count : int;
-
             block.neighbor_north_count = get_block_neighbors(block, .NORTH);
+            block.neighbor_south_count = get_block_neighbors(block, .SOUTH);
+            block.neighbor_east_count  = get_block_neighbors(block, .EAST);
+            block.neighbor_west_count  = get_block_neighbors(block, .WEST);
 
-            // for i: 1..8 {
-            //     north_pos := Vector2.{ block.pos.x, block.pos.y - DIRT_WORLD_TILE_HEIGHT * i };
-            //     neighbor_exists_north, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
-            //     if neighbor_exists_north {
-            //         north_neighbor_count += 1;
-            //         // If this block already knows its north neighbor count, we don't need to keep going
-            //         if neighbor.neighbor_north_count > -1 {
-
-            //         }
-            //     } else {
-            //         break;
-            //     }
-            // }
-
-            // for i: 1..8 {
-            //     south_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT * i };
-            //     neighbor_exists_south, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
-            //     if neighbor_exists_south {
-            //         south_neighbor_count += 1;
-            //     } else {
-            //         break;
-            //     }
-            // }
-
-            // for i: 1..8 {
-            //     east_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT * i };
-            //     neighbor_exists_east, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
-            //     if neighbor_exists_east {
-            //         east_neighbor_count += 1;
-            //     } else {
-            //         break;
-            //     }
-            // }
-
-            // for i: 1..8 {
-            //     west_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT * i };
-            //     neighbor_exists_west, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
-            //     if neighbor_exists_west {
-            //         west_neighbor_count += 1;
-            //     } else {
-            //         break;
-            //     }
-            // }
-
-            min_neighbor_count := min(min(north_neighbor_count, south_neighbor_count), min(east_neighbor_count, west_neighbor_count));
+            min_neighbor_count := min(
+                min(block.neighbor_north_count, block.neighbor_south_count),
+                min(block.neighbor_east_count,   block.neighbor_west_count)
+            );
             block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
         }
 
@@ -1004,13 +964,10 @@ main :: () {
                 {
                     for active_blocks {
                         block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type);
-                        color : Color = Color.{ 255 - it.shadow * 32, 255 - it.shadow * 32, 255 - it.shadow * 32, 255 };
+                        color : Color = Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
 
                         // Draw block texture
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
-                        
-                        // Debug draw north neighbor count
-                        DrawText(tprint("%\0", it.neighbor_north_count).data, xx (it.sprite_rect.x + 4), xx (it.sprite_rect.y + 4), 25, WHITE);
 
                         // Damage block overlay (cracks)
                         if it.health_curr < it.health_max {
@@ -2106,48 +2063,69 @@ get_block_neighbors :: (block: *Block, direction: Direction) -> s32 {
                 block.neighbor_north_count = result;
                 return result;
             }
-        // case .SOUTH;
-        //     potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT };
+        case .SOUTH;
+            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT };
 
-        //     neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
+            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
-        //     if neighbor_exists {
-        //         south_neighbor_count += 1;
-        //         // If this block already knows its south neighbor count, we don't need to keep going
-        //         if neighbor.neighbor_south_count > -1 {
+            if neighbor_exists {
+                // If this block already knows its south neighbor count, we don't need to keep going
+                if neighbor.neighbor_south_count > -1 {
+                    result = neighbor.neighbor_south_count + 1;
+                    block.neighbor_south_count = result;
+                    return result;
+                } else {
+                    result = get_block_neighbors(neighbor, direction) + 1;
+                    block.neighbor_south_count = result;
+                    return result;
+                }
+            } else {
+                result = 0;
+                block.neighbor_south_count = result;
+                return result;
+            }
+        case .EAST;
+            potential_neighbor_pos := Vector2.{ block.pos.x + DIRT_WORLD_TILE_WIDTH , block.pos.y };
 
-        //         }
-        //     } else {
-        //         return south_neighbor_count;
-        //     }
-        // case .EAST;
-        //     potential_neighbor_pos := Vector2.{ block.pos.x + DIRT_WORLD_TILE_HEIGHT, block.pos.y };
+            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
-        //     neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
+            if neighbor_exists {
+                // If this block already knows its east neighbor count, we don't need to keep going
+                if neighbor.neighbor_east_count > -1 {
+                    result = neighbor.neighbor_east_count + 1;
+                    block.neighbor_east_count = result;
+                    return result;
+                } else {
+                    result = get_block_neighbors(neighbor, direction) + 1;
+                    block.neighbor_east_count = result;
+                    return result;
+                }
+            } else {
+                result = 0;
+                block.neighbor_east_count = result;
+                return result;
+            }
+        case .WEST;
+            potential_neighbor_pos := Vector2.{ block.pos.x - DIRT_WORLD_TILE_WIDTH , block.pos.y };
 
-        //     if neighbor_exists {
-        //         east_neighbor_count += 1;
-        //         // If this block already knows its east neighbor count, we don't need to keep going
-        //         if neighbor.neighbor_east_count > -1 {
+            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
-        //         }
-        //     } else {
-        //         return east_neighbor_count;
-        //     }
-        // case .WEST;
-            // potential_neighbor_pos := Vector2.{ block.pos.x - DIRT_WORLD_TILE_HEIGHT, block.pos.y };
-
-            // neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
-
-            // if neighbor_exists {
-            //     west_neighbor_count += 1;
-            //     // If this block already knows its west neighbor count, we don't need to keep going
-            //     if neighbor.neighbor_west_count > -1 {
-
-            //     }
-            // } else {
-            //     return west_neighbor_count;
-            // }
+            if neighbor_exists {
+                // If this block already knows its east neighbor count, we don't need to keep going
+                if neighbor.neighbor_west_count > -1 {
+                    result = neighbor.neighbor_west_count + 1;
+                    block.neighbor_west_count = result;
+                    return result;
+                } else {
+                    result = get_block_neighbors(neighbor, direction) + 1;
+                    block.neighbor_west_count = result;
+                    return result;
+                }
+            } else {
+                result = 0;
+                block.neighbor_west_count = result;
+                return result;
+            }
         case;
             assert(false, "Invalid direction");
             return -1;
