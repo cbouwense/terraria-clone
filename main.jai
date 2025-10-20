@@ -720,6 +720,7 @@ main :: () {
 
                             can_place_block := debug_mode || (is_position_placeable && is_within_reach);
                             
+                            // Place block down
                             if can_place_block {
                                 defer global_id_counter += 1;
 
@@ -736,7 +737,6 @@ main :: () {
                                 new_block.health_curr   = BLOCK_HEALTH_MAX;
                                 new_block.hardness      = get_block_hardness(selected_item_stack.item_type);
                                 new_block.weak_to_tool  = get_block_weak_to_tool(selected_item_stack.item_type);
-                                // @TODO: shadow calculation
                                 new_block.neighbor_north_count = -1;
                                 new_block.neighbor_south_count = -1;
                                 new_block.neighbor_east_count  = -1;
@@ -747,6 +747,9 @@ main :: () {
                                 player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
                                 player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
+
+                                set_block_shadow_relative_to_neighbors(new_pos);
+                                update_block_shadows_around_pos(new_pos);
                             }
                         }
                     }
@@ -2077,15 +2080,12 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
         min(neighbor_shadow_east,  neighbor_shadow_west),
     );
 
-    block.shadow = min(
-        ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7,
-        block.shadow,
-    );
+    block.shadow = ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
 }
 
 // @TODO: this is kinda hacky and I feel like there's probably some elegant recursive solution here that I'm going to have to
 // eventually uncover.
-update_block_shadows_around_pos :: (block_pos: Vector2) -> void {
+update_block_shadows_around_pos :: (block_pos: Vector2) {
     for col: -7..7 {
         for row: -7..7 {
             block_to_update_pos := Vector2.{ block_pos.x + col * DIRT_WORLD_TILE_WIDTH, block_pos.y + row * DIRT_WORLD_TILE_HEIGHT };
