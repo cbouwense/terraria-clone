@@ -196,7 +196,7 @@ SWORD_MINING_MULTIPLIER :: 1.5;
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
-WORLD_GRID_COLS :: 10;
+WORLD_GRID_COLS :: 1000;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -367,6 +367,12 @@ main :: () {
     COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
     perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
     print_vars(perlin_2d);
+
+    zero_count := 0;
+    for perlin_2d {
+        if it == 0.0 zero_count += 1;
+    }
+    print_vars(zero_count);
 
     initial_x := ((DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
@@ -1742,7 +1748,7 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
     // results : [DESIRED_VALUES * DESIRED_VALUES] float;
     results : [..] float;
     for i: 0..(DESIRED_VALUES * DESIRED_VALUES) {
-        array_add(*results, 13.37);
+        array_add(*results, 0.0);
     }
 
     for o: 0..octaves {
@@ -1762,6 +1768,8 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
             }
         }
 
+        print_vars(octave_factor, amplitude, frequency, blocks_per_section, random_grid_gradients);
+
         for row: 0..(DESIRED_VALUES - (blocks_per_section + 1)) {
             for col: 0..(DESIRED_VALUES - (blocks_per_section + 1)) {
                 north_west := Vector2.{ xx (row - (row % blocks_per_section)), xx (col - (col % blocks_per_section)) }; 
@@ -1777,11 +1785,13 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 south_west_delta := Vector2Subtract( south_west, curr);
                 south_east_delta := Vector2Subtract( south_east, curr);
 
+                print_vars(row, col, north_west, south_west, north_east, south_east, curr, north_west_delta, north_east_delta, south_west_delta, south_east_delta);
+
                 // Get dot products of grid corner vectors and distances
-                north_west_gradient := random_grid_gradients[cast(int) (((cast(int) north_west.x) % blocks_per_section) + north_west.y)];
-                north_east_gradient := random_grid_gradients[cast(int) (((cast(int) north_east.x) % blocks_per_section) + north_east.y)];
-                south_west_gradient := random_grid_gradients[cast(int) (((cast(int) south_west.x) % blocks_per_section) + south_west.y)];
-                south_east_gradient := random_grid_gradients[cast(int) (((cast(int) south_east.x) % blocks_per_section) + south_east.y)];
+                north_west_gradient := random_grid_gradients[cast(int) (((cast(int) north_west.x) % blocks_per_section) + north_west.y / blocks_per_section)];
+                north_east_gradient := random_grid_gradients[cast(int) (((cast(int) north_east.x) % blocks_per_section) + north_east.y / blocks_per_section)];
+                south_west_gradient := random_grid_gradients[cast(int) (((cast(int) south_west.x) % blocks_per_section) + south_west.y / blocks_per_section)];
+                south_east_gradient := random_grid_gradients[cast(int) (((cast(int) south_east.x) % blocks_per_section) + south_east.y / blocks_per_section)];
 
                 north_west_dot := dot_product(north_west_gradient, north_west_delta);
                 north_east_dot := dot_product(north_east_gradient, north_east_delta);
@@ -1793,10 +1803,6 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 perlin     := lerp(north_lerp, south_lerp,         smootherstep(curr.y));
 
                 results[row * blocks_per_section + col] += amplitude * perlin;
-                // if row * blocks_per_section + col == 1 {
-                //     print_vars(row, col, results);
-                //     // print_vars(north_west_dot, north_east_dot, south_west_dot, south_east_dot, north_lerp, south_lerp, perlin, results[i], i);
-                // }
             }
         }
     }
