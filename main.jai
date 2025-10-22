@@ -43,6 +43,7 @@ player_shoes_map          : Texture;
 dirt_map                  : Texture;
 grass_map                 : Texture;
 rock_map                  : Texture;
+copper_ore_map            : Texture;
 damage_map                : Texture;
 pickaxe_texture           : Texture;
 axe_texture               : Texture;
@@ -79,12 +80,13 @@ player_sprite_shoes_airborne            : Sprite;
 player_sprites    : [..] *Sprite;
 player_animations : [..] *AnimatedSprite;
 
-item_sprite_dirt    : Sprite;
-item_sprite_grass   : Sprite;
-item_sprite_rock    : Sprite;
-item_sprite_pickaxe : Sprite;
-item_sprite_axe     : Sprite;
-item_sprite_sword   : Sprite;
+item_sprite_dirt       : Sprite;
+item_sprite_grass      : Sprite;
+item_sprite_rock       : Sprite;
+item_sprite_copper_ore : Sprite;
+item_sprite_pickaxe    : Sprite;
+item_sprite_axe        : Sprite;
+item_sprite_sword      : Sprite;
 
 SCALE :: 2;
 
@@ -159,6 +161,16 @@ ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
 ROCK_STACK_CAPACITY :: 64;
 ROCK_HARDNESS :: 4.0;
 
+COPPER_ORE_MAP_COLS :: 16;
+COPPER_ORE_MAP_ROWS :: 15;
+COPPER_ORE_MAP_TILE_WIDTH  :: 18;
+COPPER_ORE_MAP_TILE_HEIGHT :: 18;
+COPPER_ORE_MAP_TILE_PADDING :: 2;
+COPPER_ORE_WORLD_TILE_WIDTH  :: 18 * SCALE;
+COPPER_ORE_WORLD_TILE_HEIGHT :: 18 * SCALE;
+COPPER_ORE_STACK_CAPACITY :: 64;
+COPPER_ORE_HARDNESS :: 5.0;
+
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
 DAMAGE_MAP_TILE_WIDTH  :: 16;
@@ -184,7 +196,7 @@ SWORD_MINING_MULTIPLIER :: 1.5;
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
-WORLD_GRID_COLS :: 1000;
+WORLD_GRID_COLS :: 10;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -235,6 +247,8 @@ ItemType :: enum {
     DIRT;
     GRASS;
     ROCK;
+    COPPER_ORE;
+
     PICKAXE;
     AXE;
     SWORD;
@@ -339,13 +353,20 @@ main :: () {
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
     DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
-    dirt_heights := perlin_noise(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
+    dirt_heights := perlin_noise_1d(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
-    ROCK_PERLIN_NOISE_FREQUENCY :: 4; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_FREQUENCY :: 2;//; // How many grid nodes per map
     ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
     ROCK_PERLIN_NOISE_OCTAVES   :: 2;
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
-    rock_depths := perlin_noise(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
+    rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
+
+    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 2;//; // How many grid nodes per map
+    COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 100;
+    COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 0;
+    COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
+    perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
+    print_vars(perlin_2d);
 
     initial_x := ((DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
@@ -905,19 +926,19 @@ main :: () {
                 {
                     for active_blocks {
                         block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type);
-                        color : Color = Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
+                        color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
 
                         // Draw block texture
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
 
-                        if debug_mode {
-                            DEBUG_TEXT_SIZE :: 10;
-                            DrawText(tprint("%\0", it.neighbor_north_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx it.sprite_rect.y, DEBUG_TEXT_SIZE, WHITE);
-                            DrawText(tprint("%\0", it.neighbor_south_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx (it.sprite_rect.y + it.sprite_rect.height - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
-                            DrawText(tprint("%\0", it.neighbor_east_count).data,  xx (it.sprite_rect.x + it.sprite_rect.width - DEBUG_TEXT_SIZE), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
-                            DrawText(tprint("%\0", it.neighbor_west_count).data,  xx (it.sprite_rect.x + DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
-                            DrawText(tprint("%\0", it.shadow).data,  xx (it.sprite_rect.x + it.sprite_rect.width/2 - DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE/2), DEBUG_TEXT_SIZE*2, RED);
-                        }
+                        // if debug_mode {
+                        //     DEBUG_TEXT_SIZE :: 10;
+                        //     DrawText(tprint("%\0", it.neighbor_north_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx it.sprite_rect.y, DEBUG_TEXT_SIZE, WHITE);
+                        //     DrawText(tprint("%\0", it.neighbor_south_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx (it.sprite_rect.y + it.sprite_rect.height - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
+                        //     DrawText(tprint("%\0", it.neighbor_east_count).data,  xx (it.sprite_rect.x + it.sprite_rect.width - DEBUG_TEXT_SIZE), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
+                        //     DrawText(tprint("%\0", it.neighbor_west_count).data,  xx (it.sprite_rect.x + DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
+                        //     DrawText(tprint("%\0", it.shadow).data,  xx (it.sprite_rect.x + it.sprite_rect.width/2 - DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE/2), DEBUG_TEXT_SIZE*2, RED);
+                        // }
 
                         // Damage block overlay (cracks)
                         if it.health_curr < it.health_max {
@@ -1125,6 +1146,7 @@ init_textures :: () {
     dirt_map                  = LoadTexture("data/Tiles_0.png");
     rock_map                  = LoadTexture("data/Tiles_1.png");
     grass_map                 = LoadTexture("data/Tiles_2.png");
+    copper_ore_map            = LoadTexture("data/Tiles_7.png");
     damage_map                = LoadTexture("data/Damage.png");
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
     axe_texture               = LoadTexture("data/Axe.png");
@@ -1369,6 +1391,11 @@ init_sprites :: () {
 
     item_sprite_rock = Sprite.{
         map   = rock_map,
+        color = WHITE,
+    };
+
+    item_sprite_copper_ore = Sprite.{
+        map   = copper_ore_map,
         color = WHITE,
     };
 
@@ -1658,7 +1685,7 @@ spawn_player :: () -> Player {
     return player;
 }
 
-perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [..] float {
+perlin_noise_1d :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [..] float {
     assert(desired_values % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
 
     results : [..] float;
@@ -1706,6 +1733,85 @@ perlin_noise :: (desired_values: u32, starting_frequency: u32, starting_amplitud
     return results;
 }
 
+/**
+ * frequency: how many blocks before the next gradient. The higher the frequency, the less blocks in between gradients
+ */
+perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [] float {
+    assert(DESIRED_VALUES % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
+
+    // results : [DESIRED_VALUES * DESIRED_VALUES] float;
+    results : [..] float;
+    for i: 0..(DESIRED_VALUES * DESIRED_VALUES) {
+        array_add(*results, 13.37);
+    }
+
+    for o: 0..octaves {
+        octave_factor      := pow(2.0, cast(float) o);
+        amplitude          := starting_amplitude / octave_factor;
+        frequency          := starting_frequency * octave_factor;
+        blocks_per_section := cast(int) (DESIRED_VALUES / frequency);
+
+        random_grid_gradients: [..] Vector2;
+        for row: 0..(cast(int) frequency) {
+            for col: 0..(cast(int) frequency) {
+                gradient_x := random_get_within_range(-1, 1);
+                gradient_y := random_get_within_range(-1, 1);
+                gradient   := Vector2Normalize(Vector2.{ gradient_x, gradient_y });
+
+                array_add(*random_grid_gradients, gradient);
+            }
+        }
+
+        for row: 0..(DESIRED_VALUES - (blocks_per_section + 1)) {
+            for col: 0..(DESIRED_VALUES - (blocks_per_section + 1)) {
+                north_west := Vector2.{ xx (row - (row % blocks_per_section)), xx (col - (col % blocks_per_section)) }; 
+                south_west := Vector2.{ xx (row - (row % blocks_per_section)), xx (col - (col % blocks_per_section) + blocks_per_section) };
+                north_east := Vector2.{ xx (row - (row % blocks_per_section) + blocks_per_section), xx (col - (col % blocks_per_section)) };
+                south_east := Vector2.{ xx (row - (row % blocks_per_section) + blocks_per_section), xx (col - (col % blocks_per_section) + blocks_per_section) };
+                
+                // Get distance from current tile to each grid corner
+                // @PERF
+                curr := Vector2.{ xx row, xx col };
+                north_west_delta := Vector2Subtract( north_west, curr);
+                north_east_delta := Vector2Subtract( north_east, curr);
+                south_west_delta := Vector2Subtract( south_west, curr);
+                south_east_delta := Vector2Subtract( south_east, curr);
+
+                // Get dot products of grid corner vectors and distances
+                north_west_gradient := random_grid_gradients[cast(int) (((cast(int) north_west.x) % blocks_per_section) + north_west.y)];
+                north_east_gradient := random_grid_gradients[cast(int) (((cast(int) north_east.x) % blocks_per_section) + north_east.y)];
+                south_west_gradient := random_grid_gradients[cast(int) (((cast(int) south_west.x) % blocks_per_section) + south_west.y)];
+                south_east_gradient := random_grid_gradients[cast(int) (((cast(int) south_east.x) % blocks_per_section) + south_east.y)];
+
+                north_west_dot := dot_product(north_west_gradient, north_west_delta);
+                north_east_dot := dot_product(north_east_gradient, north_east_delta);
+                south_west_dot := dot_product(south_west_gradient, south_west_delta);
+                south_east_dot := dot_product(south_east_gradient, south_east_delta);
+
+                north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(curr.x));
+                south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(curr.x));
+                perlin     := lerp(north_lerp, south_lerp,         smootherstep(curr.y));
+
+                results[row * blocks_per_section + col] += amplitude * perlin;
+                // if row * blocks_per_section + col == 1 {
+                //     print_vars(row, col, results);
+                //     // print_vars(north_west_dot, north_east_dot, south_west_dot, south_east_dot, north_lerp, south_lerp, perlin, results[i], i);
+                // }
+            }
+        }
+    }
+
+    // // @PERF
+    // for *results {
+    //     if it.* < min_value {
+    //         it.* = min_value + abs(it.*);
+    //     }
+    // }
+
+    print_vars(results);
+    return results;
+}
+
 ReturnStatus :: enum u16 {
     SUCCESS;
     NOT_FOUND;
@@ -1721,9 +1827,10 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, retu
 
 get_block_hardness :: (item_type: ItemType) -> float {
     if item_type == {
-        case .DIRT;  return DIRT_HARDNESS;
-        case .GRASS; return GRASS_HARDNESS;
-        case .ROCK;  return ROCK_HARDNESS;
+        case .DIRT;       return DIRT_HARDNESS;
+        case .GRASS;      return GRASS_HARDNESS;
+        case .ROCK;       return ROCK_HARDNESS;
+        case .COPPER_ORE; return COPPER_ORE_HARDNESS;
 
         case .PICKAXE; assert(false, "Tried to get the block hardness of a pickaxe"); #through;
         case .AXE;     assert(false, "Tried to get the block hardness of an axe");    #through;
@@ -1738,9 +1845,10 @@ get_block_hardness :: (item_type: ItemType) -> float {
 
 can_item_be_placed_down :: (item_type: ItemType) -> bool {
     if item_type == {
-        case .DIRT;    return true;
-        case .GRASS;   return true; // @TODO: false?
-        case .ROCK;    return true;
+        case .DIRT;       return true;
+        case .GRASS;      return true; // @TODO: false?
+        case .ROCK;       return true;
+        case .COPPER_ORE; return false;
 
         case .PICKAXE; return false;
         case .AXE;     return false;
@@ -1777,9 +1885,10 @@ item_stack_is_empty :: (item_stack: ItemStack) -> bool {
 
 get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
     if item_type == {
-        case .DIRT;  return DIRT_STACK_CAPACITY;
-        case .GRASS; return GRASS_STACK_CAPACITY;
-        case .ROCK;  return ROCK_STACK_CAPACITY;
+        case .DIRT;       return DIRT_STACK_CAPACITY;
+        case .GRASS;      return GRASS_STACK_CAPACITY;
+        case .ROCK;       return ROCK_STACK_CAPACITY;
+        case .COPPER_ORE; return COPPER_ORE_STACK_CAPACITY;
         case;
             assert(false, "Invalid item type");
             return -1;
@@ -1788,9 +1897,13 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
 
 get_item_breaking_speed :: (item_type: ItemType) -> float32 {
     if item_type == {
-        case .DIRT;    return 1;
-        case .GRASS;   return 1;
-        case .ROCK;    return 1;
+        // Blocks (they don't break anything any faster)
+        case .DIRT;       return 1;
+        case .GRASS;      return 1;
+        case .ROCK;       return 1;
+        case .COPPER_ORE; return 1;
+
+        // Items
         case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
         case .AXE;     return AXE_MINING_MULTIPLIER;
         case .SWORD;   return SWORD_MINING_MULTIPLIER;
@@ -1805,6 +1918,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
     map_source  : Rectangle;
     
     if item_type == {
+        // Blocks
         case .DIRT;
             map_texture = dirt_map;
             map_source  = Rectangle.{
@@ -1835,6 +1949,18 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
             };
 
             if is_facing_left map_source.width *= -1;
+        case .COPPER_ORE;
+            map_texture = copper_ore_map;
+            map_source  = Rectangle.{
+                1 * COPPER_ORE_MAP_TILE_WIDTH,
+                1 * COPPER_ORE_MAP_TILE_HEIGHT,
+                COPPER_ORE_MAP_TILE_WIDTH  - COPPER_ORE_MAP_TILE_PADDING,
+                COPPER_ORE_MAP_TILE_HEIGHT - COPPER_ORE_MAP_TILE_PADDING,
+            };
+
+            if is_facing_left map_source.width *= -1;
+
+        // Items
         case .PICKAXE;
             map_texture = pickaxe_texture;
             map_source  = Rectangle.{
@@ -1869,12 +1995,15 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
 
 get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
     if item_type == {
-        case .DIRT;    return *item_sprite_dirt;
-        case .GRASS;   return *item_sprite_grass;
-        case .ROCK;    return *item_sprite_rock;
+        // Blocks
+        case .DIRT;       return *item_sprite_dirt;
+        case .GRASS;      return *item_sprite_grass;
+        case .ROCK;       return *item_sprite_rock;
+        case .COPPER_ORE; return *item_sprite_copper_ore;
+
         case .PICKAXE; return *item_sprite_pickaxe;
         case .AXE;     return *item_sprite_axe;
-        case .SWORD;     return *item_sprite_sword;
+        case .SWORD;   return *item_sprite_sword;
         case;
             assert(false, "You forgot an item type in your switch statement");
             return null;
@@ -1883,10 +2012,13 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
 
 item_type_is_stackable :: (item_type: ItemType) -> bool {
     if item_type == {
-        case .DIRT;    return true;
-        case .GRASS;   return true;
-        case .ROCK;    return true;
+        // Blocks
+        case .DIRT;       return true;
+        case .GRASS;      return true;
+        case .ROCK;       return true;
+        case .COPPER_ORE; return true;
 
+        // Items
         case .PICKAXE; return false;
         case .AXE;     return false;
         case .SWORD;   return false;
@@ -1899,10 +2031,13 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
 
 get_item_world_length :: (item_type: ItemType) -> float {
     if item_type == {
-        case .DIRT;    return WIELDED_BLOCK_WORLD_LENGTH;
-        case .GRASS;   return WIELDED_BLOCK_WORLD_LENGTH;
-        case .ROCK;    return WIELDED_BLOCK_WORLD_LENGTH;
+        // Blocks
+        case .DIRT;       return WIELDED_BLOCK_WORLD_LENGTH;
+        case .GRASS;      return WIELDED_BLOCK_WORLD_LENGTH;
+        case .ROCK;       return WIELDED_BLOCK_WORLD_LENGTH;
+        case .COPPER_ORE; return WIELDED_BLOCK_WORLD_LENGTH;
 
+        // Items
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
         case .AXE;     return WIELDED_TOOL_WORLD_LENGTH;
         case .SWORD;   return WIELDED_TOOL_WORLD_LENGTH;
@@ -1915,10 +2050,13 @@ get_item_world_length :: (item_type: ItemType) -> float {
 
 get_block_weak_to_tool :: (item_type: ItemType) -> ItemType {
     if item_type == {
-        case .DIRT;    return .PICKAXE;
-        case .GRASS;   return .PICKAXE;
-        case .ROCK;    return .PICKAXE;
+        // Blocks
+        case .DIRT;       return .PICKAXE;
+        case .GRASS;      return .PICKAXE;
+        case .ROCK;       return .PICKAXE;
+        case .COPPER_ORE; return .PICKAXE;
 
+        // Items
         case .PICKAXE; assert(false, "Tried to get the tool weakness of a pickaxe."); #through;
         case .AXE;     assert(false, "Tried to get the tool weakness of an axe.");    #through;
         case .SWORD;   assert(false, "Tried to get the tool weakness of a sword.");   #through;
@@ -1962,7 +2100,6 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
 }
 
-// @TODO: DRY this up a bit
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
     if direction == {
         case .NORTH;

@@ -1,10 +1,16 @@
 # In progress
 
-- lighting: block fog of war
+- world gen: ore gen
 
 # Gameplay features
 
+- crafting
+- walls
+- trees
 - UI: inventory
+- world gen: cave gen
+- world gen: randomize tiles for specific type
+- world gen: loading screen
 - little block pops out on destroying
 - lighting: world day / night cycle
 - menus: make player color customizable
@@ -13,28 +19,20 @@
 - menus: death menu
 - sound effects: placing blocks
 - sound effects: attacking blocks
-- world gen: cave gen
-- world gen: ore gen
-- world gen: randomize tiles for specific type
 - be able to walk up ramps
 - game saves
 - Celeste movement juice
-- multiplayer
 - font
-- trees
 - background image
 - background parallax
 - grass regrow
-- crafting
-- walls
+- multiplayer
 
 # Tech
 
 - hot reloading
-- single mesh for chunks / entire mass of blocks
-- simulate chunks by player position
-- cull blocks by viewport
 - metaprogram for required fields
+- active blocks doesn't keep up with zoom level
 
 # Bugs
 
