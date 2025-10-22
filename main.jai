@@ -196,7 +196,7 @@ SWORD_MINING_MULTIPLIER :: 1.5;
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
-WORLD_GRID_COLS :: 10;
+WORLD_GRID_COLS :: 1000;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -361,16 +361,17 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 2;//; // How many grid nodes per map
+    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 100;//; // How many grid nodes per map
     COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 100;
     COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 0;
     COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
     perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
-    // print_vars(perlin_2d);
+    print_vars(perlin_2d);
 
-    for perlin_2d {
-        print("%\n", it);
-    }
+min
+    // for perlin_2d {
+    //     print("%\n", it);
+    // }
 
     initial_x := ((DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
@@ -1766,7 +1767,7 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
             }
         }
 
-        print_vars(octave_factor, amplitude, frequency, blocks_per_section, random_grid_gradients);
+        // print_vars(octave_factor, amplitude, frequency, blocks_per_section, random_grid_gradients);
 
         for row: 0..DESIRED_VALUES-1 {
             for col: 0..DESIRED_VALUES-1 {
@@ -1777,13 +1778,13 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 
                 // Get distance from current tile to each grid corner
                 // @PERF
-                curr := Vector2.{ xx row, xx col };
+                curr := Vector2.{ xx col, xx row };
                 north_west_delta := Vector2Subtract(north_west, curr);
                 north_east_delta := Vector2Subtract(north_east, curr);
                 south_west_delta := Vector2Subtract(south_west, curr);
                 south_east_delta := Vector2Subtract(south_east, curr);
 
-                print_vars(row, col, north_west, south_west, north_east, south_east, curr, north_west_delta, north_east_delta, south_west_delta, south_east_delta);
+                // print_vars(row, col, north_west, south_west, north_east, south_east, curr, north_west_delta, north_east_delta, south_west_delta, south_east_delta);
 
                 // Get dot products of grid corner vectors and distances
                 north_west_gradient := random_grid_gradients[cast(int) (((cast(int) north_west.x) % blocks_per_section) + north_west.y / blocks_per_section)];
