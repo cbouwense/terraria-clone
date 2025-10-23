@@ -4,6 +4,7 @@
 #import "Math";
 #import "Print_Vars";
 #import "Random";
+#import "Sort";
 #import "String";
 #import "System";
 
@@ -361,17 +362,18 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 100;//; // How many grid nodes per map
+    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 2;//; // How many gradient vectors per column - 1
     COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 100;
     COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 0;
     COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
     perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
-    print_vars(perlin_2d);
 
-min
-    // for perlin_2d {
-    //     print("%\n", it);
-    // }
+    perlin_2d_sorted := array_copy(perlin_2d);
+    quick_sort(perlin_2d_sorted, (x, y) => x - y);
+
+    p80_index := perlin_2d.count * 80 / 100;
+    p80 := perlin_2d[p80_index];
+    print_vars(p80_index, p80);
 
     initial_x := ((DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
@@ -1772,8 +1774,8 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
         for row: 0..DESIRED_VALUES-1 {
             for col: 0..DESIRED_VALUES-1 {
                 north_west := Vector2.{ xx (col - (col % blocks_per_section)), xx (row - (row % blocks_per_section)) }; 
-                north_east := Vector2.{ xx (col - (col % blocks_per_section)), xx (row - (row % blocks_per_section) + blocks_per_section) };
-                south_west := Vector2.{ xx (col - (col % blocks_per_section) + blocks_per_section), xx (row - (row % blocks_per_section)) };
+                north_east := Vector2.{ xx (col - (col % blocks_per_section) + blocks_per_section), xx (row - (row % blocks_per_section)) };
+                south_west := Vector2.{ xx (col - (col % blocks_per_section)), xx (row - (row % blocks_per_section) + blocks_per_section) };
                 south_east := Vector2.{ xx (col - (col % blocks_per_section) + blocks_per_section), xx (row - (row % blocks_per_section) + blocks_per_section) };
                 
                 // Get distance from current tile to each grid corner
@@ -1784,13 +1786,16 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 south_west_delta := Vector2Subtract(south_west, curr);
                 south_east_delta := Vector2Subtract(south_east, curr);
 
-                // print_vars(row, col, north_west, south_west, north_east, south_east, curr, north_west_delta, north_east_delta, south_west_delta, south_east_delta);
-
                 // Get dot products of grid corner vectors and distances
-                north_west_gradient := random_grid_gradients[cast(int) (((cast(int) north_west.x) % blocks_per_section) + north_west.y / blocks_per_section)];
-                north_east_gradient := random_grid_gradients[cast(int) (((cast(int) north_east.x) % blocks_per_section) + north_east.y / blocks_per_section)];
-                south_west_gradient := random_grid_gradients[cast(int) (((cast(int) south_west.x) % blocks_per_section) + south_west.y / blocks_per_section)];
-                south_east_gradient := random_grid_gradients[cast(int) (((cast(int) south_east.x) % blocks_per_section) + south_east.y / blocks_per_section)];
+                north_west_gradient_index := cast(int) ((north_west.x / blocks_per_section) + (north_west.y / blocks_per_section * (frequency + 1)));
+                north_east_gradient_index := cast(int) ((north_east.x / blocks_per_section) + (north_east.y / blocks_per_section * (frequency + 1)));
+                south_west_gradient_index := cast(int) ((south_west.x / blocks_per_section) + (south_west.y / blocks_per_section * (frequency + 1)));
+                south_east_gradient_index := cast(int) ((south_east.x / blocks_per_section) + (south_east.y / blocks_per_section * (frequency + 1)));
+
+                north_west_gradient := random_grid_gradients[north_west_gradient_index];
+                north_east_gradient := random_grid_gradients[north_east_gradient_index];
+                south_west_gradient := random_grid_gradients[south_west_gradient_index];
+                south_east_gradient := random_grid_gradients[south_east_gradient_index];
 
                 north_west_dot := dot_product(north_west_gradient, north_west_delta);
                 north_east_dot := dot_product(north_east_gradient, north_east_delta);
@@ -1800,6 +1805,35 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(curr.x));
                 south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(curr.x));
                 perlin     := lerp(north_lerp, south_lerp,         smootherstep(curr.y));
+
+                // print_vars(
+                //     row, 
+                //     col, 
+                //     north_west, 
+                //     north_east, 
+                //     south_west, 
+                //     south_east, 
+                //     curr, 
+                //     north_west_delta, 
+                //     north_east_delta, 
+                //     south_west_delta, 
+                //     south_east_delta,
+                //     north_west_gradient_index,
+                //     north_east_gradient_index,
+                //     south_west_gradient_index,
+                //     south_east_gradient_index,
+                //     north_west_gradient,
+                //     north_east_gradient,
+                //     south_west_gradient,
+                //     south_east_gradient,
+                //     north_west_dot,
+                //     north_east_dot,
+                //     south_west_dot,
+                //     south_east_dot,
+                //     north_lerp,
+                //     south_lerp,
+                //     perlin,
+                // );
 
                 results[row * DESIRED_VALUES + col] += amplitude * perlin;
             }
