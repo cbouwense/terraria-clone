@@ -137,8 +137,8 @@ DIRT_MAP_ROWS :: 15;
 DIRT_MAP_TILE_WIDTH  :: 18;
 DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_MAP_TILE_PADDING :: 2;
-DIRT_WORLD_TILE_WIDTH  :: 18 * SCALE;
-DIRT_WORLD_TILE_HEIGHT :: 18 * SCALE;
+BLOCK_WORLD_WIDTH  :: 18 * SCALE;
+BLOCK_WORLD_HEIGHT :: 18 * SCALE;
 DIRT_STACK_CAPACITY :: 64;
 DIRT_HARDNESS :: 0.5;
 
@@ -362,23 +362,20 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 2;//; // How many gradient vectors per column - 1
+    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 50;//; // How many gradient vectors per column - 1
     COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 100;
-    COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 0;
+    COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 2;
     COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
     perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
 
     perlin_2d_sorted := array_copy(perlin_2d);
     quick_sort(perlin_2d_sorted, (x, y) => x - y);
 
-    p80_index := perlin_2d.count * 80 / 100;
-    p80 := perlin_2d[p80_index];
-    print_vars(p80_index, p80);
-
-    initial_x := ((DIRT_WORLD_TILE_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
+    initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
     // Initialize blocks
-    x := initial_x;
+    x := cast(int) initial_x;
+    min_y := 0; // the most negative y
 
     for columns_generated: 0..WORLD_GRID_COLS {
         col := columns_generated;
@@ -390,8 +387,8 @@ main :: () {
             rect := Rectangle.{
                 xx x,
                 xx y,
-                xx DIRT_WORLD_TILE_WIDTH,
-                xx DIRT_WORLD_TILE_HEIGHT,
+                xx BLOCK_WORLD_WIDTH,
+                xx BLOCK_WORLD_HEIGHT,
             };
 
             // @TODO: post increment macro or something?
@@ -399,7 +396,7 @@ main :: () {
             // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
             new_block := New(Block);
             new_block.type          = Block;
-            new_block.id            = global_id_counter;
+            // new_block.id            = global_id_counter;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -416,7 +413,11 @@ main :: () {
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
-            y -= DIRT_WORLD_TILE_HEIGHT;
+            y -= BLOCK_WORLD_HEIGHT;
+        }
+
+        if hill_dirt_blocks * -BLOCK_WORLD_HEIGHT < min_y {
+            min_y = hill_dirt_blocks * -BLOCK_WORLD_HEIGHT;
         }
 
         // Generate ground dirt
@@ -427,32 +428,32 @@ main :: () {
             rect := Rectangle.{
                 xx x,
                 xx y,
-                xx DIRT_WORLD_TILE_WIDTH,
-                xx DIRT_WORLD_TILE_HEIGHT,
+                xx BLOCK_WORLD_WIDTH,
+                xx BLOCK_WORLD_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
             defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
-            new_block.id            = global_id_counter;
+            // new_block.id            = global_id_counter;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
             new_block.health_max    = BLOCK_HEALTH_MAX;
             new_block.health_curr   = BLOCK_HEALTH_MAX;
             new_block.item_type     = .DIRT;
-            new_block.hardness      = DIRT_HARDNESS;
+            new_block.hardness      = get_block_hardness(.DIRT);
             new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count    = -1;
-            new_block.neighbor_south_count    = -1;
-            new_block.neighbor_east_count     = -1;
-            new_block.neighbor_west_count     = -1;
+            new_block.neighbor_north_count = -1;
+            new_block.neighbor_south_count = -1;
+            new_block.neighbor_east_count  = -1;
+            new_block.neighbor_west_count  = -1;
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
-            y += DIRT_WORLD_TILE_HEIGHT;
+            y += BLOCK_WORLD_HEIGHT;
         }
 
         // Generate rock
@@ -462,15 +463,15 @@ main :: () {
             rect := Rectangle.{
                 xx x,
                 xx y,
-                xx DIRT_WORLD_TILE_WIDTH,
-                xx DIRT_WORLD_TILE_HEIGHT,
+                xx BLOCK_WORLD_WIDTH,
+                xx BLOCK_WORLD_HEIGHT,
             };
 
             // @TODO: post incrememnt macro or something?
             defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
-            new_block.id            = global_id_counter;
+            // new_block.id            = global_id_counter;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -490,21 +491,40 @@ main :: () {
             y += ROCK_WORLD_TILE_HEIGHT;
         }
 
-        x += DIRT_WORLD_TILE_WIDTH;
+        x += BLOCK_WORLD_WIDTH;
     }
 
-    // Define initial shadows for blocks
-    for block: global_block_pos_to_block {
-        block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
-        block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
-        block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
-        block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
+    p80_index := perlin_2d.count * 99 / 100;
+    p80 := perlin_2d_sorted[p80_index];
+    print_vars(p80_index, p80);
 
-        min_neighbor_count := min(
-            min(block.neighbor_north_count, block.neighbor_south_count),
-            min(block.neighbor_east_count,   block.neighbor_west_count)
-        );
-        block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+    for block: global_block_pos_to_block {
+        // Define initial shadows for blocks
+        {
+            block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
+            block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
+            block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
+            block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
+
+            min_neighbor_count := min(
+                min(block.neighbor_north_count, block.neighbor_south_count),
+                min(block.neighbor_east_count,   block.neighbor_west_count)
+            );
+            block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+        }
+
+        // Copper deposits
+        {
+            if block.bounding_rect.y < 0 continue;
+            index := cast(int) ((WORLD_GRID_COLS * block.bounding_rect.y / BLOCK_WORLD_WIDTH) + ((block.bounding_rect.x - initial_x) / BLOCK_WORLD_WIDTH));
+            block.id        = cast (u32) index;
+            // print_vars(block.bounding_rect, index, perlin_2d[index], p80);
+            if perlin_2d[index] >= p80 {
+                block.item_type = .COPPER_ORE;
+                block.hardness  = COPPER_ORE_HARDNESS;
+                // block.id        = cast (u32) index;
+            }
+        } 
     }
 
     // Initialize camera
@@ -714,7 +734,7 @@ main :: () {
                         item_can_be_placed_down     := can_item_be_placed_down(selected_item_stack.item_type);
 
                         if has_an_item_selected && selected_item_stack.stack_count > 0 && item_can_be_placed_down {
-                            new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT);
+                            new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT);
                             new_pos := get_rect_center(new_rect);
                             
                             // Check if the new block would be placed on the player
@@ -724,19 +744,19 @@ main :: () {
                             block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(new_pos));
 
                             // Check for a neighbor above
-                            north_pos := Vector2.{ new_pos.x, new_pos.y - DIRT_WORLD_TILE_HEIGHT };
+                            north_pos := Vector2.{ new_pos.x, new_pos.y - BLOCK_WORLD_HEIGHT };
                             neighbor_exists_north, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
 
                             // Check for a neighbor below
-                            south_pos := Vector2.{ new_pos.x, new_pos.y + DIRT_WORLD_TILE_HEIGHT };
+                            south_pos := Vector2.{ new_pos.x, new_pos.y + BLOCK_WORLD_HEIGHT };
                             neighbor_exists_south, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
 
                             // Check for a neighbor right
-                            east_pos := Vector2.{ new_pos.x + DIRT_WORLD_TILE_WIDTH, new_pos.y };
+                            east_pos := Vector2.{ new_pos.x + BLOCK_WORLD_WIDTH, new_pos.y };
                             neighbor_exists_east, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
 
                             // Check for a neighbor left
-                            west_pos := Vector2.{ new_pos.x - DIRT_WORLD_TILE_WIDTH, new_pos.y };
+                            west_pos := Vector2.{ new_pos.x - BLOCK_WORLD_WIDTH, new_pos.y };
                             neighbor_exists_west, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
 
                             is_position_placeable :=
@@ -940,11 +960,9 @@ main :: () {
 
                         // if debug_mode {
                         //     DEBUG_TEXT_SIZE :: 10;
-                        //     DrawText(tprint("%\0", it.neighbor_north_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx it.sprite_rect.y, DEBUG_TEXT_SIZE, WHITE);
-                        //     DrawText(tprint("%\0", it.neighbor_south_count).data, xx (it.sprite_rect.x + it.sprite_rect.width / 2), xx (it.sprite_rect.y + it.sprite_rect.height - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
-                        //     DrawText(tprint("%\0", it.neighbor_east_count).data,  xx (it.sprite_rect.x + it.sprite_rect.width - DEBUG_TEXT_SIZE), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
-                        //     DrawText(tprint("%\0", it.neighbor_west_count).data,  xx (it.sprite_rect.x + DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, WHITE);
-                        //     DrawText(tprint("%\0", it.shadow).data,  xx (it.sprite_rect.x + it.sprite_rect.width/2 - DEBUG_TEXT_SIZE/2), xx (it.sprite_rect.y + it.sprite_rect.height / 2 - DEBUG_TEXT_SIZE/2), DEBUG_TEXT_SIZE*2, RED);
+                        //     DrawText(tprint("%\0", it.id).data, xx it.sprite_rect.x, xx (it.sprite_rect.y + DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, ORANGE);
+                        //     DrawText(tprint("%\0", it.pos.x).data, xx it.sprite_rect.x, xx it.sprite_rect.y, DEBUG_TEXT_SIZE + 2, WHITE);
+                        //     DrawText(tprint("%\0", it.pos.y).data, xx it.sprite_rect.x, xx (it.sprite_rect.y + DEBUG_TEXT_SIZE + 4), DEBUG_TEXT_SIZE, WHITE);
                         // }
 
                         // Damage block overlay (cracks)
@@ -1067,7 +1085,7 @@ main :: () {
 
                 // Draw cursor
                 if debug_mode {
-                    DrawRectangleRec(create_rect_for_tile_from_point(mouse_pos_in_world, DIRT_WORLD_TILE_WIDTH, DIRT_WORLD_TILE_HEIGHT), TRANSPARENT_WHITE);
+                    DrawRectangleRec(create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT), TRANSPARENT_WHITE);
                 }
             }
 
@@ -1802,9 +1820,9 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 south_west_dot := dot_product(south_west_gradient, south_west_delta);
                 south_east_dot := dot_product(south_east_gradient, south_east_delta);
 
-                north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(curr.x));
-                south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(curr.x));
-                perlin     := lerp(north_lerp, south_lerp,         smootherstep(curr.y));
+                north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(north_west_delta.x));
+                south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(north_west_delta.x));
+                perlin     := lerp(north_lerp, south_lerp,         smootherstep(north_west_delta.x));
 
                 // print_vars(
                 //     row, 
@@ -1904,11 +1922,11 @@ derive_active_blocks :: (active_blocks: *[..] *Block, window_start: Vector2, win
     array_reset(active_blocks);
     
     for block: global_block_pos_to_block {
-        if block.pos.x + DIRT_WORLD_TILE_WIDTH < window_start.x continue;
-        if block.pos.x - DIRT_WORLD_TILE_WIDTH > window_end.x continue;
+        if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+        if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
         
-        if block.pos.y - DIRT_WORLD_TILE_HEIGHT > window_end.y continue;
-        if block.pos.y + DIRT_WORLD_TILE_HEIGHT < window_start.y continue;
+        if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+        if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
         array_add(active_blocks, block);
     }
@@ -2142,7 +2160,7 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
     if direction == {
         case .NORTH;
-            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y - DIRT_WORLD_TILE_HEIGHT };
+            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y - BLOCK_WORLD_HEIGHT };
 
             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
@@ -2163,7 +2181,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .SOUTH;
-            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y + DIRT_WORLD_TILE_HEIGHT };
+            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y + BLOCK_WORLD_HEIGHT };
 
             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
@@ -2184,7 +2202,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .EAST;
-            potential_neighbor_pos := Vector2.{ block.pos.x + DIRT_WORLD_TILE_WIDTH , block.pos.y };
+            potential_neighbor_pos := Vector2.{ block.pos.x + BLOCK_WORLD_WIDTH , block.pos.y };
 
             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
@@ -2205,7 +2223,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .WEST;
-            potential_neighbor_pos := Vector2.{ block.pos.x - DIRT_WORLD_TILE_WIDTH , block.pos.y };
+            potential_neighbor_pos := Vector2.{ block.pos.x - BLOCK_WORLD_WIDTH , block.pos.y };
 
             neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
 
@@ -2235,19 +2253,19 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string(block_pos));
     if !block_exists return;
 
-    neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - DIRT_WORLD_TILE_HEIGHT };
+    neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
     neighbor_north_exists, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_north_pos));
     neighbor_shadow_north := ifx neighbor_north_exists then neighbor_north.shadow else -1;
 
-    neighbor_south_pos := Vector2.{ block_pos.x, block_pos.y + DIRT_WORLD_TILE_HEIGHT };
+    neighbor_south_pos := Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
     neighbor_south_exists, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_south_pos));
     neighbor_shadow_south := ifx neighbor_south_exists then neighbor_south.shadow else -1;
 
-    neighbor_east_pos  := Vector2.{ block_pos.x + DIRT_WORLD_TILE_WIDTH, block_pos.y };
+    neighbor_east_pos  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
     neighbor_east_exists, neighbor_east := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_east_pos));
     neighbor_shadow_east := ifx neighbor_east_exists then neighbor_east.shadow else -1;
 
-    neighbor_west_pos  := Vector2.{ block_pos.x - DIRT_WORLD_TILE_WIDTH, block_pos.y };
+    neighbor_west_pos  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
     neighbor_west_exists, neighbor_west := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_west_pos));
     neighbor_shadow_west := ifx neighbor_west_exists then neighbor_west.shadow else -1;
 
@@ -2264,7 +2282,7 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
 update_block_shadows_around_pos :: (block_pos: Vector2) {
     for col: -7..7 {
         for row: -7..7 {
-            block_to_update_pos := Vector2.{ block_pos.x + col * DIRT_WORLD_TILE_WIDTH, block_pos.y + row * DIRT_WORLD_TILE_HEIGHT };
+            block_to_update_pos := Vector2.{ block_pos.x + col * BLOCK_WORLD_WIDTH, block_pos.y + row * BLOCK_WORLD_HEIGHT };
             set_block_shadow_relative_to_neighbors(block_to_update_pos);
         }
     }
@@ -2276,7 +2294,7 @@ update_block_shadows_around_pos :: (block_pos: Vector2) {
             defer col *= -1;
             defer row *= -1;
 
-            block_to_update_pos := Vector2.{ block_pos.x + col * DIRT_WORLD_TILE_WIDTH, block_pos.y + row * DIRT_WORLD_TILE_HEIGHT };
+            block_to_update_pos := Vector2.{ block_pos.x + col * BLOCK_WORLD_WIDTH, block_pos.y + row * BLOCK_WORLD_HEIGHT };
             set_block_shadow_relative_to_neighbors(block_to_update_pos);
         }
     }
