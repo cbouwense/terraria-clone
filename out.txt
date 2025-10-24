@@ -92,8 +92,10 @@ INFO: TEXTURE: [ID 19] Texture loaded successfully (32x32 | R8G8B8A8 | 1 mipmaps
 INFO: FILEIO: [data/Sword.png] File loaded successfully
 INFO: IMAGE: Data loaded successfully (32x32 | R8G8B8A8 | 1 mipmaps)
 INFO: TEXTURE: [ID 20] Texture loaded successfully (32x32 | R8G8B8A8 | 1 mipmaps)
-p80_index = 990000      (s64)
-p80       = 2394.025879 (float32)
+perlin_2d.count = 1000000 (s64)
+
+copper_ore_cutoff_index = 950000   (s64)
+copper_ore_cutoff       = 3.732848 (float32)
 
 INFO: TEXTURE: [ID 2] Unloaded texture data from VRAM (GPU)
 INFO: SHADER: [ID 3] Default shader unloaded successfully

@@ -130,15 +130,16 @@ HOTBAR_SLOTS         :: 8;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
-BLOCK_HEALTH_MAX :: 50;
+BLOCK_WORLD_WIDTH  :: 18 * SCALE;
+BLOCK_WORLD_HEIGHT :: 18 * SCALE;
+BLOCK_HEALTH_MAX   :: 50;
+BLOCK_WEAKNESS_MULTIPLIER :: 6;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
 DIRT_MAP_TILE_WIDTH  :: 18;
 DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_MAP_TILE_PADDING :: 2;
-BLOCK_WORLD_WIDTH  :: 18 * SCALE;
-BLOCK_WORLD_HEIGHT :: 18 * SCALE;
 DIRT_STACK_CAPACITY :: 64;
 DIRT_HARDNESS :: 0.5;
 
@@ -160,7 +161,7 @@ ROCK_MAP_TILE_PADDING :: 2;
 ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
 ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
 ROCK_STACK_CAPACITY :: 64;
-ROCK_HARDNESS :: 4.0;
+ROCK_HARDNESS :: 3.0;
 
 COPPER_ORE_MAP_COLS :: 16;
 COPPER_ORE_MAP_ROWS :: 15;
@@ -170,7 +171,7 @@ COPPER_ORE_MAP_TILE_PADDING :: 2;
 COPPER_ORE_WORLD_TILE_WIDTH  :: 18 * SCALE;
 COPPER_ORE_WORLD_TILE_HEIGHT :: 18 * SCALE;
 COPPER_ORE_STACK_CAPACITY :: 64;
-COPPER_ORE_HARDNESS :: 5.0;
+COPPER_ORE_HARDNESS :: 4.0;
 
 DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
@@ -196,8 +197,6 @@ SWORD_MINING_MULTIPLIER :: 1.5;
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
-
-WORLD_GRID_COLS :: 1000;
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -350,6 +349,8 @@ main :: () {
     
     player := spawn_player();
 
+    WORLD_GRID_COLS :: 1000;
+
     DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
     DIRT_PERLIN_NOISE_OCTAVES   :: 5;
@@ -362,14 +363,29 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 50;//; // How many gradient vectors per column - 1
-    COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 100;
-    COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 2;
+    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 100;//; // How many gradient vectors per column - 1
+    COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 1;
+    COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 1;
     COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
     perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
+    print_vars(perlin_2d.count);
 
+    // for row: 0..WORLD_GRID_COLS-1 {
+    //     print("[");
+    //     for col: 0..WORLD_GRID_COLS-1 {
+    //         p := perlin_2d[row * WORLD_GRID_COLS + col];
+    //         if p == 0 print("%,\t\t\t", p);
+    //         else print("%,\t", p);
+    //     }
+    //     print("],\n");
+    // }
+    
     perlin_2d_sorted := array_copy(perlin_2d);
     quick_sort(perlin_2d_sorted, (x, y) => x - y);
+
+    copper_ore_cutoff_index := perlin_2d.count * 95 / 100;
+    copper_ore_cutoff := perlin_2d_sorted[copper_ore_cutoff_index];
+    print_vars(copper_ore_cutoff_index, copper_ore_cutoff);
 
     initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
@@ -377,13 +393,22 @@ main :: () {
     x := cast(int) initial_x;
     min_y := 0; // the most negative y
 
-    for columns_generated: 0..WORLD_GRID_COLS {
-        col := columns_generated;
-        y   := 0;
-
+    for col: 0..WORLD_GRID_COLS-1 {
+        y := 0;
+       
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
-        for hill_rows_generated: 0..hill_dirt_blocks {
+        for row: 0..hill_dirt_blocks {
+            perlin_index := (hill_dirt_blocks - row) * (WORLD_GRID_COLS-1) + col;
+
+            block_type := ItemType.DIRT;
+            if row == hill_dirt_blocks {
+                block_type = .GRASS;
+            }
+            else if perlin_2d[perlin_index] >= copper_ore_cutoff {
+                block_type = .COPPER_ORE;
+            }
+
             rect := Rectangle.{
                 xx x,
                 xx y,
@@ -402,14 +427,14 @@ main :: () {
             new_block.sprite_rect   = rect;
             new_block.health_max    = BLOCK_HEALTH_MAX;
             new_block.health_curr   = BLOCK_HEALTH_MAX;
-            new_block.item_type     = ifx hill_rows_generated == hill_dirt_blocks then .GRASS else .DIRT;
-            new_block.hardness      = ifx hill_rows_generated == hill_dirt_blocks then GRASS_HARDNESS else DIRT_HARDNESS;
-            new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
+            new_block.item_type     = block_type;
+            new_block.hardness      = get_block_hardness(block_type);
+            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count    = -1;
-            new_block.neighbor_south_count    = -1;
-            new_block.neighbor_east_count     = -1;
-            new_block.neighbor_west_count     = -1;
+            new_block.neighbor_north_count = -1;
+            new_block.neighbor_south_count = -1;
+            new_block.neighbor_east_count  = -1;
+            new_block.neighbor_west_count  = -1;
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
@@ -424,7 +449,10 @@ main :: () {
         ground_dirt_blocks := cast(int) abs(rock_depths[col]);
         y = 0;
 
-        for ground_rows_generated: 0..ground_dirt_blocks {
+        for row: 0..ground_dirt_blocks-1 {
+            perlin_index := row * (WORLD_GRID_COLS-1) + col;
+            block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff then ItemType.COPPER_ORE else ItemType.DIRT;
+
             rect := Rectangle.{
                 xx x,
                 xx y,
@@ -442,9 +470,9 @@ main :: () {
             new_block.sprite_rect   = rect;
             new_block.health_max    = BLOCK_HEALTH_MAX;
             new_block.health_curr   = BLOCK_HEALTH_MAX;
-            new_block.item_type     = .DIRT;
-            new_block.hardness      = get_block_hardness(.DIRT);
-            new_block.weak_to_tool  = get_block_weak_to_tool(.DIRT);
+            new_block.item_type     = block_type;
+            new_block.hardness      = get_block_hardness(block_type);
+            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
             new_block.neighbor_north_count = -1;
             new_block.neighbor_south_count = -1;
@@ -459,7 +487,10 @@ main :: () {
         // Generate rock
         rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
 
-        for rock_rows_generated: 0..(100 - ground_dirt_blocks) {
+        for row: 0..(100 - ground_dirt_blocks) {
+            perlin_index := row * (WORLD_GRID_COLS-1) + col;
+            block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff then ItemType.COPPER_ORE else ItemType.ROCK;
+
             rect := Rectangle.{
                 xx x,
                 xx y,
@@ -477,14 +508,14 @@ main :: () {
             new_block.sprite_rect   = rect;
             new_block.health_max    = BLOCK_HEALTH_MAX;
             new_block.health_curr   = BLOCK_HEALTH_MAX;
-            new_block.hardness      = ROCK_HARDNESS;
-            new_block.item_type     = .ROCK;
-            new_block.weak_to_tool  = get_block_weak_to_tool(.ROCK);
+            new_block.item_type     = block_type;
+            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
+            new_block.hardness      = get_block_hardness(block_type);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count    = -1;
-            new_block.neighbor_south_count    = -1;
-            new_block.neighbor_east_count     = -1;
-            new_block.neighbor_west_count     = -1;
+            new_block.neighbor_north_count = -1;
+            new_block.neighbor_south_count = -1;
+            new_block.neighbor_east_count  = -1;
+            new_block.neighbor_west_count  = -1;
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
@@ -493,10 +524,6 @@ main :: () {
 
         x += BLOCK_WORLD_WIDTH;
     }
-
-    p80_index := perlin_2d.count * 99 / 100;
-    p80 := perlin_2d_sorted[p80_index];
-    print_vars(p80_index, p80);
 
     for block: global_block_pos_to_block {
         // Define initial shadows for blocks
@@ -508,24 +535,25 @@ main :: () {
 
             min_neighbor_count := min(
                 min(block.neighbor_north_count, block.neighbor_south_count),
-                min(block.neighbor_east_count,   block.neighbor_west_count)
+                min(block.neighbor_east_count,  block.neighbor_west_count)
             );
             block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
         }
-
-        // Copper deposits
-        {
-            if block.bounding_rect.y < 0 continue;
-            index := cast(int) ((WORLD_GRID_COLS * block.bounding_rect.y / BLOCK_WORLD_WIDTH) + ((block.bounding_rect.x - initial_x) / BLOCK_WORLD_WIDTH));
-            block.id        = cast (u32) index;
-            // print_vars(block.bounding_rect, index, perlin_2d[index], p80);
-            if perlin_2d[index] >= p80 {
-                block.item_type = .COPPER_ORE;
-                block.hardness  = COPPER_ORE_HARDNESS;
-                // block.id        = cast (u32) index;
-            }
-        } 
     }
+
+    // Copper deposits
+    // {
+    //     if block.bounding_rect.y < 0 continue;
+    //     // index    := cast(int) ((WORLD_GRID_COLS * block.bounding_rect.y / BLOCK_WORLD_WIDTH) + ((block.bounding_rect.x - initial_x) / BLOCK_WORLD_WIDTH));
+    //     index    := cast(int) ((WORLD_GRID_COLS * block.bounding_rect.y / BLOCK_WORLD_WIDTH) + ((block.bounding_rect.x - initial_x) / BLOCK_WORLD_WIDTH));
+    //     block.id  = cast (u32) index;
+    //     // print_vars(block.bounding_rect, index, perlin_2d[index], copper_ore_cutoff);
+    //     if perlin_2d[index] >= copper_ore_cutoff {
+    //         block.item_type = .COPPER_ORE;
+    //         block.hardness  = COPPER_ORE_HARDNESS;
+    //         // block.id        = cast (u32) index;
+    //     }
+    // }
 
     // Initialize camera
     camera: Camera2D;
@@ -700,7 +728,7 @@ main :: () {
 
                                     damage := breaking_speed / block_mouse_is_over.hardness;
                                     if block_mouse_is_over.weak_to_tool == tool_type {
-                                        damage *= 6;
+                                        damage *= BLOCK_WEAKNESS_MULTIPLIER;
                                     }
                                     block_mouse_is_over.health_curr -= damage;
                                     
@@ -1598,12 +1626,6 @@ get_rect_center :: (rect: Rectangle) -> Vector2 {
     return Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
 }
 
-smoothstep :: (x: float) -> float {
-    if x <= 0.0 return 0.0;
-    if x >= 1.0 return 1.0;
-    return (3 * x * x) - (2 * x * x * x); 
-}
-
 smootherstep :: (x: float) -> float {
     if x <= 0.0 return 0.0;
     if x >= 1.0 return 1.0;
@@ -1763,22 +1785,22 @@ perlin_noise_1d :: (desired_values: u32, starting_frequency: u32, starting_ampli
  */
 perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [] float {
     assert(DESIRED_VALUES % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
+    assert(DESIRED_VALUES % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
 
-    // results : [DESIRED_VALUES * DESIRED_VALUES] float;
     results : [..] float;
-    for i: 0..(DESIRED_VALUES * DESIRED_VALUES) {
+    for i: 0..(DESIRED_VALUES * DESIRED_VALUES - 1) {
         array_add(*results, 0.0);
     }
 
     for o: 0..octaves {
         octave_factor      := pow(2.0, cast(float) o);
         amplitude          := starting_amplitude / octave_factor;
-        frequency          := starting_frequency * octave_factor;
+        frequency          := cast(int) (starting_frequency * octave_factor);
         blocks_per_section := cast(int) (DESIRED_VALUES / frequency);
 
         random_grid_gradients: [..] Vector2;
-        for row: 0..(cast(int) frequency) {
-            for col: 0..(cast(int) frequency) {
+        for row: 0..(frequency + 1) {
+            for col: 0..(frequency + 1) {
                 gradient_x := random_get_within_range(-1, 1);
                 gradient_y := random_get_within_range(-1, 1);
                 gradient   := Vector2Normalize(Vector2.{ gradient_x, gradient_y });
@@ -1786,8 +1808,6 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 array_add(*random_grid_gradients, gradient);
             }
         }
-
-        // print_vars(octave_factor, amplitude, frequency, blocks_per_section, random_grid_gradients);
 
         for row: 0..DESIRED_VALUES-1 {
             for col: 0..DESIRED_VALUES-1 {
@@ -1797,7 +1817,6 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 south_east := Vector2.{ xx (col - (col % blocks_per_section) + blocks_per_section), xx (row - (row % blocks_per_section) + blocks_per_section) };
                 
                 // Get distance from current tile to each grid corner
-                // @PERF
                 curr := Vector2.{ xx col, xx row };
                 north_west_delta := Vector2Subtract(north_west, curr);
                 north_east_delta := Vector2Subtract(north_east, curr);
@@ -1820,52 +1839,18 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 south_west_dot := dot_product(south_west_gradient, south_west_delta);
                 south_east_dot := dot_product(south_east_gradient, south_east_delta);
 
-                north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(north_west_delta.x));
-                south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(north_west_delta.x));
-                perlin     := lerp(north_lerp, south_lerp,         smootherstep(north_west_delta.x));
+                t_x := abs((curr.x - north_west.x) / blocks_per_section);
+                t_y := abs((curr.y - north_west.y) / blocks_per_section);
 
-                // print_vars(
-                //     row, 
-                //     col, 
-                //     north_west, 
-                //     north_east, 
-                //     south_west, 
-                //     south_east, 
-                //     curr, 
-                //     north_west_delta, 
-                //     north_east_delta, 
-                //     south_west_delta, 
-                //     south_east_delta,
-                //     north_west_gradient_index,
-                //     north_east_gradient_index,
-                //     south_west_gradient_index,
-                //     south_east_gradient_index,
-                //     north_west_gradient,
-                //     north_east_gradient,
-                //     south_west_gradient,
-                //     south_east_gradient,
-                //     north_west_dot,
-                //     north_east_dot,
-                //     south_west_dot,
-                //     south_east_dot,
-                //     north_lerp,
-                //     south_lerp,
-                //     perlin,
-                // );
+                north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(t_x));
+                south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(t_x));
+                perlin     := lerp(north_lerp, south_lerp,         smootherstep(t_y));
 
                 results[row * DESIRED_VALUES + col] += amplitude * perlin;
             }
         }
     }
 
-    // // @PERF
-    // for *results {
-    //     if it.* < min_value {
-    //         it.* = min_value + abs(it.*);
-    //     }
-    // }
-
-    // print_vars(results);
     return results;
 }
 
