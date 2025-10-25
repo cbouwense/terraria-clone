@@ -349,7 +349,7 @@ main :: () {
     
     player := spawn_player();
 
-    WORLD_GRID_COLS :: 1000;
+    WORLD_GRID_COLS :: 500;
 
     DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
@@ -363,8 +363,8 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 100;//; // How many gradient vectors per column - 1
-    COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 1;
+    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 5;//; // How many gradient vectors per column - 1
+    COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
     COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 1;
     COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
     perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES, COPPER_ORE_PERLIN_NOISE_MIN_VALUE);
@@ -383,9 +383,11 @@ main :: () {
     perlin_2d_sorted := array_copy(perlin_2d);
     quick_sort(perlin_2d_sorted, (x, y) => x - y);
 
-    copper_ore_cutoff_index := perlin_2d.count * 95 / 100;
-    copper_ore_cutoff := perlin_2d_sorted[copper_ore_cutoff_index];
-    print_vars(copper_ore_cutoff_index, copper_ore_cutoff);
+    copper_ore_cutoff_max_index := perlin_2d.count * 60 / 100;
+    copper_ore_cutoff_min_index := perlin_2d.count * 40 / 100;
+    copper_ore_cutoff_max := perlin_2d_sorted[copper_ore_cutoff_max_index];
+    copper_ore_cutoff_min := perlin_2d_sorted[copper_ore_cutoff_min_index];
+    // print_vars(copper_ore_cutoff_index, copper_ore_cutoff);
 
     initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
@@ -405,7 +407,8 @@ main :: () {
             if row == hill_dirt_blocks {
                 block_type = .GRASS;
             }
-            else if perlin_2d[perlin_index] >= copper_ore_cutoff {
+            
+            else if perlin_2d[perlin_index] >= copper_ore_cutoff_min && perlin_2d[perlin_index] <= copper_ore_cutoff_max {
                 block_type = .COPPER_ORE;
             }
 
@@ -451,7 +454,7 @@ main :: () {
 
         for row: 0..ground_dirt_blocks-1 {
             perlin_index := row * (WORLD_GRID_COLS-1) + col;
-            block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff then ItemType.COPPER_ORE else ItemType.DIRT;
+            block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff_min && perlin_2d[perlin_index] <= copper_ore_cutoff_max then ItemType.COPPER_ORE else ItemType.DIRT;
 
             rect := Rectangle.{
                 xx x,
@@ -488,8 +491,8 @@ main :: () {
         rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
 
         for row: 0..(100 - ground_dirt_blocks) {
-            perlin_index := row * (WORLD_GRID_COLS-1) + col;
-            block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff then ItemType.COPPER_ORE else ItemType.ROCK;
+            perlin_index := (row * (WORLD_GRID_COLS-1) + col) % perlin_2d.count;
+            block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff_min && perlin_2d[perlin_index] <= copper_ore_cutoff_max then ItemType.COPPER_ORE else ItemType.ROCK;
 
             rect := Rectangle.{
                 xx x,
@@ -1798,6 +1801,8 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
         frequency          := cast(int) (starting_frequency * octave_factor);
         blocks_per_section := cast(int) (DESIRED_VALUES / frequency);
 
+        assert(blocks_per_section > 0, "Got zero blocks per section during 2d perlin noise generation. You probably have too many octaves.");
+
         random_grid_gradients: [..] Vector2;
         for row: 0..(frequency + 1) {
             for col: 0..(frequency + 1) {
@@ -1829,18 +1834,18 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32, starting_ampl
                 south_west_gradient_index := cast(int) ((south_west.x / blocks_per_section) + (south_west.y / blocks_per_section * (frequency + 1)));
                 south_east_gradient_index := cast(int) ((south_east.x / blocks_per_section) + (south_east.y / blocks_per_section * (frequency + 1)));
 
-                north_west_gradient := random_grid_gradients[north_west_gradient_index];
-                north_east_gradient := random_grid_gradients[north_east_gradient_index];
-                south_west_gradient := random_grid_gradients[south_west_gradient_index];
-                south_east_gradient := random_grid_gradients[south_east_gradient_index];
+                north_west_gradient := random_grid_gradients[north_west_gradient_index % random_grid_gradients.count];
+                north_east_gradient := random_grid_gradients[north_east_gradient_index % random_grid_gradients.count];
+                south_west_gradient := random_grid_gradients[south_west_gradient_index % random_grid_gradients.count];
+                south_east_gradient := random_grid_gradients[south_east_gradient_index % random_grid_gradients.count]; // @TODO: DONT DO THIS MODULO FOR REAL, JUST DEBUGGING HERE I SWEAR
 
                 north_west_dot := dot_product(north_west_gradient, north_west_delta);
                 north_east_dot := dot_product(north_east_gradient, north_east_delta);
                 south_west_dot := dot_product(south_west_gradient, south_west_delta);
                 south_east_dot := dot_product(south_east_gradient, south_east_delta);
 
-                t_x := abs((curr.x - north_west.x) / blocks_per_section);
-                t_y := abs((curr.y - north_west.y) / blocks_per_section);
+                t_x := abs((curr.x - north_east.x) / blocks_per_section);
+                t_y := abs((curr.y - north_east.y) / blocks_per_section);
 
                 north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(t_x));
                 south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(t_x));

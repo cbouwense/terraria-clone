@@ -1,6 +1,6 @@
 # In progress
 
-- world gen: ore gen
+- world gen: randomize tiles for specific type
 
 # Gameplay features
 
@@ -9,7 +9,6 @@
 - trees
 - UI: inventory
 - world gen: cave gen
-- world gen: randomize tiles for specific type
 - world gen: loading screen
 - little block pops out on destroying
 - lighting: world day / night cycle
@@ -32,10 +31,10 @@
 
 - hot reloading
 - metaprogram for required fields
-- active blocks doesn't keep up with zoom level
 
 # Bugs
 
+- active blocks doesn't keep up with zoom level
 - player looks one pixel off the ground
 - rocks can have their pink border sampled
 - player can spawn inside ground
