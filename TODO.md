@@ -1,34 +1,33 @@
 # In progress
 
-
+- actual item sprites for blocks
 
 # Gameplay features
 
 - crafting
 - walls
-- trees
-- UI: inventory
-- world gen: cave gen
-- world gen: flood fill ore gen
-- world gen: loading screen
-- little block pops out on destroying
-- lighting: world day / night cycle
-- menus: make player color customizable
-- menus: main menu
-- menus: settings menu
-- menus: death menu
-- sound effects: placing blocks
-- sound effects: attacking blocks
-- be able to walk up ramps
+- [ui] inventory
+- [world_gen] trees
+- [world_gen] cave gen
+- [world_gen] flood fill ore gen
+- [world_gen] loading screen
+- [lighting] world day / night cycle
+- [menus] make player color customizable
+- [menus] main menu
+- [menus] settings menu
+- [menus] death menu
+- [sound_effects] placing blocks
+- [sound_effects] attacking blocks
 - game saves
-- Celeste movement juice
 - font
 - background image
 - background parallax
-- grass regrow
 - multiplayer
-- particles
-- actual item sprites for blocks
+- [juice] be able to walk up ramps
+- [juice] Celeste movement
+- [juice] grass regrow
+- [juice] particles
+- [juice] little block pops out on destroying
 
 # Tech
 
