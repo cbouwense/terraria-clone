@@ -335,6 +335,7 @@ main :: () {
     // Initialization
     //
     random_seed(123456779);
+    // random_seed(1187234213);
 
     init(*global_block_pos_to_block);
     defer deinit(*global_block_pos_to_block);
@@ -351,197 +352,209 @@ main :: () {
     
     player := spawn_player();
 
-    WORLD_GRID_COLS :: 300;
+    WORLD_GRID_COLS :: 1000;
 
-    // DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
-    // DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
-    // DIRT_PERLIN_NOISE_OCTAVES   :: 5;
-    //  DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
-    // dirt_heights := perlin_noise_1d(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
+    DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
+    DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
+    DIRT_PERLIN_NOISE_OCTAVES   :: 5;
+    DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
+    dirt_heights := perlin_noise_1d(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
-    // ROCK_PERLIN_NOISE_FREQUENCY :: 2;//; // How many grid nodes per map
-    // ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
-    // ROCK_PERLIN_NOISE_OCTAVES   :: 2;
-    // ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
-    // rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
+    ROCK_PERLIN_NOISE_FREQUENCY :: 2;//; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
+    ROCK_PERLIN_NOISE_OCTAVES   :: 2;
+    ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
+    rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    COPPER_ORE_PERLIN_NOISE_FREQUENCY :: 5; // How many rows / columns
-    COPPER_ORE_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
-    COPPER_ORE_PERLIN_NOISE_OCTAVES   :: 1;
-    // COPPER_ORE_PERLIN_NOISE_MIN_VALUE :: 0;
-    perlin_2d := perlin_noise_2d(WORLD_GRID_COLS, COPPER_ORE_PERLIN_NOISE_FREQUENCY, COPPER_ORE_PERLIN_NOISE_AMPLITUDE, COPPER_ORE_PERLIN_NOISE_OCTAVES);
-    
-    // for row: 0..WORLD_GRID_COLS-1 {
-    //     for col: 0..WORLD_GRID_COLS-1 {
-    //         p := perlin_2d[row * WORLD_GRID_COLS + col];
-    //         color := Color.{ cast (u8) (p * 255), cast (u8) (p * 255), cast (u8) (p * 255), 255 };
-    //         print_vars(p, color);
-    //     }
-    // }
+    // CAVE_POCKET_PERLIN_NOISE_FREQUENCY :: 25; // How many rows / columns
+    // CAVE_POCKET_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
+    // CAVE_POCKET_PERLIN_NOISE_OCTAVES   :: 4;
+    // cave_pocket_noise := perlin_noise_2d(WORLD_GRID_COLS, CAVE_POCKET_PERLIN_NOISE_FREQUENCY, CAVE_POCKET_PERLIN_NOISE_AMPLITUDE, CAVE_POCKET_PERLIN_NOISE_OCTAVES);
 
-    // perlin_2d_sorted := array_copy(perlin_2d);
-    // quick_sort(perlin_2d_sorted, (x, y) => x - y);
+    CAVE_SPAGHETTI_PERLIN_NOISE_FREQUENCY :: 25; // How many rows / columns
+    CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
+    CAVE_SPAGHETTI_PERLIN_NOISE_OCTAVES   :: 1;
+    cave_spaghetti_noise := perlin_noise_2d(WORLD_GRID_COLS, CAVE_SPAGHETTI_PERLIN_NOISE_FREQUENCY, CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE, CAVE_SPAGHETTI_PERLIN_NOISE_OCTAVES);
 
-    // copper_ore_cutoff_max_index := perlin_2d.count * 60 / 100;
-    // copper_ore_cutoff_min_index := perlin_2d.count * 40 / 100;
-    // copper_ore_cutoff_max := perlin_2d_sorted[copper_ore_cutoff_max_index];
-    // copper_ore_cutoff_min := perlin_2d_sorted[copper_ore_cutoff_min_index];
-    // print_vars(copper_ore_cutoff_index, copper_ore_cutoff);
+    // cave_pocket_noise_sorted := array_copy(cave_pocket_noise);
+    // quick_sort(cave_pocket_noise_sorted, (x, y) => x - y);
+    // print_vars(cave_pocket_noise_sorted);
+
+    cave_spaghetti_noise_sorted := array_copy(cave_spaghetti_noise);
+    quick_sort(cave_spaghetti_noise_sorted, (x, y) => x - y);
+    print_vars(cave_spaghetti_noise_sorted);
+
+    // cave_pocket_cutoff_max_index := cave_pocket_noise.count * 100 / 100 - 1;
+    // cave_pocket_cutoff_min_index := cave_pocket_noise.count * 90 / 100;
+    // cave_pocket_cutoff_max       := cave_pocket_noise_sorted[cave_pocket_cutoff_max_index];
+    // cave_pocket_cutoff_min       := cave_pocket_noise_sorted[cave_pocket_cutoff_min_index];
+
+    cave_spaghetti_cutoff_max_index := cave_spaghetti_noise.count * 70 / 100 - 1;
+    cave_spaghetti_cutoff_min_index := cave_spaghetti_noise.count * 30 / 100;
+    cave_spaghetti_cutoff_max       := cave_spaghetti_noise_sorted[cave_spaghetti_cutoff_max_index];
+    cave_spaghetti_cutoff_min       := cave_spaghetti_noise_sorted[cave_spaghetti_cutoff_min_index];
 
     initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
 
     // Initialize blocks
     x := cast(int) initial_x;
-    min_y := 0; // the most negative y
 
-    // for col: 0..WORLD_GRID_COLS-1 {
-    //     y := 0;
+    for col: 0..WORLD_GRID_COLS-1 {
+        y := 0;
        
-    //     // Generate hills
-    //     hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
-    //     for row: 0..hill_dirt_blocks {
-    //         perlin_index := (hill_dirt_blocks - row) * (WORLD_GRID_COLS-1) + col;
+        // Generate hills
+        hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
+        for row: 0..hill_dirt_blocks {
+            block_type := ItemType.DIRT;
+            if row == hill_dirt_blocks {
+                block_type = .GRASS;
+            }
 
-    //         block_type := ItemType.DIRT;
-    //         if row == hill_dirt_blocks {
-    //             block_type = .GRASS;
-    //         }
+            rect := Rectangle.{
+                xx x,
+                xx y,
+                xx BLOCK_WORLD_WIDTH,
+                xx BLOCK_WORLD_HEIGHT,
+            };
+
+            // @TODO: post increment macro or something?
+            defer global_id_counter += 1;
+            // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
+            new_block := New(Block);
+            new_block.type          = Block;
+            // new_block.id            = global_id_counter;
+            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+            new_block.bounding_rect = rect;
+            new_block.sprite_rect   = rect;
+            new_block.health_max    = BLOCK_HEALTH_MAX;
+            new_block.health_curr   = BLOCK_HEALTH_MAX;
+            new_block.item_type     = block_type;
+            new_block.hardness      = get_block_hardness(block_type);
+            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
+            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+            new_block.neighbor_north_count = -1;
+            new_block.neighbor_south_count = -1;
+            new_block.neighbor_east_count  = -1;
+            new_block.neighbor_west_count  = -1;
+
+            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+
+            y -= BLOCK_WORLD_HEIGHT;
+        }
+
+        // Generate ground dirt
+        ground_dirt_blocks := cast(int) abs(rock_depths[col]);
+        y = 0;
+
+        for row: 0..ground_dirt_blocks-1 {
+            defer y += BLOCK_WORLD_HEIGHT;
+
+            noise_index := row * (WORLD_GRID_COLS-1) + col;
+            // if cave_pocket_noise[noise_index] >= cave_pocket_cutoff_min && cave_pocket_noise[noise_index] <= cave_pocket_cutoff_max {
+            //     continue;
+            // }
+
+            if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
+                continue;
+            }
+
+            block_type := ItemType.DIRT;
+
+            rect := Rectangle.{
+                xx x,
+                xx y,
+                xx BLOCK_WORLD_WIDTH,
+                xx BLOCK_WORLD_HEIGHT,
+            };
+
+            // @TODO: post incrememnt macro or something?
+            defer global_id_counter += 1;
+            new_block := New(Block);
+            new_block.type          = Block;
+            // new_block.id            = global_id_counter;
+            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+            new_block.bounding_rect = rect;
+            new_block.sprite_rect   = rect;
+            new_block.health_max    = BLOCK_HEALTH_MAX;
+            new_block.health_curr   = BLOCK_HEALTH_MAX;
+            new_block.item_type     = block_type;
+            new_block.hardness      = get_block_hardness(block_type);
+            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
+            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+            new_block.neighbor_north_count = -1;
+            new_block.neighbor_south_count = -1;
+            new_block.neighbor_east_count  = -1;
+            new_block.neighbor_west_count  = -1;
+
+            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+        }
+
+        // Generate rock
+        rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
+
+        for row: 0..(100 - ground_dirt_blocks) {
+            defer y += ROCK_WORLD_TILE_HEIGHT;
             
-    //         else if perlin_2d[perlin_index] >= copper_ore_cutoff_min && perlin_2d[perlin_index] <= copper_ore_cutoff_max {
-    //             block_type = .COPPER_ORE;
-    //         }
+            noise_index := row * (WORLD_GRID_COLS-1) + col;
+            // if cave_pocket_noise[noise_index] >= cave_pocket_cutoff_min && cave_pocket_noise[noise_index] <= cave_pocket_cutoff_max {
+            //     continue;
+            // }
 
-    //         rect := Rectangle.{
-    //             xx x,
-    //             xx y,
-    //             xx BLOCK_WORLD_WIDTH,
-    //             xx BLOCK_WORLD_HEIGHT,
-    //         };
+            if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
+                continue;
+            }
 
-    //         // @TODO: post increment macro or something?
-    //         defer global_id_counter += 1;
-    //         // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
-    //         new_block := New(Block);
-    //         new_block.type          = Block;
-    //         // new_block.id            = global_id_counter;
-    //         new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
-    //         new_block.bounding_rect = rect;
-    //         new_block.sprite_rect   = rect;
-    //         new_block.health_max    = BLOCK_HEALTH_MAX;
-    //         new_block.health_curr   = BLOCK_HEALTH_MAX;
-    //         new_block.item_type     = block_type;
-    //         new_block.hardness      = get_block_hardness(block_type);
-    //         new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-    //         // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-    //         new_block.neighbor_north_count = -1;
-    //         new_block.neighbor_south_count = -1;
-    //         new_block.neighbor_east_count  = -1;
-    //         new_block.neighbor_west_count  = -1;
+            block_type := ItemType.ROCK;
 
-    //         table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+            rect := Rectangle.{
+                xx x,
+                xx y,
+                xx BLOCK_WORLD_WIDTH,
+                xx BLOCK_WORLD_HEIGHT,
+            };
 
-    //         y -= BLOCK_WORLD_HEIGHT;
-    //     }
+            // @TODO: post incrememnt macro or something?
+            defer global_id_counter += 1;
+            new_block := New(Block);
+            new_block.type          = Block;
+            // new_block.id            = global_id_counter;
+            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+            new_block.bounding_rect = rect;
+            new_block.sprite_rect   = rect;
+            new_block.health_max    = BLOCK_HEALTH_MAX;
+            new_block.health_curr   = BLOCK_HEALTH_MAX;
+            new_block.item_type     = block_type;
+            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
+            new_block.hardness      = get_block_hardness(block_type);
+            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+            new_block.neighbor_north_count = -1;
+            new_block.neighbor_south_count = -1;
+            new_block.neighbor_east_count  = -1;
+            new_block.neighbor_west_count  = -1;
 
-    //     if hill_dirt_blocks * -BLOCK_WORLD_HEIGHT < min_y {
-    //         min_y = hill_dirt_blocks * -BLOCK_WORLD_HEIGHT;
-    //     }
+            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
-    //     // Generate ground dirt
-    //     ground_dirt_blocks := cast(int) abs(rock_depths[col]);
-    //     y = 0;
+        }
 
-    //     for row: 0..ground_dirt_blocks-1 {
-    //         perlin_index := row * (WORLD_GRID_COLS-1) + col;
-    //         block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff_min && perlin_2d[perlin_index] <= copper_ore_cutoff_max then ItemType.COPPER_ORE else ItemType.DIRT;
+        x += BLOCK_WORLD_WIDTH;
+    }
 
-    //         rect := Rectangle.{
-    //             xx x,
-    //             xx y,
-    //             xx BLOCK_WORLD_WIDTH,
-    //             xx BLOCK_WORLD_HEIGHT,
-    //         };
+    for block: global_block_pos_to_block {
+        // Define initial shadows for blocks
+        {
+            // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
+            block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
+            block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
+            block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
+            block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
 
-    //         // @TODO: post incrememnt macro or something?
-    //         defer global_id_counter += 1;
-    //         new_block := New(Block);
-    //         new_block.type          = Block;
-    //         // new_block.id            = global_id_counter;
-    //         new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
-    //         new_block.bounding_rect = rect;
-    //         new_block.sprite_rect   = rect;
-    //         new_block.health_max    = BLOCK_HEALTH_MAX;
-    //         new_block.health_curr   = BLOCK_HEALTH_MAX;
-    //         new_block.item_type     = block_type;
-    //         new_block.hardness      = get_block_hardness(block_type);
-    //         new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-    //         // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-    //         new_block.neighbor_north_count = -1;
-    //         new_block.neighbor_south_count = -1;
-    //         new_block.neighbor_east_count  = -1;
-    //         new_block.neighbor_west_count  = -1;
-
-    //         table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-
-    //         y += BLOCK_WORLD_HEIGHT;
-    //     }
-
-    //     // Generate rock
-    //     rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
-
-    //     for row: 0..(100 - ground_dirt_blocks) {
-    //         perlin_index := (row * (WORLD_GRID_COLS-1) + col) % perlin_2d.count;
-    //         block_type := ifx perlin_2d[perlin_index] >= copper_ore_cutoff_min && perlin_2d[perlin_index] <= copper_ore_cutoff_max then ItemType.COPPER_ORE else ItemType.ROCK;
-
-    //         rect := Rectangle.{
-    //             xx x,
-    //             xx y,
-    //             xx BLOCK_WORLD_WIDTH,
-    //             xx BLOCK_WORLD_HEIGHT,
-    //         };
-
-    //         // @TODO: post incrememnt macro or something?
-    //         defer global_id_counter += 1;
-    //         new_block := New(Block);
-    //         new_block.type          = Block;
-    //         // new_block.id            = global_id_counter;
-    //         new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
-    //         new_block.bounding_rect = rect;
-    //         new_block.sprite_rect   = rect;
-    //         new_block.health_max    = BLOCK_HEALTH_MAX;
-    //         new_block.health_curr   = BLOCK_HEALTH_MAX;
-    //         new_block.item_type     = block_type;
-    //         new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-    //         new_block.hardness      = get_block_hardness(block_type);
-    //         // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-    //         new_block.neighbor_north_count = -1;
-    //         new_block.neighbor_south_count = -1;
-    //         new_block.neighbor_east_count  = -1;
-    //         new_block.neighbor_west_count  = -1;
-
-    //         table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-
-    //         y += ROCK_WORLD_TILE_HEIGHT;
-    //     }
-
-    //     x += BLOCK_WORLD_WIDTH;
-    // }
-
-    // for block: global_block_pos_to_block {
-    //     // Define initial shadows for blocks
-    //     {
-    //         block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
-    //         block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
-    //         block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
-    //         block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
-
-    //         min_neighbor_count := min(
-    //             min(block.neighbor_north_count, block.neighbor_south_count),
-    //             min(block.neighbor_east_count,  block.neighbor_west_count)
-    //         );
-    //         block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-    //     }
-    // }
+            min_neighbor_count := min(
+                min(block.neighbor_north_count, block.neighbor_south_count),
+                min(block.neighbor_east_count,  block.neighbor_west_count)
+            );
+            block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+        }
+    }
 
     // Initialize camera
     camera: Camera2D;
@@ -604,7 +617,7 @@ main :: () {
         //
         // Input
         //
-        #if false {
+        {
             if IsKeyPressed(.KEY_P) paused     = !paused;
             if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
             if IsKeyPressed(.KEY_R) player     = spawn_player();
@@ -640,8 +653,7 @@ main :: () {
         //
         // Update
         //
-        // if !paused {
-        #if false {
+        if !paused {
             // Update player
             {
                 // Movement
@@ -959,26 +971,26 @@ main :: () {
             BeginDrawing();
             defer EndDrawing();
 
-            ClearBackground(BLACK);
-            // ClearBackground(SKYBLUE);
+            // ClearBackground(BLACK);
+            ClearBackground(SKYBLUE);
 
-            OFFSET :: 150;
+            // OFFSET :: 150;
 
-            for row: 0..WORLD_GRID_COLS-1 {
-                for col: 0..WORLD_GRID_COLS-1 {
-                    p := perlin_2d[row * WORLD_GRID_COLS + col];
+            // for row: 0..WORLD_GRID_COLS-1 {
+            //     for col: 0..WORLD_GRID_COLS-1 {
+            //         p := perlin_2d[row * WORLD_GRID_COLS + col];
 
-                    r: u8 = cast(u8) (255 * (p + 1) / 2);
-                    g: u8 = cast(u8) (255 * (p + 1) / 2);
-                    b: u8 = cast(u8) (255 * (p + 1) / 2);
-                    color := Color.{ r, g, b, 255 };
+            //         r: u8 = cast(u8) (255 * (p + 1) / 2);
+            //         g: u8 = cast(u8) (255 * (p + 1) / 2);
+            //         b: u8 = cast(u8) (255 * (p + 1) / 2);
+            //         color := Color.{ r, g, b, 255 };
 
-                    DrawRectangle(xx (col * SCALE + OFFSET), xx (row * SCALE + OFFSET), SCALE, SCALE, color);
-                }
-            }
+            //         DrawRectangle(xx (col * SCALE + OFFSET), xx (row * SCALE + OFFSET), SCALE, SCALE, color);
+            //     }
+            // }
 
             // Draw world
-            #if false {
+            {
                 BeginMode2D(camera);
                 defer EndMode2D();
 
@@ -1123,7 +1135,7 @@ main :: () {
             }
 
             // Draw UI
-            #if false {
+            {
                 DrawFPS(GetScreenWidth() - 100, 10);
 
                 // Hotbar
@@ -1792,11 +1804,9 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32 = 1, starting_
         amplitude           := starting_amplitude / octave_factor;
         frequency           := cast(int) (starting_frequency * octave_factor);
         blocks_per_section  := cast(int) (DESIRED_VALUES / frequency);
-        max_raw_noise_value := blocks_per_section * SQRT_2;
+        max_raw_noise_value := blocks_per_section * SQRT_2 / 2;
 
         assert(blocks_per_section > 0, "Got zero blocks per section during 2d perlin noise generation. You probably have too many octaves.");
-
-        // print_vars(octave_factor, amplitude, frequency, blocks_per_section)
         
         for row: 0..frequency {
             for col: 0..frequency {
@@ -1807,8 +1817,6 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32 = 1, starting_
                 array_add(*random_grid_gradients, gradient);
             }
         }
-
-        // print_vars(random_grid_gradients);
 
         for row: 0..DESIRED_VALUES-1 {
             for col: 0..DESIRED_VALUES-1 {
@@ -1852,16 +1860,6 @@ perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32 = 1, starting_
                 north_lerp := lerp(north_west_dot, north_east_dot, smootherstep(t_x));
                 south_lerp := lerp(south_west_dot, south_east_dot, smootherstep(t_x));
                 perlin     := lerp(north_lerp, south_lerp, smootherstep(t_y));
-
-                // print_vars(
-                //     row, col,
-                //     // north_west, north_east, south_west, south_east,
-                //     // north_west_delta, north_east_delta, south_west_delta, south_east_delta,
-                //     north_west_dot, north_east_dot, south_west_dot, south_east_dot,
-                //     north_west_gradient_index, north_east_gradient_index, south_west_gradient_index, south_east_gradient_index,
-                //     // t_x, t_y,
-                //     north_lerp, south_lerp, perlin
-                // );
 
                 results[row * DESIRED_VALUES + col] += amplitude * (perlin / max_raw_noise_value);
             }

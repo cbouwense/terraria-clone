@@ -1,6 +1,6 @@
 # In progress
 
-- world gen: randomize tiles for specific type
+- world gen: cave gen
 
 # Gameplay features
 
@@ -8,7 +8,8 @@
 - walls
 - trees
 - UI: inventory
-- world gen: cave gen
+- world gen: flood fill ore gen
+- world gen: randomize tiles for specific type
 - world gen: loading screen
 - little block pops out on destroying
 - lighting: world day / night cycle
@@ -41,3 +42,5 @@
 - linux build doesn't work
 - player can fall into the ground, usually on corners
 - switching mid swing shows different wielded item
+- worlds with ~2000 or greater columns get stack overflowed (I think because of the recursive shadow stuff
+- 1d perlin noise looks fucked up on some seeds
