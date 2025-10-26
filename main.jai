@@ -48,6 +48,9 @@ grass_map                 : Texture;
 rock_map                  : Texture;
 copper_ore_map            : Texture;
 damage_map                : Texture;
+dirt_item_texture         : Texture;
+rock_item_texture         : Texture;
+copper_ore_item_texture   : Texture;
 pickaxe_texture           : Texture;
 axe_texture               : Texture;
 sword_texture             : Texture;
@@ -83,8 +86,12 @@ player_sprite_shoes_airborne            : Sprite;
 player_sprites    : [..] *Sprite;
 player_animations : [..] *AnimatedSprite;
 
+block_sprite_dirt       : Sprite;
+block_sprite_grass      : Sprite;
+block_sprite_rock       : Sprite;
+block_sprite_copper_ore : Sprite;
+
 item_sprite_dirt       : Sprite;
-item_sprite_grass      : Sprite;
 item_sprite_rock       : Sprite;
 item_sprite_copper_ore : Sprite;
 item_sprite_pickaxe    : Sprite;
@@ -150,8 +157,6 @@ GRASS_MAP_ROWS :: 22;
 GRASS_MAP_TILE_WIDTH  :: 18;
 GRASS_MAP_TILE_HEIGHT :: 18;
 GRASS_MAP_TILE_PADDING :: 2;
-GRASS_WORLD_TILE_WIDTH  :: 18 * SCALE;
-GRASS_WORLD_TILE_HEIGHT :: 18 * SCALE;
 GRASS_STACK_CAPACITY :: 64;
 GRASS_HARDNESS :: 0.5;
 
@@ -160,8 +165,6 @@ ROCK_MAP_ROWS :: 15;
 ROCK_MAP_TILE_WIDTH  :: 18;
 ROCK_MAP_TILE_HEIGHT :: 18;
 ROCK_MAP_TILE_PADDING :: 2;
-ROCK_WORLD_TILE_WIDTH  :: 18 * SCALE;
-ROCK_WORLD_TILE_HEIGHT :: 18 * SCALE;
 ROCK_STACK_CAPACITY :: 64;
 ROCK_HARDNESS :: 3.0;
 
@@ -170,8 +173,6 @@ COPPER_ORE_MAP_ROWS :: 15;
 COPPER_ORE_MAP_TILE_WIDTH  :: 18;
 COPPER_ORE_MAP_TILE_HEIGHT :: 18;
 COPPER_ORE_MAP_TILE_PADDING :: 2;
-COPPER_ORE_WORLD_TILE_WIDTH  :: 18 * SCALE;
-COPPER_ORE_WORLD_TILE_HEIGHT :: 18 * SCALE;
 COPPER_ORE_STACK_CAPACITY :: 64;
 COPPER_ORE_HARDNESS :: 4.0;
 
@@ -179,8 +180,21 @@ DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
 DAMAGE_MAP_TILE_WIDTH  :: 16;
 DAMAGE_MAP_TILE_HEIGHT :: 16;
-DAMAGE_WORLD_TILE_WIDTH  :: 18 * SCALE;
-DAMAGE_WORLD_TILE_HEIGHT :: 18 * SCALE;
+
+DIRT_ITEM_TEXTURE_WIDTH     :: 16;
+DIRT_ITEM_TEXTURE_HEIGHT    :: 16;
+DIRT_ITEM_STACK_CAPACITY    :: 64;
+DIRT_ITEM_MINING_MULTIPLIER :: 1;
+
+ROCK_ITEM_TEXTURE_WIDTH     :: 16;
+ROCK_ITEM_TEXTURE_HEIGHT    :: 16;
+ROCK_ITEM_STACK_CAPACITY    :: 64;
+ROCK_ITEM_MINING_MULTIPLIER :: 1;
+
+COPPER_ORE_ITEM_TEXTURE_WIDTH     :: 16;
+COPPER_ORE_ITEM_TEXTURE_HEIGHT    :: 16;
+COPPER_ORE_ITEM_STACK_CAPACITY    :: 64;
+COPPER_ORE_ITEM_MINING_MULTIPLIER :: 1;
 
 PICKAXE_TEXTURE_WIDTH     :: 32;
 PICKAXE_TEXTURE_HEIGHT    :: 32;
@@ -254,7 +268,6 @@ BlockType :: enum {
 
 ItemType :: enum {
     DIRT_ITEM;
-    GRASS_ITEM;
     ROCK_ITEM;
     COPPER_ORE_ITEM;
     PICKAXE;
@@ -482,7 +495,7 @@ main :: () {
         rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
 
         for row: 0..(100 - ground_dirt_blocks) {
-            defer y += ROCK_WORLD_TILE_HEIGHT;
+            defer y += BLOCK_WORLD_HEIGHT;
             
             noise_index := row * (WORLD_GRID_COLS-1) + col;
 
@@ -992,7 +1005,7 @@ main :: () {
                     }
 
                     if debug_mode {
-                        DrawLineEx(Vector2.{-WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * ROCK_WORLD_TILE_WIDTH / 2.0, 0.0 }, 2.0, RED);
+                        DrawLineEx(Vector2.{-WORLD_GRID_COLS * BLOCK_WORLD_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * BLOCK_WORLD_HEIGHT / 2.0, 0.0 }, 2.0, RED);
                     }
                 }
 
@@ -1183,6 +1196,9 @@ init_textures :: () {
     grass_map                 = LoadTexture("data/Tiles_2.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
     damage_map                = LoadTexture("data/Damage.png");
+    dirt_item_texture         = LoadTexture("data/Dirt_Item.png");
+    rock_item_texture         = LoadTexture("data/Rock_Item.png");
+    copper_ore_item_texture   = LoadTexture("data/Copper_Ore_Item.png");
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
     axe_texture               = LoadTexture("data/Axe.png");
     sword_texture             = LoadTexture("data/Sword.png");
@@ -1414,22 +1430,22 @@ init_sprites :: () {
     array_add(*player_animations, *player_animation_hands_swinging);
     array_add(*player_animations, *player_animation_shoes_running);
 
-    item_sprite_dirt = Sprite.{
+    block_sprite_dirt = Sprite.{
         map   = dirt_map,
         color = WHITE,
     };
 
-    item_sprite_grass = Sprite.{
+    block_sprite_grass = Sprite.{
         map   = grass_map,
         color = WHITE,
     };
 
-    item_sprite_rock = Sprite.{
+    block_sprite_rock = Sprite.{
         map   = rock_map,
         color = WHITE,
     };
 
-    item_sprite_copper_ore = Sprite.{
+    block_sprite_copper_ore = Sprite.{
         map   = copper_ore_map,
         color = WHITE,
     };
@@ -1864,7 +1880,6 @@ get_block_hardness :: (block_type: BlockType) -> float {
 can_item_be_placed_down :: (item_type: ItemType) -> bool {
     if item_type == {
         case .DIRT_ITEM;       return true;
-        case .GRASS_ITEM;      return true; // @TODO: false?
         case .ROCK_ITEM;       return true;
         case .COPPER_ORE_ITEM; return false;
         case .PICKAXE;         return false;
@@ -1906,7 +1921,6 @@ item_stack_is_empty :: (item_stack: ItemStack) -> bool {
 get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
     if item_type == {
         case .DIRT_ITEM;       return DIRT_STACK_CAPACITY;
-        case .GRASS_ITEM;      return GRASS_STACK_CAPACITY;
         case .ROCK_ITEM;       return ROCK_STACK_CAPACITY;
         case .COPPER_ORE_ITEM; return COPPER_ORE_STACK_CAPACITY;
 
@@ -1923,7 +1937,6 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
     if item_type == {
         // Blocks (they don't break anything any faster)
         case .DIRT_ITEM;       return 1;
-        case .GRASS_ITEM;      return 1;
         case .ROCK_ITEM;       return 1;
         case .COPPER_ORE_ITEM; return 1;
 
@@ -2067,7 +2080,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         case .PICKAXE;
             map_texture = pickaxe_texture;
             map_source  = Rectangle.{
-                PICKAXE_TEXTURE_HEIGHT,
+                PICKAXE_TEXTURE_HEIGHT, // @TODO: wait what
                 PICKAXE_TEXTURE_HEIGHT,
                 PICKAXE_TEXTURE_HEIGHT,
                 PICKAXE_TEXTURE_HEIGHT,
@@ -2076,7 +2089,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         case .AXE;
             map_texture = axe_texture;
             map_source  = Rectangle.{
-                AXE_TEXTURE_HEIGHT,
+                AXE_TEXTURE_HEIGHT, // @TODO: wait what
                 AXE_TEXTURE_HEIGHT,
                 AXE_TEXTURE_HEIGHT,
                 AXE_TEXTURE_HEIGHT,
@@ -2085,17 +2098,29 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         case .SWORD;
             map_texture = sword_texture;
             map_source  = Rectangle.{
-                SWORD_TEXTURE_HEIGHT,
+                SWORD_TEXTURE_HEIGHT, // @TODO: wait what
                 SWORD_TEXTURE_HEIGHT,
                 SWORD_TEXTURE_HEIGHT,
                 SWORD_TEXTURE_HEIGHT,
             };
 
-        // @TODO
-        // case .DIRT;
-        // case .GRASS;
-        // case .ROCK;
-        // case .COPPER_ORE;
+        case .DIRT_ITEM;
+            map_texture = dirt_item_texture;
+            map_source = Rectangle.{
+                0, 0, DIRT_ITEM_TEXTURE_WIDTH, DIRT_ITEM_TEXTURE_HEIGHT,
+            };
+
+        case .ROCK_ITEM;
+            map_texture = rock_item_texture;
+            map_source = Rectangle.{
+                0, 0, ROCK_ITEM_TEXTURE_WIDTH, ROCK_ITEM_TEXTURE_HEIGHT,
+            };
+
+        case .COPPER_ORE_ITEM;
+            map_texture = copper_ore_item_texture;
+            map_source = Rectangle.{
+                0, 0, COPPER_ORE_ITEM_TEXTURE_WIDTH, COPPER_ORE_ITEM_TEXTURE_HEIGHT,
+            };
 
         case;
             assert(false, "You forgot an item type in your switch statement");
@@ -2108,10 +2133,10 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
 
 get_sprite_by_block_type :: (block_type: BlockType) -> *Sprite {
     if block_type == {
-        case .DIRT;       return *item_sprite_dirt;
-        case .GRASS;      return *item_sprite_grass;
-        case .ROCK;       return *item_sprite_rock;
-        case .COPPER_ORE; return *item_sprite_copper_ore;
+        case .DIRT;       return *block_sprite_dirt;
+        case .GRASS;      return *block_sprite_grass;
+        case .ROCK;       return *block_sprite_rock;
+        case .COPPER_ORE; return *block_sprite_copper_ore;
         case;
             assert(false, "You forgot a block type in your switch statement");
             return null;
@@ -2120,14 +2145,12 @@ get_sprite_by_block_type :: (block_type: BlockType) -> *Sprite {
 
 get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
     if item_type == {
-        // @TODO
-        // case .DIRT;
-        // case .GRASS;
-        // case .ROCK;
-        // case .COPPER_ORE;
-        case .PICKAXE; return *item_sprite_pickaxe;
-        case .AXE;     return *item_sprite_axe;
-        case .SWORD;   return *item_sprite_sword;
+        case .DIRT_ITEM;       return *item_sprite_dirt;
+        case .ROCK_ITEM;       return *item_sprite_rock;
+        case .COPPER_ORE_ITEM; return *item_sprite_copper_ore;
+        case .PICKAXE;         return *item_sprite_pickaxe;
+        case .AXE;             return *item_sprite_axe;
+        case .SWORD;           return *item_sprite_sword;
         case;
             assert(false, "You forgot an item type in your switch statement");
             return null;
@@ -2136,16 +2159,12 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
 
 item_type_is_stackable :: (item_type: ItemType) -> bool {
     if item_type == {
-        // Blocks
         case .DIRT_ITEM;       return true;
-        case .GRASS_ITEM;      return true;
         case .ROCK_ITEM;       return true;
         case .COPPER_ORE_ITEM; return true;
-
-        // Items
-        case .PICKAXE; return false;
-        case .AXE;     return false;
-        case .SWORD;   return false;
+        case .PICKAXE;         return false;
+        case .AXE;             return false;
+        case .SWORD;           return false;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -2169,11 +2188,9 @@ get_block_world_length :: (block_type: BlockType) -> float {
 get_item_world_length :: (item_type: ItemType) -> float {
     if item_type == {
         // Blocks
-        // @TODO
-        // case .DIRT_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
-        // case .GRASS_ITEM;      return WIELDED_BLOCK_WORLD_LENGTH;
-        // case .ROCK_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
-        // case .COPPER_ORE_ITEM; return WIELDED_BLOCK_WORLD_LENGTH;
+        case .DIRT_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
+        case .ROCK_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
+        case .COPPER_ORE_ITEM; return WIELDED_BLOCK_WORLD_LENGTH;
 
         // Items
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
@@ -2202,7 +2219,6 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
 item_type_to_block_type :: (item_type: ItemType) -> BlockType {
     if item_type == {
         case ItemType.DIRT_ITEM;       return BlockType.DIRT;
-        case ItemType.GRASS_ITEM;      return BlockType.GRASS;
         case ItemType.ROCK_ITEM;       return BlockType.ROCK;
         case ItemType.COPPER_ORE_ITEM; return BlockType.COPPER_ORE;
 
@@ -2218,7 +2234,7 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
 block_type_to_item_type :: (block_type: BlockType) -> ItemType {
     if block_type == {
         case BlockType.DIRT;       return ItemType.DIRT_ITEM;
-        case BlockType.GRASS;      return ItemType.GRASS_ITEM;
+        case BlockType.GRASS;      return ItemType.DIRT_ITEM;
         case BlockType.ROCK;       return ItemType.ROCK_ITEM;
         case BlockType.COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
 

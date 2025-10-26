@@ -1,7 +1,5 @@
 # In progress
 
-- actual item sprites for blocks
-
 # Gameplay features
 
 - crafting
