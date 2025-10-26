@@ -1,6 +1,6 @@
 # In progress
 
-- world gen: randomize tiles for specific type
+
 
 # Gameplay features
 
@@ -27,6 +27,8 @@
 - background parallax
 - grass regrow
 - multiplayer
+- particles
+- actual item sprites for blocks
 
 # Tech
 

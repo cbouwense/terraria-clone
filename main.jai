@@ -205,17 +205,19 @@ DEBUG_CAM_SPEED :: 5;
 global_id_counter: u32 = 0;
 
 Entity :: struct {
-    type           : Type;
+    type : Type;
 
-    id             : u32;
+    id : u32;
 
-    pos            : Vector2;
-    vel            : Vector2;
+    pos : Vector2;
+    vel : Vector2;
 
     is_facing_left : bool;
 
     bounding_rect  : Rectangle; // Used for collision
     sprite_rect    : Rectangle;
+
+    texture_map_source_pos : Vector2;
 
     health_max     : float32;
     health_curr    : float32;
@@ -421,6 +423,7 @@ main :: () {
             new_block.neighbor_south_count = -1;
             new_block.neighbor_east_count  = -1;
             new_block.neighbor_west_count  = -1;
+            new_block.texture_map_source_pos = get_texture_map_source_coords_by_item_type(block_type);
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
@@ -466,6 +469,7 @@ main :: () {
             new_block.neighbor_south_count = -1;
             new_block.neighbor_east_count  = -1;
             new_block.neighbor_west_count  = -1;
+            new_block.texture_map_source_pos = get_texture_map_source_coords_by_item_type(block_type);
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
         }
@@ -482,7 +486,7 @@ main :: () {
                 continue;
             }
 
-            block_type := ItemType.ROCK;
+            block_type := ItemType.COPPER_ORE;
 
             rect := Rectangle.{
                 xx x,
@@ -509,6 +513,7 @@ main :: () {
             new_block.neighbor_south_count = -1;
             new_block.neighbor_east_count  = -1;
             new_block.neighbor_west_count  = -1;
+            new_block.texture_map_source_pos = get_texture_map_source_coords_by_item_type(block_type);
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
@@ -818,6 +823,7 @@ main :: () {
                                 new_block.neighbor_south_count = -1;
                                 new_block.neighbor_east_count  = -1;
                                 new_block.neighbor_west_count  = -1;
+                                new_block.texture_map_source_pos = get_texture_map_source_coords_by_item_type(selected_item_stack.item_type);
                                 
                                 table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
@@ -958,7 +964,7 @@ main :: () {
                 // Draw blocks
                 {
                     for active_blocks {
-                        block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type);
+                        block_map_texture, block_map_source := get_texture_map_by_item_type(it.item_type, it.texture_map_source_pos);
                         color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
 
                         // Draw block texture
@@ -996,7 +1002,7 @@ main :: () {
                         has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
                         if has_an_item_selected {
-                            item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
+                            item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, Vector2.{ -1, -1 }, player.is_facing_left); // @TODO: default source thing sucks
 
                             length := get_item_world_length(selected_item_stack.item_type);
                             rotation : float;
@@ -1927,17 +1933,102 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
     }
 }
 
-get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = false) -> texture: Texture, source: Rectangle {
+get_texture_map_source_coords_by_item_type :: (item_type: ItemType) -> Vector2 {
+    if item_type == {
+        // Blocks
+        case .DIRT;
+            return Vector2.{
+                cast(float) (cast(int) random_get_within_range(0, 1))  * DIRT_MAP_TILE_HEIGHT,
+                cast(float) (cast(int) random_get_within_range(5, 11)) * DIRT_MAP_TILE_HEIGHT,
+            };
+
+        case .GRASS;
+            x := cast(int) random_get_within_range(1, 3);
+
+            return Vector2.{
+                cast(float) (x * GRASS_MAP_TILE_WIDTH),
+                cast(float) (0 * GRASS_MAP_TILE_HEIGHT),
+            };
+
+        case .ROCK;
+            random_number := cast(int) random_get_within_range(1, 15);
+            x, y : int;
+
+            if random_number == 1  { x = 1;  y = 1; }
+            if random_number == 2  { x = 2;  y = 1; }
+            if random_number == 3  { x = 3;  y = 1; }
+            if random_number == 4  { x = 6;  y = 1; }
+            if random_number == 5  { x = 6;  y = 2; }
+            if random_number == 6  { x = 7;  y = 1; }
+            if random_number == 7  { x = 7;  y = 2; }
+            if random_number == 8  { x = 8;  y = 1; }
+            if random_number == 9  { x = 8;  y = 2; }
+            if random_number == 10 { x = 10; y = 0; }
+            if random_number == 11 { x = 10; y = 1; }
+            if random_number == 12 { x = 10; y = 2; }
+            if random_number == 13 { x = 11; y = 0; }
+            if random_number == 14 { x = 11; y = 1; }
+            if random_number == 15 { x = 11; y = 2; }
+
+            return Vector2.{
+                cast(float) (x * ROCK_MAP_TILE_HEIGHT),
+                cast(float) (y * ROCK_MAP_TILE_HEIGHT),
+            };
+
+        case .COPPER_ORE;
+            random_number := cast(int) random_get_within_range(1, 15);
+            x, y : int;
+
+            if random_number == 1  { x = 1;  y = 1; }
+            if random_number == 2  { x = 2;  y = 1; }
+            if random_number == 3  { x = 3;  y = 1; }
+            if random_number == 4  { x = 6;  y = 1; }
+            if random_number == 5  { x = 6;  y = 2; }
+            if random_number == 6  { x = 7;  y = 1; }
+            if random_number == 7  { x = 7;  y = 2; }
+            if random_number == 8  { x = 8;  y = 1; }
+            if random_number == 9  { x = 8;  y = 2; }
+            if random_number == 10 { x = 10; y = 0; }
+            if random_number == 11 { x = 10; y = 1; }
+            if random_number == 12 { x = 10; y = 2; }
+            if random_number == 13 { x = 11; y = 0; }
+            if random_number == 14 { x = 11; y = 1; }
+            if random_number == 15 { x = 11; y = 2; }
+
+            return Vector2.{
+                cast(float) (x * COPPER_ORE_MAP_TILE_HEIGHT),
+                cast(float) (y * COPPER_ORE_MAP_TILE_HEIGHT),
+            };
+
+        // Items
+        case .PICKAXE;
+            return Vector2.{ PICKAXE_TEXTURE_HEIGHT, PICKAXE_TEXTURE_HEIGHT };
+
+        case .AXE;
+            return Vector2.{ AXE_TEXTURE_HEIGHT, AXE_TEXTURE_HEIGHT };
+
+        case .SWORD;
+            return Vector2.{ SWORD_TEXTURE_HEIGHT, SWORD_TEXTURE_HEIGHT };
+
+        case;
+            assert(false, "You forgot an item type in your switch statement");
+            return Vector2.{ -1, -1 }; // Unreachable
+    }
+};
+
+get_texture_map_by_item_type :: (item_type: ItemType, source_rect_pos: Vector2 = Vector2.{ -1, -1 }, is_facing_left: bool = false) -> texture: Texture, source: Rectangle {
     map_texture : Texture;
     map_source  : Rectangle;
+
+    source_x := ifx source_rect_pos.x == -1 && source_rect_pos.y == -1 then get_texture_map_source_coords_by_item_type(item_type).x else source_rect_pos.x;
+    source_y := ifx source_rect_pos.x == -1 && source_rect_pos.y == -1 then get_texture_map_source_coords_by_item_type(item_type).y else source_rect_pos.y;
     
     if item_type == {
         // Blocks
         case .DIRT;
             map_texture = dirt_map;
             map_source  = Rectangle.{
-                0,
-                5 * DIRT_MAP_TILE_HEIGHT,
+                source_x, source_y,
                 DIRT_MAP_TILE_WIDTH - DIRT_MAP_TILE_PADDING,
                 DIRT_MAP_TILE_HEIGHT - DIRT_MAP_TILE_PADDING,
             };
@@ -1946,8 +2037,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         case .GRASS;
             map_texture = grass_map;
             map_source  = Rectangle.{
-                3 * GRASS_MAP_TILE_WIDTH,
-                0 * GRASS_MAP_TILE_HEIGHT,
+                source_x, source_y,
                 GRASS_MAP_TILE_WIDTH - GRASS_MAP_TILE_PADDING,
                 GRASS_MAP_TILE_HEIGHT - GRASS_MAP_TILE_PADDING,
             };
@@ -1956,8 +2046,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         case .ROCK;
             map_texture = rock_map;
             map_source  = Rectangle.{
-                1 * ROCK_MAP_TILE_WIDTH,
-                1 * ROCK_MAP_TILE_HEIGHT,
+                source_x, source_y,
                 ROCK_MAP_TILE_WIDTH - ROCK_MAP_TILE_PADDING,
                 ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING,
             };
@@ -1966,8 +2055,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         case .COPPER_ORE;
             map_texture = copper_ore_map;
             map_source  = Rectangle.{
-                1 * COPPER_ORE_MAP_TILE_WIDTH,
-                1 * COPPER_ORE_MAP_TILE_HEIGHT,
+                source_x, source_y,
                 COPPER_ORE_MAP_TILE_WIDTH  - COPPER_ORE_MAP_TILE_PADDING,
                 COPPER_ORE_MAP_TILE_HEIGHT - COPPER_ORE_MAP_TILE_PADDING,
             };
