@@ -335,7 +335,6 @@ main :: () {
     // Initialization
     //
     random_seed(123456779);
-    // random_seed(1187234213);
 
     init(*global_block_pos_to_block);
     defer deinit(*global_block_pos_to_block);
@@ -366,28 +365,14 @@ main :: () {
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
-    // CAVE_POCKET_PERLIN_NOISE_FREQUENCY :: 25; // How many rows / columns
-    // CAVE_POCKET_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
-    // CAVE_POCKET_PERLIN_NOISE_OCTAVES   :: 4;
-    // cave_pocket_noise := perlin_noise_2d(WORLD_GRID_COLS, CAVE_POCKET_PERLIN_NOISE_FREQUENCY, CAVE_POCKET_PERLIN_NOISE_AMPLITUDE, CAVE_POCKET_PERLIN_NOISE_OCTAVES);
-
     CAVE_SPAGHETTI_PERLIN_NOISE_FREQUENCY :: 25; // How many rows / columns
     CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
     CAVE_SPAGHETTI_PERLIN_NOISE_OCTAVES   :: 1;
     cave_spaghetti_noise := perlin_noise_2d(WORLD_GRID_COLS, CAVE_SPAGHETTI_PERLIN_NOISE_FREQUENCY, CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE, CAVE_SPAGHETTI_PERLIN_NOISE_OCTAVES);
 
-    // cave_pocket_noise_sorted := array_copy(cave_pocket_noise);
-    // quick_sort(cave_pocket_noise_sorted, (x, y) => x - y);
-    // print_vars(cave_pocket_noise_sorted);
-
     cave_spaghetti_noise_sorted := array_copy(cave_spaghetti_noise);
     quick_sort(cave_spaghetti_noise_sorted, (x, y) => x - y);
     print_vars(cave_spaghetti_noise_sorted);
-
-    // cave_pocket_cutoff_max_index := cave_pocket_noise.count * 100 / 100 - 1;
-    // cave_pocket_cutoff_min_index := cave_pocket_noise.count * 90 / 100;
-    // cave_pocket_cutoff_max       := cave_pocket_noise_sorted[cave_pocket_cutoff_max_index];
-    // cave_pocket_cutoff_min       := cave_pocket_noise_sorted[cave_pocket_cutoff_min_index];
 
     cave_spaghetti_cutoff_max_index := cave_spaghetti_noise.count * 70 / 100 - 1;
     cave_spaghetti_cutoff_min_index := cave_spaghetti_noise.count * 30 / 100;
@@ -450,10 +435,6 @@ main :: () {
             defer y += BLOCK_WORLD_HEIGHT;
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
-            // if cave_pocket_noise[noise_index] >= cave_pocket_cutoff_min && cave_pocket_noise[noise_index] <= cave_pocket_cutoff_max {
-            //     continue;
-            // }
-
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
                 continue;
             }
@@ -496,9 +477,6 @@ main :: () {
             defer y += ROCK_WORLD_TILE_HEIGHT;
             
             noise_index := row * (WORLD_GRID_COLS-1) + col;
-            // if cave_pocket_noise[noise_index] >= cave_pocket_cutoff_min && cave_pocket_noise[noise_index] <= cave_pocket_cutoff_max {
-            //     continue;
-            // }
 
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
                 continue;
@@ -588,6 +566,11 @@ main :: () {
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
+    active_blocks: [..]*Block;
+    active_blocks.allocator = temp;
+
+    derive_active_blocks(*active_blocks, camera);
+
     while !WindowShouldClose() {
         defer reset_temporary_storage();
 
@@ -596,14 +579,6 @@ main :: () {
 
         player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
         player_is_swinging : bool;
-
-        window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
-        window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
-
-        active_blocks: [..]*Block;
-        active_blocks.allocator = temp;
-
-        derive_active_blocks(*active_blocks, window_start, window_end);
 
         mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
         mouse_wheel_move   := GetMouseWheelMove();
@@ -654,6 +629,31 @@ main :: () {
         // Update
         //
         if !paused {
+            // Update camera
+            {
+                if drag_cam {
+                    free_cam_pos = Vector2Add(free_cam_pos, Vector2Scale(GetMouseDelta(), -1.0 * DEBUG_CAM_SPEED));
+                }
+
+                if scroll_as_zoom {
+                    camera.zoom += mouse_wheel_move * 0.1;
+                }
+
+                if camera.zoom > 3.0 camera.zoom = 3.0;
+                else if debug_mode && camera.zoom < 0.01 camera.zoom = 0.01;
+                else if !debug_mode && camera.zoom < 0.5 camera.zoom = 0.5;
+
+                if debug_mode {
+                    camera.offset = Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
+                    camera.target = free_cam_pos;
+                } else {
+                    update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
+                    free_cam_pos = player.pos;
+                }
+            }
+
+            derive_active_blocks(*active_blocks, camera);
+
             // Update player
             {
                 // Movement
@@ -939,29 +939,6 @@ main :: () {
                     }
                 }
             }
-
-            // Update camera
-            {
-                if drag_cam {
-                    free_cam_pos = Vector2Add(free_cam_pos, Vector2Scale(GetMouseDelta(), -1.0 * DEBUG_CAM_SPEED));
-                }
-
-                if scroll_as_zoom {
-                    camera.zoom += mouse_wheel_move * 0.1;
-                }
-
-                if camera.zoom > 3.0 camera.zoom = 3.0;
-                else if debug_mode && camera.zoom < 0.01 camera.zoom = 0.01;
-                else if !debug_mode && camera.zoom < 0.5 camera.zoom = 0.5;
-
-                if debug_mode {
-                    camera.offset = Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
-                    camera.target = free_cam_pos;
-                } else {
-                    update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
-                    free_cam_pos = player.pos;
-                }
-            }
         }
 
         //
@@ -971,23 +948,7 @@ main :: () {
             BeginDrawing();
             defer EndDrawing();
 
-            // ClearBackground(BLACK);
             ClearBackground(SKYBLUE);
-
-            // OFFSET :: 150;
-
-            // for row: 0..WORLD_GRID_COLS-1 {
-            //     for col: 0..WORLD_GRID_COLS-1 {
-            //         p := perlin_2d[row * WORLD_GRID_COLS + col];
-
-            //         r: u8 = cast(u8) (255 * (p + 1) / 2);
-            //         g: u8 = cast(u8) (255 * (p + 1) / 2);
-            //         b: u8 = cast(u8) (255 * (p + 1) / 2);
-            //         color := Color.{ r, g, b, 255 };
-
-            //         DrawRectangle(xx (col * SCALE + OFFSET), xx (row * SCALE + OFFSET), SCALE, SCALE, color);
-            //     }
-            // }
 
             // Draw world
             {
@@ -1002,13 +963,6 @@ main :: () {
 
                         // Draw block texture
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
-
-                        // if debug_mode {
-                        //     DEBUG_TEXT_SIZE :: 10;
-                        //     DrawText(tprint("%\0", it.id).data, xx it.sprite_rect.x, xx (it.sprite_rect.y + DEBUG_TEXT_SIZE), DEBUG_TEXT_SIZE, ORANGE);
-                        //     DrawText(tprint("%\0", it.pos.x).data, xx it.sprite_rect.x, xx it.sprite_rect.y, DEBUG_TEXT_SIZE + 2, WHITE);
-                        //     DrawText(tprint("%\0", it.pos.y).data, xx it.sprite_rect.x, xx (it.sprite_rect.y + DEBUG_TEXT_SIZE + 4), DEBUG_TEXT_SIZE, WHITE);
-                        // }
 
                         // Damage block overlay (cracks)
                         if it.health_curr < it.health_max {
@@ -1918,7 +1872,10 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
     }
 }
 
-derive_active_blocks :: (active_blocks: *[..] *Block, window_start: Vector2, window_end: Vector2) {
+derive_active_blocks :: (active_blocks: *[..] *Block, camera: Camera2D) {
+    window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+    window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
+
     array_reset(active_blocks);
     
     for block: global_block_pos_to_block {
