@@ -554,7 +554,7 @@ main :: () {
             block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
         }
 
-        // Find texture source pos
+        // Initialize texture source pos
         {
             block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
         }
@@ -766,7 +766,9 @@ main :: () {
                                         try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
 
                                         update_block_shadows_around_pos(block_mouse_is_over.pos);
-                                        
+
+                                        update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+
                                         // @TODO: free its memory, probably, right?
                                     }
                                 }
@@ -2460,4 +2462,21 @@ update_block_shadows_around_pos :: (block_pos: Vector2) {
             set_block_shadow_relative_to_neighbors(block_to_update_pos);
         }
     }
+}
+
+update_texture_map_source_pos_around_pos :: (block_pos: Vector2) {
+    potential_neighbor_pos_north := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
+    potential_neighbor_pos_south := Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
+    potential_neighbor_pos_east  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
+    potential_neighbor_pos_west  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
+
+    neighbor_exists_north, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_north));
+    neighbor_exists_south, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_south));
+    neighbor_exists_east,  neighbor_east  := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_east));
+    neighbor_exists_west,  neighbor_west  := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_west));
+
+    if neighbor_exists_north { neighbor_north.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_north); }
+    if neighbor_exists_south { neighbor_south.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_south); }
+    if neighbor_exists_east  { neighbor_east.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_east);  }
+    if neighbor_exists_west  { neighbor_west.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_west);  }
 }
