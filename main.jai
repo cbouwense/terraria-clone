@@ -436,11 +436,11 @@ main :: () {
             new_block.hardness      = get_block_hardness(block_type);
             new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count = -1;
-            new_block.neighbor_south_count = -1;
-            new_block.neighbor_east_count  = -1;
-            new_block.neighbor_west_count  = -1;
-            new_block.texture_map_source_pos = get_texture_map_source_coords_by_block_type(block_type);
+            new_block.neighbor_north_count   = -1;
+            new_block.neighbor_south_count   = -1;
+            new_block.neighbor_east_count    = -1;
+            new_block.neighbor_west_count    = -1;
+            new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
@@ -482,11 +482,11 @@ main :: () {
             new_block.hardness      = get_block_hardness(block_type);
             new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count = -1;
-            new_block.neighbor_south_count = -1;
-            new_block.neighbor_east_count  = -1;
-            new_block.neighbor_west_count  = -1;
-            new_block.texture_map_source_pos = get_texture_map_source_coords_by_block_type(block_type);
+            new_block.neighbor_north_count   = -1;
+            new_block.neighbor_south_count   = -1;
+            new_block.neighbor_east_count    = -1;
+            new_block.neighbor_west_count    = -1;
+            new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
         }
@@ -526,14 +526,13 @@ main :: () {
             new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
             new_block.hardness      = get_block_hardness(block_type);
             // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count = -1;
-            new_block.neighbor_south_count = -1;
-            new_block.neighbor_east_count  = -1;
-            new_block.neighbor_west_count  = -1;
-            new_block.texture_map_source_pos = get_texture_map_source_coords_by_block_type(block_type);
+            new_block.neighbor_north_count   = -1;
+            new_block.neighbor_south_count   = -1;
+            new_block.neighbor_east_count    = -1;
+            new_block.neighbor_west_count    = -1;
+            new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-
         }
 
         x += BLOCK_WORLD_WIDTH;
@@ -553,6 +552,11 @@ main :: () {
                 min(block.neighbor_east_count,  block.neighbor_west_count)
             );
             block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+        }
+
+        // Find texture source pos
+        {
+            block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
         }
     }
 
@@ -837,14 +841,14 @@ main :: () {
                                 new_block.health_curr   = BLOCK_HEALTH_MAX;
                                 new_block.hardness      = get_block_hardness(new_block_type);
                                 new_block.weak_to_tool  = get_block_weak_to_tool(new_block_type);
-                                new_block.neighbor_north_count = -1;
-                                new_block.neighbor_south_count = -1;
-                                new_block.neighbor_east_count  = -1;
-                                new_block.neighbor_west_count  = -1;
-                                new_block.texture_map_source_pos = get_texture_map_source_coords_by_block_type(new_block_type);
-                                
-                                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                                new_block.neighbor_north_count   = -1;
+                                new_block.neighbor_south_count   = -1;
+                                new_block.neighbor_east_count    = -1;
+                                new_block.neighbor_west_count    = -1;
+                                new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
+                                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+            
                                 player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
                                 player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
@@ -982,7 +986,7 @@ main :: () {
                 // Draw blocks
                 {
                     for active_blocks {
-                        block_map_texture, block_map_source := get_texture_map_by_block_type(it.block_type, it.texture_map_source_pos);
+                        block_map_texture, block_map_source := get_texture_map_for_block(it);
                         color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
 
                         // Draw block texture
@@ -1951,87 +1955,138 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
     }
 }
 
-get_texture_map_source_coords_by_block_type :: (block_type: BlockType) -> Vector2 {
-    if block_type == {
-        // Blocks
-        case .DIRT;
-            return Vector2.{
-                cast(float) (cast(int) random_get_within_range(0, 1))  * DIRT_MAP_TILE_HEIGHT,
-                cast(float) (cast(int) random_get_within_range(5, 11)) * DIRT_MAP_TILE_HEIGHT,
-            };
+get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
+    north_exists, _north := get_neighbor(block, .NORTH);
+    south_exists, _south := get_neighbor(block, .SOUTH);
+    east_exists,  _east  := get_neighbor(block, .EAST);
+    west_exists,  _west  := get_neighbor(block, .WEST);
+    
+    x := -1;
+    y := -1;
 
-        case .GRASS;
-            x := cast(int) random_get_within_range(1, 3);
-
-            return Vector2.{
-                cast(float) (x * GRASS_MAP_TILE_WIDTH),
-                cast(float) (0 * GRASS_MAP_TILE_HEIGHT),
-            };
-
-        case .ROCK;
-            random_number := cast(int) random_get_within_range(1, 15);
-            x, y : int;
-
-            if random_number == 1  { x = 1;  y = 1; }
-            if random_number == 2  { x = 2;  y = 1; }
-            if random_number == 3  { x = 3;  y = 1; }
-            if random_number == 4  { x = 6;  y = 1; }
-            if random_number == 5  { x = 6;  y = 2; }
-            if random_number == 6  { x = 7;  y = 1; }
-            if random_number == 7  { x = 7;  y = 2; }
-            if random_number == 8  { x = 8;  y = 1; }
-            if random_number == 9  { x = 8;  y = 2; }
-            if random_number == 10 { x = 10; y = 0; }
-            if random_number == 11 { x = 10; y = 1; }
-            if random_number == 12 { x = 10; y = 2; }
-            if random_number == 13 { x = 11; y = 0; }
-            if random_number == 14 { x = 11; y = 1; }
-            if random_number == 15 { x = 11; y = 2; }
-
-            return Vector2.{
-                cast(float) (x * ROCK_MAP_TILE_HEIGHT),
-                cast(float) (y * ROCK_MAP_TILE_HEIGHT),
-            };
-
-        case .COPPER_ORE;
-            random_number := cast(int) random_get_within_range(1, 15);
-            x, y : int;
-
-            if random_number == 1  { x = 1;  y = 1; }
-            if random_number == 2  { x = 2;  y = 1; }
-            if random_number == 3  { x = 3;  y = 1; }
-            if random_number == 4  { x = 6;  y = 1; }
-            if random_number == 5  { x = 6;  y = 2; }
-            if random_number == 6  { x = 7;  y = 1; }
-            if random_number == 7  { x = 7;  y = 2; }
-            if random_number == 8  { x = 8;  y = 1; }
-            if random_number == 9  { x = 8;  y = 2; }
-            if random_number == 10 { x = 10; y = 0; }
-            if random_number == 11 { x = 10; y = 1; }
-            if random_number == 12 { x = 10; y = 2; }
-            if random_number == 13 { x = 11; y = 0; }
-            if random_number == 14 { x = 11; y = 1; }
-            if random_number == 15 { x = 11; y = 2; }
-
-            return Vector2.{
-                cast(float) (x * COPPER_ORE_MAP_TILE_HEIGHT),
-                cast(float) (y * COPPER_ORE_MAP_TILE_HEIGHT),
-            };
-        
-        case;
-            assert(false, "You forgot a block type in your switch statement");
-            return Vector2.{ -1, -1 }; // Unreachable
+    if north_exists && south_exists && east_exists && west_exists {
+        x = cast(int) random_get_within_range(1, 3);
+        y = 1;
     }
+    else if north_exists && south_exists && east_exists && !west_exists    {
+        x = 0;
+        y = cast(int) random_get_within_range(0, 2);
+    }
+    else if north_exists && south_exists && !east_exists && west_exists    {
+        x = 4;
+        y = cast(int) random_get_within_range(0, 2);
+    }
+    else if north_exists && south_exists && !east_exists && !west_exists   {
+        x = 5;
+        y = cast(int) random_get_within_range(0, 2);
+    }
+    else if north_exists && !south_exists && east_exists && west_exists    {
+        x = cast(int) random_get_within_range(1, 3);
+        y = 2;
+    }
+    else if north_exists && !south_exists && east_exists && !west_exists   {
+        random_number := cast(int) random_get_within_range(0, 2);
+        
+        y = 4;
+        if random_number == 0 {
+            x = 0;
+        }
+        else if random_number == 1 {
+            x = 2;
+        }
+        else {// if random_number == 2 {
+            x = 4;
+        }
+    }
+    else if north_exists && !south_exists && !east_exists && west_exists   {
+        random_number := cast(int) random_get_within_range(0, 2);
+        
+        y = 4;
+        if random_number == 0 {
+            x = 1;
+        }
+        else if random_number == 1 {
+            x = 3;
+        }
+        else {// if random_number == 2 {
+            x = 5;
+        }
+    }
+    else if north_exists && !south_exists && !east_exists && !west_exists  {
+        x = cast(int) random_get_within_range(6, 8);
+        y = 3;
+    }
+    else if !north_exists && south_exists && east_exists && west_exists    {
+        x = cast(int) random_get_within_range(1, 3);
+        y = 0;
+    }
+    else if !north_exists && south_exists && east_exists && !west_exists   {
+        random_number := cast(int) random_get_within_range(0, 2);
+        
+        y = 3;
+        if random_number == 0 {
+            x = 0;
+        }
+        else if random_number == 1 {
+            x = 2;
+        }
+        else {// if random_number == 2 {
+            x = 4;
+        }
+    }
+    else if !north_exists && south_exists && !east_exists && west_exists   {
+        random_number := cast(int) random_get_within_range(0, 2);
+        
+        y = 3;
+        if random_number == 0 {
+            x = 1;
+        }
+        else if random_number == 1 {
+            x = 3;
+        }
+        else {// if random_number == 2 {
+            x = 5;
+        }
+    }
+    else if !north_exists && south_exists && !east_exists && !west_exists  {
+        x = cast(int) random_get_within_range(6, 8);
+        y = 0;
+    }
+    else if !north_exists && !south_exists && east_exists && west_exists   {
+        x = cast(int) random_get_within_range(6, 8);
+        y = 4;
+    }
+    else if !north_exists && !south_exists && east_exists && !west_exists  {
+        x = 9;
+        y = cast(int) random_get_within_range(0, 2);
+    }
+    else if !north_exists && !south_exists && !east_exists && west_exists  {
+        x = 12;
+        y = cast(int) random_get_within_range(0, 2);
+    }
+    else if !north_exists && !south_exists && !east_exists && !west_exists {
+        x = cast(int) random_get_within_range(9, 11);
+        y = 3;
+    }
+    else {
+        print_vars(north_exists, south_exists, east_exists, west_exists);
+        assert(false, "You forgot some combination of north south east west");
+    }
+
+    return Vector2.{
+        cast(float) (x * GRASS_MAP_TILE_WIDTH),
+        cast(float) (y * GRASS_MAP_TILE_HEIGHT),
+    };
 }
 
-get_texture_map_by_block_type :: (block_type: BlockType, source_rect_pos: Vector2 = Vector2.{ -1, -1 }) -> texture: Texture, source: Rectangle {
+get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectangle {
     map_texture : Texture;
     map_source  : Rectangle;
 
-    source_x := ifx source_rect_pos.x == -1 && source_rect_pos.y == -1 then get_texture_map_source_coords_by_block_type(block_type).x else source_rect_pos.x;
-    source_y := ifx source_rect_pos.x == -1 && source_rect_pos.y == -1 then get_texture_map_source_coords_by_block_type(block_type).y else source_rect_pos.y;
+    source_x := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1 then get_texture_map_source_coords_for_block(block).x else block.texture_map_source_pos.x;
+    source_y := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1 then get_texture_map_source_coords_for_block(block).y else block.texture_map_source_pos.y;
     
-    if block_type == {
+    if block.block_type == {
         case .DIRT;
             map_texture = dirt_map;
             map_source  = Rectangle.{
@@ -2130,18 +2185,6 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
 
     return map_texture, map_source;
 }
-
-get_sprite_by_block_type :: (block_type: BlockType) -> *Sprite {
-    if block_type == {
-        case .DIRT;       return *block_sprite_dirt;
-        case .GRASS;      return *block_sprite_grass;
-        case .ROCK;       return *block_sprite_rock;
-        case .COPPER_ORE; return *block_sprite_copper_ore;
-        case;
-            assert(false, "You forgot a block type in your switch statement");
-            return null;
-    }
-};
 
 get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
     if item_type == {
@@ -2277,13 +2320,24 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
 }
 
+get_neighbor :: (block: Block, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
+    potential_neighbor_pos: Vector2;
+    if direction == {
+        case .NORTH; potential_neighbor_pos = Vector2.{ block.pos.x, block.pos.y - BLOCK_WORLD_HEIGHT };
+        case .SOUTH; potential_neighbor_pos = Vector2.{ block.pos.x, block.pos.y + BLOCK_WORLD_HEIGHT };
+        case .EAST;  potential_neighbor_pos = Vector2.{ block.pos.x + BLOCK_WORLD_WIDTH, block.pos.y };
+        case .WEST;  potential_neighbor_pos = Vector2.{ block.pos.x - BLOCK_WORLD_WIDTH, block.pos.y };
+        case;        assert(false, "Invalid direction");
+    }
+    neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+    return neighbor_exists, neighbor;
+}
+
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
+    neighbor_exists, neighbor := get_neighbor(block.*, direction);
+
     if direction == {
         case .NORTH;
-            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y - BLOCK_WORLD_HEIGHT };
-
-            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
-
             if neighbor_exists {
                 // If this block already knows its north neighbor count, we don't need to keep going
                 if neighbor.neighbor_north_count > -1 {
@@ -2301,10 +2355,6 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .SOUTH;
-            potential_neighbor_pos := Vector2.{ block.pos.x, block.pos.y + BLOCK_WORLD_HEIGHT };
-
-            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
-
             if neighbor_exists {
                 // If this block already knows its south neighbor count, we don't need to keep going
                 if neighbor.neighbor_south_count > -1 {
@@ -2322,10 +2372,6 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .EAST;
-            potential_neighbor_pos := Vector2.{ block.pos.x + BLOCK_WORLD_WIDTH , block.pos.y };
-
-            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
-
             if neighbor_exists {
                 // If this block already knows its east neighbor count, we don't need to keep going
                 if neighbor.neighbor_east_count > -1 {
@@ -2343,10 +2389,6 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .WEST;
-            potential_neighbor_pos := Vector2.{ block.pos.x - BLOCK_WORLD_WIDTH , block.pos.y };
-
-            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
-
             if neighbor_exists {
                 // If this block already knows its east neighbor count, we don't need to keep going
                 if neighbor.neighbor_west_count > -1 {

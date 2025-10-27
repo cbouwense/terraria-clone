@@ -1,5 +1,7 @@
 # In progress
 
+- [world_gen] relative block sprites
+
 # Gameplay features
 
 - crafting
