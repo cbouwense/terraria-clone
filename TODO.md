@@ -1,9 +1,10 @@
 # In progress
 
-- walls
+- [juice] block type-aware relative tiling 
 
 # Game
 
+- walls
 - crafting
 - [ui] inventory
 - [world_gen] trees
@@ -27,7 +28,6 @@
 - [juice] grass regrow
 - [juice] particles
 - [juice] little block pops out on destroying
-- [juice] block type-aware relative tiling 
 
 # Tech
 
