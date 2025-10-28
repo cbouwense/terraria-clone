@@ -856,7 +856,11 @@ main :: () {
                                 player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
 
                                 set_block_shadow_relative_to_neighbors(new_pos);
+                                
                                 update_block_shadows_around_pos(new_pos);
+
+                                new_block.texture_map_source_pos = get_texture_map_source_coords_for_block(new_block);
+                                update_texture_map_source_pos_around_pos(new_pos);
                             }
                         }
                     }
@@ -1958,21 +1962,191 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
 }
 
 get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
-    north_exists, _north := get_neighbor(block, .NORTH);
-    south_exists, _south := get_neighbor(block, .SOUTH);
-    east_exists,  _east  := get_neighbor(block, .EAST);
-    west_exists,  _west  := get_neighbor(block, .WEST);
+    north_exists, north := get_neighbor(block, .NORTH);
+    south_exists, south := get_neighbor(block, .SOUTH);
+    east_exists,  east  := get_neighbor(block, .EAST);
+    west_exists,  west  := get_neighbor(block, .WEST);
     
     x := -1;
     y := -1;
 
     if north_exists && south_exists && east_exists && west_exists {
-        x = cast(int) random_get_within_range(1, 3);
-        y = 1;
+        if block.block_type == .DIRT {
+            x = cast(int) random_get_within_range(1, 3);
+            y = 1;
+        }
+        // Block-entrappable blocks (rock, ore, etc).
+        else {
+            if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
+                x = cast(int) random_get_within_range(6, 8);
+                y = 11;
+            }
+            else if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(11, 13);
+                    y = 17;
+                }
+                else {
+                    x = 12;
+                    y = cast(int) random_get_within_range(8, 10);
+                }
+            }
+            else if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(8, 10);
+                    y = 17;
+                }
+                else {
+                    x = 12;
+                    y = cast(int) random_get_within_range(5, 7);
+                }
+            }
+            else if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
+                x = cast(int) random_get_within_range(8, 10);
+                y = 10;
+            }
+            else if north.block_type == .DIRT && south.block_type != .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
+                x = 12;
+                y = cast(int) random_get_within_range(5, 7);
+            }
+            else if north.block_type == .DIRT && south.block_type != .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
+                random_number := cast(int) random_get_within_range(1, 3);
+                x = 3;
+
+                if random_number == 1 {
+                    y = 5;
+                }
+                else if random_number == 2 {
+                    y = 7;
+                }
+                else if random_number == 3 {
+                    y = 9;
+                }
+                else {
+                    assert(false, "dawg");
+                }
+            }
+            else if north.block_type == .DIRT && south.block_type != .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
+                random_number := cast(int) random_get_within_range(1, 3);
+                x = 2;
+
+                if random_number == 1 {
+                    y = 5;
+                }
+                else if random_number == 2 {
+                    y = 7;
+                }
+                else if random_number == 3 {
+                    y = 9;
+                }
+                else {
+                    assert(false, "dawg");
+                }
+            }
+            else if north.block_type == .DIRT && south.block_type != .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
+                x = cast(int) random_get_within_range(8, 10);
+                y = 6;
+            }
+            else if north.block_type != .DIRT && south.block_type == .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
+                x = 11;
+                y = cast(int) random_get_within_range(8, 10);
+            }
+            else if north.block_type != .DIRT && south.block_type == .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
+                random_number := cast(int) random_get_within_range(1, 3);
+                x = 3;
+
+                if random_number == 1 {
+                    y = 6;
+                }
+                else if random_number == 2 {
+                    y = 8;
+                }
+                else if random_number == 3 {
+                    y = 10;
+                }
+                else {
+                    assert(false, "dawg");
+                }
+            }
+            else if north.block_type != .DIRT && south.block_type == .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
+                random_number := cast(int) random_get_within_range(1, 3);
+                x = 2;
+
+                if random_number == 1 {
+                    y = 6;
+                }
+                else if random_number == 2 {
+                    y = 8;
+                }
+                else if random_number == 3 {
+                    y = 10;
+                }
+                else {
+                    assert(false, "dawg");
+                }
+            }
+            else if north.block_type != .DIRT && south.block_type == .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
+                x = cast(int) random_get_within_range(8, 10);
+                y = 5;
+            }
+            else if north.block_type != .DIRT && south.block_type != .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
+                x = 10;
+                y = cast(int) random_get_within_range(7, 9);
+            }
+            else if north.block_type != .DIRT && south.block_type != .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
+                x = 8;
+                y = cast(int) random_get_within_range(7, 9);
+            }
+            else if north.block_type != .DIRT && south.block_type != .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
+                x = 9;
+                y = cast(int) random_get_within_range(7, 9);
+            }
+            else if north.block_type != .DIRT && south.block_type != .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
+                x = cast(int) random_get_within_range(1, 3);
+                y = 1;
+            }
+        }
     }
-    else if north_exists && south_exists && east_exists && !west_exists    {
-        x = 0;
-        y = cast(int) random_get_within_range(0, 2);
+    else if north_exists && south_exists && east_exists && !west_exists {
+        if block.block_type == .DIRT {
+            x = 0;
+            y = cast(int) random_get_within_range(0, 2);
+        }
+        // Block-entrappable blocks (rock, ore, etc).
+        else {
+            if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type == .DIRT {
+                x = cast(int) random_get_within_range(9, 11);
+                y = 3;
+            }
+            else if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type != .DIRT {
+                x = 9;
+                y = cast(int) random_get_within_range(0, 2);
+            }
+            else if north.block_type == .DIRT && south.block_type != .DIRT && east.block_type == .DIRT {
+                x = cast(int) random_get_within_range(6, 8);
+                y = 0;
+            }
+            else if north.block_type == .DIRT && south.block_type != .DIRT && east.block_type != .DIRT {
+                x = 4;
+                y = cast(int) random_get_within_range(8, 10);
+            }
+            else if north.block_type != .DIRT && south.block_type == .DIRT && east.block_type == .DIRT {
+                x = cast(int) random_get_within_range(6, 8);
+                y = 3;
+            }
+            else if north.block_type != .DIRT && south.block_type == .DIRT && east.block_type != .DIRT {
+                x = 4;
+                y = cast(int) random_get_within_range(5, 7);
+            }
+            else if north.block_type != .DIRT && south.block_type != .DIRT && east.block_type == .DIRT {
+                x = cast(int) random_get_within_range(13, 15);
+                y = 2;
+            }
+            else if north.block_type != .DIRT && south.block_type != .DIRT && east.block_type != .DIRT {
+                x = 0;
+                y = cast(int) random_get_within_range(0, 2);
+            }
+        }
     }
     else if north_exists && south_exists && !east_exists && west_exists    {
         x = 4;

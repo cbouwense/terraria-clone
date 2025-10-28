@@ -1,11 +1,10 @@
 # In progress
 
-- [world_gen] relative block sprites
+- walls
 
-# Gameplay features
+# Game
 
 - crafting
-- walls
 - [ui] inventory
 - [world_gen] trees
 - [world_gen] cave gen
@@ -19,15 +18,16 @@
 - [sound_effects] placing blocks
 - [sound_effects] attacking blocks
 - game saves
-- font
 - background image
 - background parallax
 - multiplayer
+- [juice] font
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
 - [juice] particles
 - [juice] little block pops out on destroying
+- [juice] block type-aware relative tiling 
 
 # Tech
 
