@@ -358,7 +358,7 @@ main :: () {
     init(*global_block_pos_to_block);
     defer deinit(*global_block_pos_to_block);
 
-    InitWindow(1600, 1200, "Terraria Clone");
+    InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
     SetTargetFPS(144);
 
@@ -2148,45 +2148,90 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if north_exists && south_exists && !east_exists && west_exists {
         if block.block_type == .DIRT {
             x = 4;
             y = cast(int) random_get_within_range(0, 2);
         } else {
             if north.block_type == .DIRT && south.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
-            }
+                if block.block_type == .GRASS {
+                    x = 1;
+                    y = cast(int) random_get_within_range(15, 17);
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             else if north.block_type == .DIRT && south.block_type == .DIRT && west.block_type != .DIRT {
-                x = 12;
-                y = cast(int) random_get_within_range(0, 2);
-            }
+                if block.block_type == .GRASS {
+                    x = 1;
+                    y = cast(int) random_get_within_range(15, 17);
+                } else {
+                    x = 12;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             else if north.block_type == .DIRT && south.block_type != .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 0;
-            }
+                if block.block_type == .GRASS {
+                    x = 5;
+                    y = cast(int) random_get_within_range(8, 10);
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 0;
+                }
             else if north.block_type == .DIRT && south.block_type != .DIRT && west.block_type != .DIRT {
-                x = 5;
-                y = cast(int) random_get_within_range(8, 10);
-            }
+                if block.block_type == .GRASS {
+                    x = 5;
+                    y = cast(int) random_get_within_range(8, 10);
+                } else {
+                    x = 5;
+                    y = cast(int) random_get_within_range(8, 10);
+                }
             else if north.block_type != .DIRT && south.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 3;
-            }
+                if block.block_type == .GRASS {
+                    x = 5;
+                    y = cast(int) random_get_within_range(5, 7);
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 3;
+                }
             else if north.block_type != .DIRT && south.block_type == .DIRT && west.block_type != .DIRT {
-                x = 5;
-                y = cast(int) random_get_within_range(5, 7);
-            }
+                if block.block_type == .GRASS {
+                    x = 5;
+                    y = cast(int) random_get_within_range(5, 7);
+                } else {
+                    x = 5;
+                    y = cast(int) random_get_within_range(5, 7);
+                }
             else if north.block_type != .DIRT && south.block_type != .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(13, 15);
-                y = 3;
-            }
+                if block.block_type == .GRASS {
+                    x = 4;
+                    y = cast(int) random_get_within_range(0, 2);
+                } else {
+                    x = cast(int) random_get_within_range(13, 15);
+                    y = 3;
+                }
             else if north.block_type != .DIRT && south.block_type != .DIRT && west.block_type != .DIRT {
-                x = 4;
-                y = cast(int) random_get_within_range(0, 2);
-            }
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 13;
+
+                    if random_number == 0 {
+                        x = 9;
+                    }
+                    else if random_number == 1 {
+                        x = 12;
+                    }
+                    else {
+                        x = 15;
+                    }
+                } else {
+                    x = 4;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
         }
     }
+    // grass good
     else if north_exists && south_exists && !east_exists && !west_exists {
         if block.block_type == .DIRT {
             x = 5;
@@ -2206,11 +2251,12 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 y = cast(int) random_get_within_range(5, 7);
             }
             else if north.block_type != .DIRT && south.block_type != .DIRT {
-               x = 5;
+                x = 5;
                 y = cast(int) random_get_within_range(0, 2);
             }
         }
     }
+    // grass good
     else if north_exists && !south_exists && east_exists && west_exists {
         if block.block_type == .DIRT {
             x = cast(int) random_get_within_range(1, 3);
@@ -2218,39 +2264,90 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if north.block_type == .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;   
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(2, 4);
+                    y = 16; 
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;   
+                }
             }
             else if north.block_type == .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
-                x = 12;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(3, 5);
+                    y = 12; 
+                } else {
+                    x = 12;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if north.block_type == .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
-                x = 9;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(0, 2);
+                    y = 12; 
+                } else {
+                    x = 9;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if north.block_type == .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
-                x = cast(int) random_get_within_range(13, 15);
-                y = 1;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(1, 3);
+                    y = 2; 
+                } else {
+                    x = cast(int) random_get_within_range(13, 15);
+                    y = 1;
+                }
             }
             else if north.block_type != .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 3;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(2, 4);
+                    y = 16; 
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 3;
+                }
             }
             else if north.block_type != .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
-                x = cast(int) random_get_within_range(3, 5);
-                y = 12;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(3, 5);
+                    y = 12; 
+                } else {
+                    x = cast(int) random_get_within_range(3, 5);
+                    y = 12;
+                }
             }
             else if north.block_type != .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(0, 2);
-                y = 12;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(0, 2);
+                    y = 12; 
+                } else {
+                    x = cast(int) random_get_within_range(0, 2);
+                    y = 12;
+                }
             }
             else if north.block_type != .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
-                x = cast(int) random_get_within_range(1, 3);
-                y = 2;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 14;
+                    if random_number == 0 {
+                        x = 8;
+                    }
+                    else if random_number == 1 {
+                        x = 11;
+                    }
+                    else {// if random_number == 2 {
+                        x = 14;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(1, 3);
+                    y = 2;
+                }
             }
         }
     }
+    // grass good
     else if north_exists && !south_exists && east_exists && !west_exists {
         if block.block_type == .DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
@@ -2268,33 +2365,94 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if north.block_type == .DIRT && east.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 4;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else if north.block_type == .DIRT && east.block_type != .DIRT {
-                x = 9;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 4;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
+                } else {
+                    x = 9;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if north.block_type != .DIRT && east.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 3;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 4;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 3;
+                }
             }
             else if north.block_type != .DIRT && east.block_type != .DIRT {
-                random_number := cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
             
-                y = 4;
-                if random_number == 0 {
-                    x = 0;
-                }
-                else if random_number == 1 {
-                    x = 2;
-                }
-                else {// if random_number == 2 {
-                    x = 4;
+                    y = 14;
+                    if random_number == 0 {
+                        x = 7;
+                    }
+                    else if random_number == 1 {
+                        x = 10;
+                    }
+                    else {// if random_number == 2 {
+                        x = 13;
+                    }
+                } else {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 4;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
                 }
             }
         }
     }
+    // grass good
     else if north_exists && !south_exists && !east_exists && west_exists {
         if block.block_type == .DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
@@ -2312,33 +2470,94 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if north.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 4;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else if north.block_type == .DIRT && west.block_type != .DIRT {
-                x = 12;
-                cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 4;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
+                } else {
+                    x = 12;
+                    cast(int) random_get_within_range(0, 2);
+                }
             }
             else if north.block_type != .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 3;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+            
+                    y = 4;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 3;
+                }
             }
             else if north.block_type != .DIRT && west.block_type != .DIRT {
-                random_number := cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 14;
+                    if random_number == 0 {
+                        x = 9;
+                    }
+                    else if random_number == 1 {
+                        x = 12;
+                    }
+                    else {// if random_number == 2 {
+                        x = 15;
+                    }
+                } else {
+                    random_number := cast(int) random_get_within_range(0, 2);
             
-                y = 4;
-                if random_number == 0 {
-                    x = 1;
-                }
-                else if random_number == 1 {
-                    x = 3;
-                }
-                else {// if random_number == 2 {
-                    x = 5;
+                    y = 4;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
                 }
             }
         }
     }
+    // grass good
     else if north_exists && !south_exists && !east_exists && !west_exists {
         if block.block_type == .DIRT {
             x = cast(int) random_get_within_range(6, 8);
@@ -2354,6 +2573,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if !north_exists && south_exists && east_exists && west_exists {
         if block.block_type == .DIRT {
             x = cast(int) random_get_within_range(1, 3);
@@ -2361,24 +2581,49 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if south.block_type == .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(2, 4);
+                    y = 15;
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else if south.block_type == .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
-                x = 12;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(3, 5);
+                    y = 11;
+                } else {
+                    x = 12;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if south.block_type == .DIRT && east.block_type != .DIRT && west.block_type == .DIRT {
-                x = 9;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(0, 2);
+                    y = 11;
+                } else {
+                    x = 9;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if south.block_type == .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
-                x = cast(int) random_get_within_range(13, 15);
-                y = 0;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(1, 3);
+                    y = 0;
+                } else {
+                    x = cast(int) random_get_within_range(13, 15);
+                    y = 0;
+                }
             }
             else if south.block_type != .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 0;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(2, 4);
+                    y = 15;
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 0;
+                }
             }
             else if south.block_type != .DIRT && east.block_type == .DIRT && west.block_type != .DIRT {
                 x = cast(int) random_get_within_range(3, 5);
@@ -2389,11 +2634,28 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 y = 11;
             }
             else if south.block_type != .DIRT && east.block_type != .DIRT && west.block_type != .DIRT {
-                x = cast(int) random_get_within_range(1, 3);
-                y = 0;
+                if block.block_type == .GRASS {
+                    random_number: = cast(int) random_get_within_range(1, 3);
+                    
+                    y = 12;
+
+                    if random_number == 1 {
+                        x = 8;
+                    }
+                    else if random_number == 2 {
+                        x = 11;
+                    }
+                    else if random_number == 3 {
+                        x = 14;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(1, 3);
+                    y = 0;
+                }
             }
         }
     }
+    // grass good
     else if !north_exists && south_exists && east_exists && !west_exists {
         if block.block_type == .DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
@@ -2411,16 +2673,61 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if south.block_type == .DIRT && east.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else if south.block_type == .DIRT && east.block_type != .DIRT {
-                x = 9;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
+                } else {
+                    x = 9;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if south.block_type != .DIRT && east.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 0;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 0;
+                    }
+                    else if random_number == 1 {
+                        x = 2;
+                    }
+                    else {// if random_number == 2 {
+                        x = 4;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 0;
+                }
             }
             else if south.block_type != .DIRT && east.block_type != .DIRT {
                 random_number := cast(int) random_get_within_range(0, 2);
@@ -2438,6 +2745,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if !north_exists && south_exists && !east_exists && west_exists {
         if block.block_type == .DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
@@ -2455,33 +2763,84 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if south.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else if south.block_type == .DIRT && west.block_type != .DIRT {
-                x = 12;
-                y = cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
+                } else {
+                    x = 12;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
             }
             else if south.block_type != .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(6, 8);
-                y = 0;
+                if block.block_type == .GRASS {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
+                } else {
+                    x = cast(int) random_get_within_range(6, 8);
+                    y = 0;
+                }
             }
             else if south.block_type != .DIRT && west.block_type != .DIRT {
-                random_number := cast(int) random_get_within_range(0, 2);
-            
-                y = 3;
-                if random_number == 0 {
-                    x = 1;
-                }
-                else if random_number == 1 {
-                    x = 3;
-                }
-                else {// if random_number == 2 {
-                    x = 5;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(8, 10);
+                    y = 15;
+                } else {
+                    random_number := cast(int) random_get_within_range(0, 2);
+                
+                    y = 3;
+                    if random_number == 0 {
+                        x = 1;
+                    }
+                    else if random_number == 1 {
+                        x = 3;
+                    }
+                    else {// if random_number == 2 {
+                        x = 5;
+                    }
                 }
             }
         }
     }
+    // grass good
     else if !north_exists && south_exists && !east_exists && !west_exists  {
         if block.block_type == .DIRT {
             x = cast(int) random_get_within_range(6, 8);
@@ -2489,8 +2848,13 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if south.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    x = 6;
+                    y = cast(int) random_get_within_range(5, 7);
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else {
                 x = cast(int) random_get_within_range(6, 8);
@@ -2498,6 +2862,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if !north_exists && !south_exists && east_exists && west_exists   {
         if block.block_type == .DIRT {
             x = cast(int) random_get_within_range(6, 8);
@@ -2505,16 +2870,31 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if east.block_type == .DIRT && west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 11;
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else if east.block_type == .DIRT && west.block_type != .DIRT {
-                x = 12;
-                cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(3, 5);
+                    y = 14;
+                } else {
+                    x = 12;
+                    cast(int) random_get_within_range(0, 2);
+                }
             }
             else if east.block_type != .DIRT && west.block_type == .DIRT {
-                x = 9;
-                cast(int) random_get_within_range(0, 2);
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(0, 2);
+                    y = 14;
+                } else {
+                    x = 9;
+                    cast(int) random_get_within_range(0, 2);
+                }
             }
             else if east.block_type != .DIRT && west.block_type != .DIRT {
                 x = cast(int) random_get_within_range(6, 8);
@@ -2522,6 +2902,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if !north_exists && !south_exists && east_exists && !west_exists  {
         if block.block_type == .DIRT {
             x = 9;
@@ -2529,8 +2910,13 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if east.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(3, 5);
+                    y = 13;
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else {
                 x = 9;
@@ -2538,6 +2924,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if !north_exists && !south_exists && !east_exists && west_exists  {
         if block.block_type == .DIRT {
             x = 12;
@@ -2545,8 +2932,13 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
         else {
             if west.block_type == .DIRT {
-                x = cast(int) random_get_within_range(9, 11);
-                y = 3;
+                if block.block_type == .GRASS {
+                    x = cast(int) random_get_within_range(0, 2);
+                    y = 13;
+                } else {
+                    x = cast(int) random_get_within_range(9, 11);
+                    y = 3;
+                }
             }
             else {
                 x = 12;
@@ -2554,6 +2946,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             }
         }
     }
+    // grass good
     else if !north_exists && !south_exists && !east_exists && !west_exists {
         x = cast(int) random_get_within_range(9, 11);
         y = 3;
