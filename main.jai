@@ -216,12 +216,8 @@ WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
 DEBUG_CAM_SPEED :: 5;
 
-global_id_counter: u32 = 0;
-
 Entity :: struct {
     type : Type;
-
-    id : u32;
 
     pos : Vector2;
     vel : Vector2;
@@ -421,12 +417,9 @@ main :: () {
                 xx BLOCK_WORLD_HEIGHT,
             };
 
-            // @TODO: post increment macro or something?
-            defer global_id_counter += 1;
             // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
             new_block := New(Block);
             new_block.type          = Block;
-            // new_block.id            = global_id_counter;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -443,6 +436,18 @@ main :: () {
             new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+
+            // Generate wall behind block
+            {
+                wall_type := WallType.DIRT;
+
+                rect := Rectangle.{
+                    xx x,
+                    xx y,
+                    xx BLOCK_WORLD_WIDTH,
+                    xx BLOCK_WORLD_HEIGHT,
+                };
+            }
 
             y -= BLOCK_WORLD_HEIGHT;
         }
@@ -472,7 +477,6 @@ main :: () {
             defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
-            // new_block.id            = global_id_counter;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -512,11 +516,8 @@ main :: () {
                 xx BLOCK_WORLD_HEIGHT,
             };
 
-            // @TODO: post incrememnt macro or something?
-            defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
-            // new_block.id            = global_id_counter;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
             new_block.bounding_rect = rect;
             new_block.sprite_rect   = rect;
@@ -829,14 +830,11 @@ main :: () {
                             
                             // Place block down
                             if can_place_block {
-                                defer global_id_counter += 1;
-
                                 new_pos := get_rect_center(new_rect);
                                 new_block_type := item_type_to_block_type(selected_item_stack.item_type);
 
                                 new_block := New(Block);
                                 new_block.type          = Block;
-                                new_block.id            = global_id_counter;
                                 new_block.pos           = new_pos;
                                 new_block.bounding_rect = new_rect;
                                 new_block.sprite_rect   = new_rect;
@@ -1664,10 +1662,8 @@ animation_get_total_duration_ms :: (animation: AnimatedSprite) -> u32 {
 spawn_player :: () -> Player {
     pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
 
-    global_id_counter += 1;
     player := Player.{
         type = Player,
-        id   = global_id_counter,
 
         pos  = pos,
         vel  = Vector2.{ 0, 0 },
