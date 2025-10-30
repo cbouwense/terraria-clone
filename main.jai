@@ -139,10 +139,13 @@ HOTBAR_SLOTS         :: 8;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
-BLOCK_WORLD_WIDTH  :: 18 * SCALE;
-BLOCK_WORLD_HEIGHT :: 18 * SCALE;
+BLOCK_WORLD_WIDTH  :: 16 * SCALE;
+BLOCK_WORLD_HEIGHT :: 16 * SCALE;
 BLOCK_HEALTH_MAX   :: 50;
 BLOCK_WEAKNESS_MULTIPLIER :: 6;
+
+WALL_WORLD_WIDTH  :: 32 * SCALE;
+WALL_WORLD_HEIGHT :: 32 * SCALE;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -216,23 +219,6 @@ WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
 DEBUG_CAM_SPEED :: 5;
 
-Entity :: struct {
-    type : Type;
-
-    pos : Vector2;
-    vel : Vector2;
-
-    is_facing_left : bool;
-
-    bounding_rect  : Rectangle; // Used for collision
-    sprite_rect    : Rectangle;
-
-    texture_map_source_pos : Vector2;
-
-    health_max     : float32;
-    health_curr    : float32;
-}
-
 Sprite :: struct {
     map         : Texture;
     active      : bool;
@@ -260,6 +246,8 @@ BlockType :: enum {
     GRASS;
     ROCK;
     COPPER_ORE;
+    WALL_DIRT;
+    WALL_ROCK;
 }
 
 ItemType :: enum {
@@ -282,6 +270,23 @@ EMPTY_ITEM_SLOT :: ItemStack.{ -1, -1, -1 };
 Inventory :: struct {
     item_stacks         : [INVENTORY_SLOTS] ItemStack;
     selected_item_stack : u32;
+}
+
+Entity :: struct {
+    type : Type;
+
+    pos : Vector2;
+    vel : Vector2;
+
+    is_facing_left : bool;
+
+    bounding_rect  : Rectangle; // Used for collision
+    sprite_rect    : Rectangle;
+
+    texture_map_source_pos : Vector2;
+
+    health_max     : float32;
+    health_curr    : float32;
 }
 
 Player :: struct {
@@ -438,15 +443,32 @@ main :: () {
             table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
 
             // Generate wall behind block
-            {
-                wall_type := WallType.DIRT;
+            #if false {
+                wall_type := BlockType.WALL_DIRT;
 
                 rect := Rectangle.{
                     xx x,
                     xx y,
-                    xx BLOCK_WORLD_WIDTH,
-                    xx BLOCK_WORLD_HEIGHT,
+                    xx WALL_WORLD_WIDTH,
+                    xx WALL_WORLD_HEIGHT,
                 };
+
+                new_wall := New(Block);
+                new_block.type          = Block;
+                new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_block.bounding_rect = rect;
+                new_block.sprite_rect   = rect;
+                new_block.health_max    = BLOCK_HEALTH_MAX;
+                new_block.health_curr   = BLOCK_HEALTH_MAX;
+                new_block.block_type    = block_type;
+                new_block.hardness      = get_block_hardness(block_type);
+                new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
+                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+                new_block.neighbor_north_count   = -1;
+                new_block.neighbor_south_count   = -1;
+                new_block.neighbor_east_count    = -1;
+                new_block.neighbor_west_count    = -1;
+                new_block.texture_map_source_pos = Vector2.{ -1, -1 };
             }
 
             y -= BLOCK_WORLD_HEIGHT;
@@ -473,8 +495,6 @@ main :: () {
                 xx BLOCK_WORLD_HEIGHT,
             };
 
-            // @TODO: post incrememnt macro or something?
-            defer global_id_counter += 1;
             new_block := New(Block);
             new_block.type          = Block;
             new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
