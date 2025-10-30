@@ -1,14 +1,13 @@
 # In progress
 
-- [juice] block type-aware relative tiling 
+- walls
 
 # Game
 
-- walls
 - crafting
 - [ui] inventory
 - [world_gen] trees
-- [world_gen] cave gen
+- [world_gen] dirt cave gen
 - [world_gen] flood fill ore gen
 - [world_gen] loading screen
 - [lighting] world day / night cycle
@@ -36,8 +35,6 @@
 
 # Bugs
 
-- player looks one pixel off the ground
-- rocks can have their pink border sampled
 - player can spawn inside ground
 - linux build doesn't work
 - player can fall into the ground, usually on corners

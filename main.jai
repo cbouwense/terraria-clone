@@ -146,8 +146,8 @@ BLOCK_WEAKNESS_MULTIPLIER :: 6;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
-DIRT_MAP_TILE_WIDTH  :: 18;
-DIRT_MAP_TILE_HEIGHT :: 18;
+DIRT_MAP_TILE_WIDTH  :: 18.0;
+DIRT_MAP_TILE_HEIGHT :: 18.0;
 DIRT_MAP_TILE_PADDING :: 2;
 DIRT_STACK_CAPACITY :: 64;
 DIRT_HARDNESS :: 0.5;
@@ -662,12 +662,12 @@ main :: () {
                 }
 
                 if scroll_as_zoom {
-                    camera.zoom += mouse_wheel_move * 0.1;
+                    camera.zoom += mouse_wheel_move * 0.2;
                 }
 
                 if camera.zoom > 3.0 camera.zoom = 3.0;
-                else if debug_mode && camera.zoom < 0.01 camera.zoom = 0.01;
-                else if !debug_mode && camera.zoom < 0.5 camera.zoom = 0.5;
+                else if debug_mode && camera.zoom < 0.02 camera.zoom = 0.02;
+                else if !debug_mode && camera.zoom < 0.4 camera.zoom = 0.4;
 
                 if debug_mode {
                     camera.offset = Vector2.{ GetScreenWidth() / 2.0, GetScreenHeight() / 2.0 };
@@ -676,6 +676,8 @@ main :: () {
                     update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
                     free_cam_pos = player.pos;
                 }
+
+                print_vars(camera);
             }
 
             derive_active_blocks(*active_blocks, camera);
@@ -1186,8 +1188,10 @@ draw_sprite :: (sprite: $T/Sprite, entity: Entity, texture_map_tile_width: u32, 
     frame        := animation_get_current_frame(sprite);
     source_width : float = ifx entity.is_facing_left then cast(float) texture_map_tile_width * -1 else cast(float) texture_map_tile_width;
     source_rect  := Rectangle.{xx (frame * texture_map_tile_width), 0.0, source_width, xx texture_map_tile_height};
+    // Without this +1 to its y pos, the player looks like he's floating off the ground by 1 pixel.
+    dest_rect    := Rectangle.{ entity.sprite_rect.x, entity.sprite_rect.y + 1, entity.sprite_rect.width, entity.sprite_rect.height }; 
 
-    DrawTexturePro(sprite.map, source_rect, entity.sprite_rect, Vector2.{ 0, 0 }, 0.0, sprite.color);
+    DrawTexturePro(sprite.map, source_rect, dest_rect, Vector2.{ 0, 0 }, 0.0, sprite.color);
 }
 
 init_textures :: () {
@@ -1201,7 +1205,7 @@ init_textures :: () {
     player_pants_map          = LoadTexture("data/Player_Pants_Release.png");
     player_hands_map          = LoadTexture("data/Player_Hands_Release.png");
     player_shoes_map          = LoadTexture("data/Player_Shoes_Release.png");
-    dirt_map                  = LoadTexture("data/Tiles_0.png");
+    dirt_map                  = LoadTexture("data/Tiles_0_debug.png");
     rock_map                  = LoadTexture("data/Tiles_1.png");
     grass_map                 = LoadTexture("data/Tiles_2.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
@@ -3023,9 +3027,13 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
     map_texture : Texture;
     map_source  : Rectangle;
 
-    source_x := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1 then get_texture_map_source_coords_for_block(block).x else block.texture_map_source_pos.x;
-    source_y := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1 then get_texture_map_source_coords_for_block(block).y else block.texture_map_source_pos.y;
-    
+    source_x := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1
+        then get_texture_map_source_coords_for_block(block).x
+        else block.texture_map_source_pos.x;
+    source_y := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1
+        then get_texture_map_source_coords_for_block(block).y
+        else block.texture_map_source_pos.y;
+
     if block.block_type == {
         case .DIRT;
             map_texture = dirt_map;
