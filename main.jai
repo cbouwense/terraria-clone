@@ -54,6 +54,7 @@ copper_ore_item_texture   : Texture;
 pickaxe_texture           : Texture;
 axe_texture               : Texture;
 sword_texture             : Texture;
+wall_dirt_map             : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -147,10 +148,18 @@ BLOCK_WEAKNESS_MULTIPLIER :: 6;
 WALL_WORLD_WIDTH  :: 32 * SCALE;
 WALL_WORLD_HEIGHT :: 32 * SCALE;
 
+WALL_DIRT_MAP_COLS :: 13;
+WALL_DIRT_MAP_ROWS :: 5;
+WALL_DIRT_MAP_TILE_WIDTH  :: 36;
+WALL_DIRT_MAP_TILE_HEIGHT :: 36;
+WALL_DIRT_MAP_TILE_PADDING :: 4;
+WALL_DIRT_STACK_CAPACITY :: 64;
+WALL_DIRT_HARDNESS :: 0.5;
+
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
-DIRT_MAP_TILE_WIDTH  :: 18.0;
-DIRT_MAP_TILE_HEIGHT :: 18.0;
+DIRT_MAP_TILE_WIDTH  :: 18;
+DIRT_MAP_TILE_HEIGHT :: 18;
 DIRT_MAP_TILE_PADDING :: 2;
 DIRT_STACK_CAPACITY :: 64;
 DIRT_HARDNESS :: 0.5;
@@ -257,6 +266,7 @@ ItemType :: enum {
     PICKAXE;
     AXE;
     SWORD;
+    HAMMER;
 }
 
 ItemStack :: struct {
@@ -348,7 +358,8 @@ vector2_to_string :: (v: Vector2) -> string {
 }
 
 data_folder: string; 
-global_block_pos_to_block: Table(string, *Block);
+global_block_pos_to_block : Table(string, *Block);
+global_wall_pos_to_wall   : Table(string, *Block);
 
 main :: () {
     //
@@ -358,6 +369,9 @@ main :: () {
 
     init(*global_block_pos_to_block);
     defer deinit(*global_block_pos_to_block);
+
+    init(*global_wall_pos_to_wall);
+    defer deinit(*global_wall_pos_to_wall);
 
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
@@ -410,50 +424,22 @@ main :: () {
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for row: 0..hill_dirt_blocks {
-            block_type := BlockType.DIRT;
-            if row == hill_dirt_blocks {
-                block_type = .GRASS;
-            }
-
-            rect := Rectangle.{
-                xx x,
-                xx y,
-                xx BLOCK_WORLD_WIDTH,
-                xx BLOCK_WORLD_HEIGHT,
-            };
-
-            // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
-            new_block := New(Block);
-            new_block.type          = Block;
-            new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
-            new_block.bounding_rect = rect;
-            new_block.sprite_rect   = rect;
-            new_block.health_max    = BLOCK_HEALTH_MAX;
-            new_block.health_curr   = BLOCK_HEALTH_MAX;
-            new_block.block_type    = block_type;
-            new_block.hardness      = get_block_hardness(block_type);
-            new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-            // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-            new_block.neighbor_north_count   = -1;
-            new_block.neighbor_south_count   = -1;
-            new_block.neighbor_east_count    = -1;
-            new_block.neighbor_west_count    = -1;
-            new_block.texture_map_source_pos = Vector2.{ -1, -1 };
-
-            table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-
-            // Generate wall behind block
-            #if false {
-                wall_type := BlockType.WALL_DIRT;
+            // Generate block
+            {
+                block_type := BlockType.DIRT;
+                if row == hill_dirt_blocks {
+                    block_type = .GRASS;
+                }
 
                 rect := Rectangle.{
                     xx x,
                     xx y,
-                    xx WALL_WORLD_WIDTH,
-                    xx WALL_WORLD_HEIGHT,
+                    xx BLOCK_WORLD_WIDTH,
+                    xx BLOCK_WORLD_HEIGHT,
                 };
 
-                new_wall := New(Block);
+                // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
+                new_block := New(Block);
                 new_block.type          = Block;
                 new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
                 new_block.bounding_rect = rect;
@@ -469,6 +455,39 @@ main :: () {
                 new_block.neighbor_east_count    = -1;
                 new_block.neighbor_west_count    = -1;
                 new_block.texture_map_source_pos = Vector2.{ -1, -1 };
+
+                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+            }
+
+            // Generate wall behind block
+            {
+                wall_type := BlockType.WALL_DIRT;
+
+                rect := Rectangle.{
+                    xx (x + WALL_WORLD_WIDTH  / 2),
+                    xx (y + WALL_WORLD_HEIGHT / 2),
+                    xx WALL_WORLD_WIDTH,
+                    xx WALL_WORLD_HEIGHT,
+                };
+
+                new_wall := New(Block);
+                new_wall.type          = Block;
+                new_wall.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_wall.bounding_rect = rect;
+                new_wall.sprite_rect   = rect;
+                new_wall.health_max    = BLOCK_HEALTH_MAX;
+                new_wall.health_curr   = BLOCK_HEALTH_MAX;
+                new_wall.block_type    = wall_type;
+                new_wall.hardness      = get_block_hardness(wall_type);
+                new_wall.weak_to_tool  = get_block_weak_to_tool(wall_type);
+                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+                new_wall.neighbor_north_count   = -1;
+                new_wall.neighbor_south_count   = -1;
+                new_wall.neighbor_east_count    = -1;
+                new_wall.neighbor_west_count    = -1;
+                new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
+
+                table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
             }
 
             y -= BLOCK_WORLD_HEIGHT;
@@ -616,7 +635,10 @@ main :: () {
     active_blocks: [..]*Block;
     active_blocks.allocator = temp;
 
-    derive_active_blocks(*active_blocks, camera);
+    active_walls: [..]*Block;
+    active_walls.allocator = temp;
+
+    derive_active_blocks(*active_blocks, *active_walls, camera);
 
     while !WindowShouldClose() {
         defer reset_temporary_storage();
@@ -701,7 +723,7 @@ main :: () {
                 print_vars(camera);
             }
 
-            derive_active_blocks(*active_blocks, camera);
+            derive_active_blocks(*active_blocks, *active_walls, camera);
 
             // Update player
             {
@@ -792,7 +814,8 @@ main :: () {
 
                                         update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
 
-                                        // @TODO: free its memory, probably, right?
+                                        // @TODO: does this work?
+                                        // free(block_mouse_is_over);
                                     }
                                 }
                             }
@@ -1009,8 +1032,31 @@ main :: () {
                 BeginMode2D(camera);
                 defer EndMode2D();
 
-                // Draw blocks
+                // Draw walls
                 {
+                    for active_walls {
+                        wall_map_texture := wall_dirt_map;
+                        wall_map_source  := Rectangle.{
+                            0, 0,
+                            WALL_DIRT_MAP_TILE_WIDTH  - WALL_DIRT_MAP_TILE_PADDING,
+                            WALL_DIRT_MAP_TILE_HEIGHT - WALL_DIRT_MAP_TILE_PADDING,
+                        };
+                        color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
+
+                        // Draw block texture
+                        DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
+
+                        // Damage block overlay (cracks)
+                        // if it.health_curr < it.health_max {
+                        //     frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
+                        //     damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
+                        //     DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        // }
+                    }
+                }
+
+                // Draw blocks
+                #if false {
                     for active_blocks {
                         block_map_texture, block_map_source := get_texture_map_for_block(it);
                         color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
@@ -1234,6 +1280,7 @@ init_textures :: () {
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
     axe_texture               = LoadTexture("data/Axe.png");
     sword_texture             = LoadTexture("data/Sword.png");
+    wall_dirt_map             = LoadTexture("data/Wall_2.png");
 }
 
 init_sprites :: () {
@@ -1899,6 +1946,7 @@ get_block_hardness :: (block_type: BlockType) -> float {
         case .GRASS;      return GRASS_HARDNESS;
         case .ROCK;       return ROCK_HARDNESS;
         case .COPPER_ORE; return COPPER_ORE_HARDNESS;
+        case .WALL_DIRT;  return WALL_DIRT_HARDNESS;
 
         case;
             print_vars(block_type);
@@ -1923,11 +1971,12 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
     }
 }
 
-derive_active_blocks :: (active_blocks: *[..] *Block, camera: Camera2D) {
+derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
     window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
     window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
 
     array_reset(active_blocks);
+    array_reset(active_walls);
     
     for block: global_block_pos_to_block {
         if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
@@ -1937,6 +1986,16 @@ derive_active_blocks :: (active_blocks: *[..] *Block, camera: Camera2D) {
         if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
         array_add(active_blocks, block);
+    }
+
+    for wall: global_wall_pos_to_wall {
+        if wall.pos.x + WALL_WORLD_WIDTH < window_start.x continue;
+        if wall.pos.x - WALL_WORLD_WIDTH > window_end.x continue;
+        
+        if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
+        if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
+
+        array_add(active_walls, wall);
     }
 }
 
@@ -3179,25 +3238,13 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
     } 
 }
 
-get_block_world_length :: (block_type: BlockType) -> float {
-    if block_type == {
-        // Blocks
-        case .DIRT;       return WIELDED_BLOCK_WORLD_LENGTH;
-        case .GRASS;      return WIELDED_BLOCK_WORLD_LENGTH;
-        case .ROCK;       return WIELDED_BLOCK_WORLD_LENGTH;
-        case .COPPER_ORE; return WIELDED_BLOCK_WORLD_LENGTH;
-        case;
-            assert(false, "Forgot a block type in your switch statement");
-            return -1; // Unreachable
-    }
-};
-
 get_item_world_length :: (item_type: ItemType) -> float {
     if item_type == {
         // Blocks
         case .DIRT_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
         case .ROCK_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
         case .COPPER_ORE_ITEM; return WIELDED_BLOCK_WORLD_LENGTH;
+        // case .WALL_DIRT;       return WIELDED_BLOCK_WORLD_LENGTH;
 
         // Items
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
@@ -3216,6 +3263,8 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
         case .GRASS;      return .PICKAXE;
         case .ROCK;       return .PICKAXE;
         case .COPPER_ORE; return .PICKAXE;
+        
+        case .WALL_DIRT;  return .HAMMER;
 
         case;
             assert(false, "Forgot a block type in your switch statement");
