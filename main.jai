@@ -459,7 +459,7 @@ main :: () {
             }
 
             // Generate wall behind block
-            {
+            #if false {
                 wall_type := BlockType.WALL_DIRT;
 
                 rect := Rectangle.{
@@ -956,7 +956,7 @@ main :: () {
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
                             can_place_block := debug_mode || (is_position_placeable && is_within_reach);
-                            
+                            print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, );
                             // Place block down
                             if can_place_block {
                                 new_pos := get_rect_center(new_rect);
@@ -1133,6 +1133,37 @@ main :: () {
                         //     damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
                         //     DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
                         // }
+
+                        // Mouse wall overlay (hover)
+                        // show_wall_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
+                        // if show_wall_hover {
+                        //     if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                        //         DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                        //     }
+                        // }
+                    }
+
+                    for active_walls {
+                        // wall_map_texture, wall_map_source := get_texture_map_for_block(it);
+                        // color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
+
+                        // Draw wall texture
+                        // DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
+
+                        // Damage block overlay (cracks)
+                        // if it.health_curr < it.health_max {
+                        //     frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
+                        //     damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
+                        //     DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        // }
+
+                        // Mouse wall overlay (hover)
+                        show_wall_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
+                        if show_wall_hover {
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                            }
+                        }
                     }
                 }
 
@@ -1146,7 +1177,7 @@ main :: () {
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
 
                         // Damage block overlay (cracks)
-                        if it.health_curr < it.health_max {
+                    if it.health_curr < it.health_max {
                             frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
                             damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
                             DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
@@ -2075,6 +2106,10 @@ derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block
         
         if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
         if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
+
+        // north_west_pos := Vector2.{ wall.pos.x };
+
+        // north_west_cover_exists, north_west_cover := table_find_new(*global_block_pos_to_block, vector2_to_string());
 
         array_add(active_walls, wall);
     }
