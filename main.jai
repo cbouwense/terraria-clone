@@ -406,7 +406,6 @@ main :: () {
 
     cave_spaghetti_noise_sorted := array_copy(cave_spaghetti_noise);
     quick_sort(cave_spaghetti_noise_sorted, (x, y) => x - y);
-    print_vars(cave_spaghetti_noise_sorted);
 
     cave_spaghetti_cutoff_max_index := cave_spaghetti_noise.count * 70 / 100 - 1;
     cave_spaghetti_cutoff_min_index := cave_spaghetti_noise.count * 30 / 100;
@@ -464,8 +463,8 @@ main :: () {
                 wall_type := BlockType.WALL_DIRT;
 
                 rect := Rectangle.{
-                    xx (x + WALL_WORLD_WIDTH  / 2),
-                    xx (y + WALL_WORLD_HEIGHT / 2),
+                    xx (x + WALL_WORLD_WIDTH  / 4),
+                    xx (y + WALL_WORLD_HEIGHT / 4),
                     xx WALL_WORLD_WIDTH,
                     xx WALL_WORLD_HEIGHT,
                 };
@@ -600,6 +599,28 @@ main :: () {
         }
     }
 
+    for wall: global_wall_pos_to_wall {
+        // Define initial shadows for walls
+        #if false {
+            // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
+            wall.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(wall, .NORTH);
+            wall.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(wall, .SOUTH);
+            wall.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(wall, .EAST);
+            wall.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(wall, .WEST);
+
+            min_neighbor_count := min(
+                min(wall.neighbor_north_count, wall.neighbor_south_count),
+                min(wall.neighbor_east_count,  wall.neighbor_west_count)
+            );
+            wall.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+        }
+
+        // Initialize texture source pos
+        {
+            wall.texture_map_source_pos = get_texture_map_source_coords_for_block(wall);
+        }
+    }
+
     // Initialize camera
     camera: Camera2D;
     camera.target   = player.pos;
@@ -719,8 +740,6 @@ main :: () {
                     update_camera_center(*camera, *player, GetScreenWidth(), GetScreenHeight());
                     free_cam_pos = player.pos;
                 }
-
-                print_vars(camera);
             }
 
             derive_active_blocks(*active_blocks, *active_walls, camera);
@@ -1035,15 +1054,10 @@ main :: () {
                 // Draw walls
                 {
                     for active_walls {
-                        wall_map_texture := wall_dirt_map;
-                        wall_map_source  := Rectangle.{
-                            0, 0,
-                            WALL_DIRT_MAP_TILE_WIDTH  - WALL_DIRT_MAP_TILE_PADDING,
-                            WALL_DIRT_MAP_TILE_HEIGHT - WALL_DIRT_MAP_TILE_PADDING,
-                        };
+                        wall_map_texture, wall_map_source := get_texture_map_for_block(it);
                         color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
 
-                        // Draw block texture
+                        // Draw wall texture
                         DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
 
                         // Damage block overlay (cracks)
@@ -1056,7 +1070,7 @@ main :: () {
                 }
 
                 // Draw blocks
-                #if false {
+                {
                     for active_blocks {
                         block_map_texture, block_map_source := get_texture_map_for_block(it);
                         color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
@@ -2040,17 +2054,44 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
     }
 }
 
+get_is_wall :: (block_type: BlockType) -> bool {
+    if block_type == {
+        case .DIRT;       return false;
+        case .GRASS;      return false;
+        case .ROCK;       return false;
+        case .COPPER_ORE; return false;
+
+        case .WALL_DIRT;  return true;
+    
+        case;
+            print_vars(block_type);
+            assert(false, "Invalid block type");
+            return false; // Unreachable
+    }
+}
+
 get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
-    north_exists, north := get_neighbor(block, .NORTH);
-    south_exists, south := get_neighbor(block, .SOUTH);
-    east_exists,  east  := get_neighbor(block, .EAST);
-    west_exists,  west  := get_neighbor(block, .WEST);
+    is_wall := get_is_wall(block.block_type);
+
+    north_exists, south_exists, east_exists, west_exists : bool;
+    north, south, east, west : *Block;
+    if is_wall {
+        north_exists, north = get_neighbor_wall(block, .NORTH);
+        south_exists, south = get_neighbor_wall(block, .SOUTH);
+        east_exists,  east  = get_neighbor_wall(block, .EAST);
+        west_exists,  west  = get_neighbor_wall(block, .WEST);
+    } else {
+        north_exists, north = get_neighbor(block, .NORTH);
+        south_exists, south = get_neighbor(block, .SOUTH);
+        east_exists,  east  = get_neighbor(block, .EAST);
+        west_exists,  west  = get_neighbor(block, .WEST);
+    }
     
     x := -1;
     y := -1;
 
     if north_exists && south_exists && east_exists && west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = cast(int) random_get_within_range(1, 3);
             y = 1;
         }
@@ -2205,7 +2246,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && south_exists && east_exists && !west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = 0;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -2291,7 +2332,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && south_exists && !east_exists && west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = 4;
             y = cast(int) random_get_within_range(0, 2);
         } else {
@@ -2381,7 +2422,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && south_exists && !east_exists && !west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = 5;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -2405,7 +2446,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && east_exists && west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = cast(int) random_get_within_range(1, 3);
             y = 2;
         }
@@ -2495,7 +2536,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && east_exists && !west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 4;
@@ -2599,7 +2640,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && !east_exists && west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 4;
@@ -2703,7 +2744,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && !east_exists && !west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = cast(int) random_get_within_range(6, 8);
             y = 3;
         }
@@ -2718,7 +2759,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && east_exists && west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = cast(int) random_get_within_range(1, 3);
             y = 0;
         }
@@ -2799,7 +2840,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && east_exists && !west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 3;
@@ -2888,7 +2929,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && !east_exists && west_exists {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 3;
@@ -2982,7 +3023,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && !east_exists && !west_exists  {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = cast(int) random_get_within_range(6, 8);
             y = 0;
         }
@@ -3003,7 +3044,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && !south_exists && east_exists && west_exists   {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = cast(int) random_get_within_range(6, 8);
             y = 4;
         }
@@ -3042,7 +3083,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && !south_exists && east_exists && !west_exists  {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
             x = 9;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -3092,10 +3133,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         assert(false, "You forgot some combination of north south east west");
     }
 
-    return Vector2.{
-        cast(float) (x * GRASS_MAP_TILE_WIDTH),
-        cast(float) (y * GRASS_MAP_TILE_HEIGHT),
-    };
+    width  := ifx is_wall then WALL_DIRT_MAP_TILE_WIDTH else GRASS_MAP_TILE_WIDTH;
+    height := ifx is_wall then WALL_DIRT_MAP_TILE_HEIGHT else GRASS_MAP_TILE_HEIGHT;
+
+    return Vector2.{ cast(float) (x * width), cast(float) (y * height) };
 }
 
 get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectangle {
@@ -3140,6 +3181,14 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
                 source_x, source_y,
                 COPPER_ORE_MAP_TILE_WIDTH  - COPPER_ORE_MAP_TILE_PADDING,
                 COPPER_ORE_MAP_TILE_HEIGHT - COPPER_ORE_MAP_TILE_PADDING,
+            };
+
+        case .WALL_DIRT;
+            map_texture = wall_dirt_map;
+            map_source  = Rectangle.{
+                source_x, source_y,
+                WALL_DIRT_MAP_TILE_WIDTH  - WALL_DIRT_MAP_TILE_PADDING,
+                WALL_DIRT_MAP_TILE_HEIGHT - WALL_DIRT_MAP_TILE_PADDING,
             };
 
         case;
@@ -3343,6 +3392,20 @@ get_neighbor :: (block: Block, direction: Direction) -> neighbor_exists: bool, n
         case;        assert(false, "Invalid direction");
     }
     neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+    return neighbor_exists, neighbor;
+}
+
+get_neighbor_wall :: (wall: Block, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
+    potential_neighbor_pos: Vector2;
+    if direction == {
+        case .NORTH; potential_neighbor_pos = Vector2.{ wall.pos.x, wall.pos.y - WALL_WORLD_HEIGHT };
+        case .SOUTH; potential_neighbor_pos = Vector2.{ wall.pos.x, wall.pos.y + WALL_WORLD_HEIGHT };
+        case .EAST;  potential_neighbor_pos = Vector2.{ wall.pos.x + WALL_WORLD_WIDTH, wall.pos.y };
+        case .WEST;  potential_neighbor_pos = Vector2.{ wall.pos.x - WALL_WORLD_WIDTH, wall.pos.y };
+        case;        assert(false, "Invalid direction");
+    }
+    neighbor_exists, neighbor := table_find_new(*global_wall_pos_to_wall, vector2_to_string(potential_neighbor_pos));
+    // print_vars(neighbor_exists, neighbor);
     return neighbor_exists, neighbor;
 }
 
