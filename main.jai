@@ -3154,7 +3154,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                     y = 14;
                 } else {
                     x = 12;
-                    cast(int) random_get_within_range(0, 2);
+                    y = cast(int) random_get_within_range(0, 2);
                 }
             }
             else if east.block_type != .DIRT && west.block_type == .DIRT {
@@ -3163,7 +3163,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                     y = 14;
                 } else {
                     x = 9;
-                    cast(int) random_get_within_range(0, 2);
+                    y = cast(int) random_get_within_range(0, 2);
                 }
             }
             else if east.block_type != .DIRT && west.block_type != .DIRT {

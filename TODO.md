@@ -1,6 +1,6 @@
 # In progress
 
-- rock tile with dirt left, rock right, no up or down is invisible
+
 
 # Game
 
