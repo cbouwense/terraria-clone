@@ -1,9 +1,10 @@
 # In progress
 
-- walls
+- rock tile with dirt left, rock right, no up or down is invisible
 
 # Game
 
+- walls
 - crafting
 - [ui] inventory
 - [world_gen] trees

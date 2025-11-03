@@ -393,14 +393,14 @@ main :: () {
     DIRT_PERLIN_NOISE_MIN_VALUE :: 10;
     dirt_heights := perlin_noise_1d(WORLD_GRID_COLS, DIRT_PERLIN_NOISE_FREQUENCY, DIRT_PERLIN_NOISE_AMPLITUDE, DIRT_PERLIN_NOISE_OCTAVES, DIRT_PERLIN_NOISE_MIN_VALUE);
 
-    ROCK_PERLIN_NOISE_FREQUENCY :: 2;//; // How many grid nodes per map
+    ROCK_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     ROCK_PERLIN_NOISE_AMPLITUDE :: 100;
     ROCK_PERLIN_NOISE_OCTAVES   :: 2;
     ROCK_PERLIN_NOISE_MIN_VALUE :: 0;
     rock_depths := perlin_noise_1d(WORLD_GRID_COLS, ROCK_PERLIN_NOISE_FREQUENCY, ROCK_PERLIN_NOISE_AMPLITUDE, ROCK_PERLIN_NOISE_OCTAVES, ROCK_PERLIN_NOISE_MIN_VALUE);
 
     CAVE_SPAGHETTI_PERLIN_NOISE_FREQUENCY :: 25; // How many rows / columns
-    CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE :: 1; // Amplitude should probably have no effect on ore gen? I guess?
+    CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE :: 1;  // Amplitude should probably have no effect on ore gen? I guess?
     CAVE_SPAGHETTI_PERLIN_NOISE_OCTAVES   :: 1;
     cave_spaghetti_noise := perlin_noise_2d(WORLD_GRID_COLS, CAVE_SPAGHETTI_PERLIN_NOISE_FREQUENCY, CAVE_SPAGHETTI_PERLIN_NOISE_AMPLITUDE, CAVE_SPAGHETTI_PERLIN_NOISE_OCTAVES);
 
@@ -412,7 +412,7 @@ main :: () {
     cave_spaghetti_cutoff_max       := cave_spaghetti_noise_sorted[cave_spaghetti_cutoff_max_index];
     cave_spaghetti_cutoff_min       := cave_spaghetti_noise_sorted[cave_spaghetti_cutoff_min_index];
 
-    initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0) + 8.0;
+    initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0);// + 8.0;
 
     // Initialize blocks
     x := cast(int) initial_x;
@@ -440,7 +440,7 @@ main :: () {
                 // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
                 new_block := New(Block);
                 new_block.type          = Block;
-                new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_block.pos           = get_rect_center(rect);
                 new_block.bounding_rect = rect;
                 new_block.sprite_rect   = rect;
                 new_block.health_max    = BLOCK_HEALTH_MAX;
@@ -471,7 +471,7 @@ main :: () {
 
                 new_wall := New(Block);
                 new_wall.type          = Block;
-                new_wall.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_wall.pos           = get_rect_center(rect);
                 new_wall.bounding_rect = rect;
                 new_wall.sprite_rect   = rect;
                 new_wall.health_max    = BLOCK_HEALTH_MAX;
@@ -512,7 +512,7 @@ main :: () {
 
                 new_wall := New(Block);
                 new_wall.type          = Block;
-                new_wall.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_wall.pos           = get_rect_center(rect);
                 new_wall.bounding_rect = rect;
                 new_wall.sprite_rect   = rect;
                 new_wall.health_max    = BLOCK_HEALTH_MAX;
@@ -548,7 +548,7 @@ main :: () {
 
                 new_block := New(Block);
                 new_block.type          = Block;
-                new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_block.pos           = get_rect_center(rect);
                 new_block.bounding_rect = rect;
                 new_block.sprite_rect   = rect;
                 new_block.health_max    = BLOCK_HEALTH_MAX;
@@ -586,7 +586,7 @@ main :: () {
 
                 new_wall := New(Block);
                 new_wall.type          = Block;
-                new_wall.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_wall.pos           = get_rect_center(rect);
                 new_wall.bounding_rect = rect;
                 new_wall.sprite_rect   = rect;
                 new_wall.health_max    = BLOCK_HEALTH_MAX;
@@ -622,7 +622,7 @@ main :: () {
 
                 new_block := New(Block);
                 new_block.type          = Block;
-                new_block.pos           = Vector2.{ rect.x + rect.width / 2.0, rect.y + rect.height / 2.0 };
+                new_block.pos           = get_rect_center(rect);
                 new_block.bounding_rect = rect;
                 new_block.sprite_rect   = rect;
                 new_block.health_max    = BLOCK_HEALTH_MAX;
@@ -901,7 +901,7 @@ main :: () {
                                         update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
 
                                         // @TODO: does this work?
-                                        // free(block_mouse_is_over);
+                                        free(block_mouse_is_over);
                                     }
                                 }
                             }
@@ -924,7 +924,7 @@ main :: () {
 
                         if has_an_item_selected && selected_item_stack.stack_count > 0 && item_can_be_placed_down {
                             new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT);
-                            new_pos := get_rect_center(new_rect);
+                            new_pos  := get_rect_center(new_rect);
                             
                             // Check if the new block would be placed on the player
                             would_be_on_player := CheckCollisionRecs(new_rect, player.bounding_rect);
@@ -932,21 +932,10 @@ main :: () {
                             // Check if the new block would be placed on an existing block
                             block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(new_pos));
 
-                            // Check for a neighbor above
-                            north_pos := Vector2.{ new_pos.x, new_pos.y - BLOCK_WORLD_HEIGHT };
-                            neighbor_exists_north, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(north_pos));
-
-                            // Check for a neighbor below
-                            south_pos := Vector2.{ new_pos.x, new_pos.y + BLOCK_WORLD_HEIGHT };
-                            neighbor_exists_south, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(south_pos));
-
-                            // Check for a neighbor right
-                            east_pos := Vector2.{ new_pos.x + BLOCK_WORLD_WIDTH, new_pos.y };
-                            neighbor_exists_east, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(east_pos));
-
-                            // Check for a neighbor left
-                            west_pos := Vector2.{ new_pos.x - BLOCK_WORLD_WIDTH, new_pos.y };
-                            neighbor_exists_west, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(west_pos));
+                            neighbor_exists_north, _ := get_neighbor(new_pos, .NORTH);
+                            neighbor_exists_south, _ := get_neighbor(new_pos, .SOUTH);
+                            neighbor_exists_east,  _ := get_neighbor(new_pos, .EAST);
+                            neighbor_exists_west,  _ := get_neighbor(new_pos, .WEST);
 
                             is_position_placeable :=
                                 !would_be_on_player &&
@@ -956,10 +945,9 @@ main :: () {
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
                             can_place_block := debug_mode || (is_position_placeable && is_within_reach);
-                            print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, );
+                            print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, new_pos, new_rect);
                             // Place block down
                             if can_place_block {
-                                new_pos := get_rect_center(new_rect);
                                 new_block_type := item_type_to_block_type(selected_item_stack.item_type);
 
                                 new_block := New(Block);
@@ -2183,10 +2171,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         east_exists,  east  = get_neighbor_wall(block, .EAST);
         west_exists,  west  = get_neighbor_wall(block, .WEST);
     } else {
-        north_exists, north = get_neighbor(block, .NORTH);
-        south_exists, south = get_neighbor(block, .SOUTH);
-        east_exists,  east  = get_neighbor(block, .EAST);
-        west_exists,  west  = get_neighbor(block, .WEST);
+        north_exists, north = get_neighbor(block.pos, .NORTH);
+        south_exists, south = get_neighbor(block.pos, .SOUTH);
+        east_exists,  east  = get_neighbor(block.pos, .EAST);
+        west_exists,  west  = get_neighbor(block.pos, .WEST);
     }
     
     x := -1;
@@ -3484,16 +3472,17 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
 }
 
-get_neighbor :: (block: Block, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
+get_neighbor :: (block_pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
     potential_neighbor_pos: Vector2;
     if direction == {
-        case .NORTH; potential_neighbor_pos = Vector2.{ block.pos.x, block.pos.y - BLOCK_WORLD_HEIGHT };
-        case .SOUTH; potential_neighbor_pos = Vector2.{ block.pos.x, block.pos.y + BLOCK_WORLD_HEIGHT };
-        case .EAST;  potential_neighbor_pos = Vector2.{ block.pos.x + BLOCK_WORLD_WIDTH, block.pos.y };
-        case .WEST;  potential_neighbor_pos = Vector2.{ block.pos.x - BLOCK_WORLD_WIDTH, block.pos.y };
+        case .NORTH; potential_neighbor_pos = Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
+        case .SOUTH; potential_neighbor_pos = Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
+        case .EAST;  potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
+        case .WEST;  potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
         case;        assert(false, "Invalid direction");
     }
     neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+    // print_vars(block_pos, direction, potential_neighbor_pos, neighbor_exists, neighbor);
     return neighbor_exists, neighbor;
 }
 
@@ -3512,7 +3501,7 @@ get_neighbor_wall :: (wall: Block, direction: Direction) -> neighbor_exists: boo
 }
 
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
-    neighbor_exists, neighbor := get_neighbor(block.*, direction);
+    neighbor_exists, neighbor := get_neighbor(block.pos, direction);
 
     if direction == {
         case .NORTH;
