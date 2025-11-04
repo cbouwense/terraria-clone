@@ -55,6 +55,7 @@ pickaxe_texture           : Texture;
 axe_texture               : Texture;
 sword_texture             : Texture;
 wall_dirt_map             : Texture;
+wall_rock_map             : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -155,6 +156,14 @@ WALL_DIRT_MAP_TILE_HEIGHT :: 36;
 WALL_DIRT_MAP_TILE_PADDING :: 4;
 WALL_DIRT_STACK_CAPACITY :: 64;
 WALL_DIRT_HARDNESS :: 0.5;
+
+WALL_ROCK_MAP_COLS :: 13;
+WALL_ROCK_MAP_ROWS :: 5;
+WALL_ROCK_MAP_TILE_WIDTH  :: 36;
+WALL_ROCK_MAP_TILE_HEIGHT :: 36;
+WALL_ROCK_MAP_TILE_PADDING :: 4;
+WALL_ROCK_STACK_CAPACITY :: 64;
+WALL_ROCK_HARDNESS :: 3.0;
 
 DIRT_MAP_COLS :: 16;
 DIRT_MAP_ROWS :: 15;
@@ -368,9 +377,13 @@ vector2_to_string :: (v: Vector2) -> string {
 data_folder: string; 
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
-blocks_grass: [..] *Block;
-blocks_dirt:  [..] *Block;
-blocks_rock:  [..] *Block;
+
+blocks_grass : [..] *Block;
+blocks_dirt  : [..] *Block;
+blocks_rock  : [..] *Block;
+
+walls_dirt :  [..] *Block;
+walls_rock :  [..] *Block;
 
 main :: () {
     //
@@ -500,6 +513,7 @@ main :: () {
                 new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
 
                 table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
+                array_add(*walls_dirt, new_wall);
             }
 
             y -= BLOCK_WORLD_HEIGHT;
@@ -541,6 +555,7 @@ main :: () {
                 new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
 
                 table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
+                array_add(*walls_rock, new_wall);
             }
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
@@ -589,7 +604,7 @@ main :: () {
             
             // Generate wall behind block
             {
-                wall_type := BlockType.WALL_DIRT;
+                wall_type := BlockType.WALL_ROCK;
 
                 rect := Rectangle.{
                     xx (x + WALL_WORLD_WIDTH  / 4),
@@ -616,6 +631,7 @@ main :: () {
                 new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
 
                 table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
+                array_add(*walls_rock, new_wall);
             }
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
@@ -882,7 +898,7 @@ main :: () {
                         block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
                         if block_mouse_is_over != null {
                             block_type := block_mouse_is_over.block_type;
-                            
+
                             table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
 
                             if block_type == {
@@ -1161,6 +1177,13 @@ main :: () {
 
                         // Draw wall texture
                         DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
+
+                        // Damage block overlay (cracks)
+                        if it.health_curr < it.health_max {
+                            frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
+                            damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
+                            DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        }
                     }
                 }
 
@@ -1190,9 +1213,6 @@ main :: () {
                     }
 
                     if debug_mode {
-                        // for global_block_pos_to_block {
-                        //     DrawRectangleLinesEx(it.bounding_rect, 1.0, LIME);
-                        // }
                         DrawLineEx(Vector2.{-WORLD_GRID_COLS * BLOCK_WORLD_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * BLOCK_WORLD_HEIGHT / 2.0, 0.0 }, 2.0, RED);
                     }
                 }
@@ -1392,6 +1412,7 @@ init_textures :: () {
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
     axe_texture               = LoadTexture("data/Axe.png");
     sword_texture             = LoadTexture("data/Sword.png");
+    wall_rock_map             = LoadTexture("data/Wall_1.png");
     wall_dirt_map             = LoadTexture("data/Wall_2.png");
 }
 
@@ -2058,7 +2079,9 @@ get_block_hardness :: (block_type: BlockType) -> float {
         case .GRASS;      return GRASS_HARDNESS;
         case .ROCK;       return ROCK_HARDNESS;
         case .COPPER_ORE; return COPPER_ORE_HARDNESS;
+
         case .WALL_DIRT;  return WALL_DIRT_HARDNESS;
+        case .WALL_ROCK;  return WALL_ROCK_HARDNESS;
 
         case;
             print_vars(block_type);
@@ -2090,45 +2113,61 @@ derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block
     array_reset(active_blocks);
     array_reset(active_walls);
     
-    for block: blocks_dirt {
-        if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
-        if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
-        
-        if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
-        if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+    // Derive active blocks
+    {
+        for block: blocks_dirt {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
-        array_add(active_blocks, block);
+            array_add(active_blocks, block);
+        }
+
+        for block: blocks_grass {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+            array_add(active_blocks, block);
+        }
+
+        for block: blocks_rock {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+            array_add(active_blocks, block);
+        }
     }
 
-    for block: blocks_grass {
-        if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
-        if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
-        
-        if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
-        if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+    // Derive active walls
+    {
+        for wall: walls_dirt {
+            if wall.pos.x + WALL_WORLD_WIDTH < window_start.x continue;
+            if wall.pos.x - WALL_WORLD_WIDTH > window_end.x continue;
+            
+            if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
+            if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
+            
+            array_add(active_walls, wall);
+        }
 
-        array_add(active_blocks, block);
+        for wall: walls_rock {
+            if wall.pos.x + WALL_WORLD_WIDTH < window_start.x continue;
+            if wall.pos.x - WALL_WORLD_WIDTH > window_end.x continue;
+            
+            if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
+            if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
+            
+            array_add(active_walls, wall);
+        }
     }
-
-    for block: blocks_rock {
-        if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
-        if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
-        
-        if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
-        if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
-
-        array_add(active_blocks, block);
-    }
-
-    // for wall: global_wall_pos_to_wall {
-    //     if wall.pos.x + WALL_WORLD_WIDTH < window_start.x continue;
-    //     if wall.pos.x - WALL_WORLD_WIDTH > window_end.x continue;
-        
-    //     if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
-    //     if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
-        
-    //     array_add(active_walls, wall);
-    // }
 }
 
 _derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
@@ -2210,6 +2249,7 @@ get_is_wall :: (block_type: BlockType) -> bool {
         case .COPPER_ORE; return false;
 
         case .WALL_DIRT;  return true;
+        case .WALL_ROCK;  return true;
     
         case;
             print_vars(block_type);
@@ -3339,6 +3379,14 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
                 WALL_DIRT_MAP_TILE_HEIGHT - WALL_DIRT_MAP_TILE_PADDING,
             };
 
+        case .WALL_ROCK;
+            map_texture = wall_rock_map;
+            map_source  = Rectangle.{
+                source_x, source_y,
+                WALL_ROCK_MAP_TILE_WIDTH  - WALL_ROCK_MAP_TILE_PADDING,
+                WALL_ROCK_MAP_TILE_HEIGHT - WALL_ROCK_MAP_TILE_PADDING,
+            };
+
         case;
             assert(false, "You forgot a block type in your switch statement");
     }
@@ -3462,6 +3510,7 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
         case .COPPER_ORE; return .PICKAXE;
         
         case .WALL_DIRT;  return .HAMMER;
+        case .WALL_ROCK;  return .HAMMER;
 
         case;
             assert(false, "Forgot a block type in your switch statement");

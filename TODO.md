@@ -1,10 +1,9 @@
 # In progress
 
-- tiles performance
+- walls
 
 # Game
 
-- walls
 - crafting
 - [ui] inventory
 - [world_gen] trees
@@ -42,4 +41,3 @@
 - switching mid swing shows different wielded item
 - worlds with ~2000 or greater columns get stack overflowed (I think because of the recursive shadow stuff
 - 1d perlin noise looks fucked up on some seeds
-- jumping feels choppy at 60fps
