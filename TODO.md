@@ -1,6 +1,6 @@
 # In progress
 
-
+- tiles performance
 
 # Game
 
@@ -26,8 +26,8 @@
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
-- [juice] particles
 - [juice] little block pops out on destroying
+- [juice] particles
 
 # Tech
 
@@ -42,3 +42,4 @@
 - switching mid swing shows different wielded item
 - worlds with ~2000 or greater columns get stack overflowed (I think because of the recursive shadow stuff
 - 1d perlin noise looks fucked up on some seeds
+- jumping feels choppy at 60fps

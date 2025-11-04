@@ -175,6 +175,7 @@ run_custom_link_command :: (w: Workspace, m: *Compiler.Message_Phase, use_system
         // Target filename.
         array_add(*arguments, tprint("/OUT:%", target_filename));
 
+        array_add(*arguments, "/STACK:16777216");
         array_add(*arguments, "/MACHINE:AMD64");
         array_add(*arguments, "/INCREMENTAL:NO");
         array_add(*arguments, "/DEBUG");

@@ -228,6 +228,8 @@ WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
 DEBUG_CAM_SPEED :: 5;
 
+MAX_BLOCKS_DIRT :: 1_000_000;
+
 Sprite :: struct {
     map         : Texture;
     active      : bool;
@@ -245,9 +247,14 @@ AnimatedSprite :: struct {
 
 Direction :: enum {
     NORTH;
+    NORTH_EAST;
+    NORTH_WEST;
     SOUTH;
+    SOUTH_EAST;
+    SOUTH_WEST;
     EAST;
     WEST;
+    CENTER; // essentially no direction
 }
 
 BlockType :: enum {
@@ -283,6 +290,7 @@ Inventory :: struct {
 }
 
 Entity :: struct {
+    id   : s32;
     type : Type;
 
     pos : Vector2;
@@ -385,7 +393,7 @@ main :: () {
     
     player := spawn_player();
 
-    WORLD_GRID_COLS :: 1000;
+    WORLD_GRID_COLS :: 100;
 
     DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
@@ -459,7 +467,7 @@ main :: () {
             }
 
             // Generate wall behind block
-            #if false {
+            {
                 wall_type := BlockType.WALL_DIRT;
 
                 rect := Rectangle.{
@@ -720,13 +728,19 @@ main :: () {
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
-    active_blocks: [..]*Block;
+    blocks_pos_dirt: [MAX_BLOCKS_DIRT] Vector2;
+    
+
+    active_blocks: [..] *Block;
     active_blocks.allocator = temp;
 
-    active_walls: [..]*Block;
+    active_walls: [..] *Block;
     active_walls.allocator = temp;
 
     derive_active_blocks(*active_blocks, *active_walls, camera);
+    // for global_block_pos_to_block {
+    //     print("%\n", it_index);
+    // }
 
     while !WindowShouldClose() {
         defer reset_temporary_storage();
@@ -1114,44 +1128,6 @@ main :: () {
 
                         // Draw wall texture
                         DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
-
-                        // Damage block overlay (cracks)
-                        // if it.health_curr < it.health_max {
-                        //     frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
-                        //     damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
-                        //     DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                        // }
-
-                        // Mouse wall overlay (hover)
-                        // show_wall_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
-                        // if show_wall_hover {
-                        //     if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                        //         DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
-                        //     }
-                        // }
-                    }
-
-                    for active_walls {
-                        // wall_map_texture, wall_map_source := get_texture_map_for_block(it);
-                        // color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
-
-                        // Draw wall texture
-                        // DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
-
-                        // Damage block overlay (cracks)
-                        // if it.health_curr < it.health_max {
-                        //     frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
-                        //     damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
-                        //     DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                        // }
-
-                        // Mouse wall overlay (hover)
-                        show_wall_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
-                        if show_wall_hover {
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
-                            }
-                        }
                     }
                 }
 
@@ -1165,7 +1141,7 @@ main :: () {
                         DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
 
                         // Damage block overlay (cracks)
-                    if it.health_curr < it.health_max {
+                        if it.health_curr < it.health_max {
                             frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
                             damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
                             DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
@@ -1181,6 +1157,9 @@ main :: () {
                     }
 
                     if debug_mode {
+                        // for global_block_pos_to_block {
+                        //     DrawRectangleLinesEx(it.bounding_rect, 1.0, LIME);
+                        // }
                         DrawLineEx(Vector2.{-WORLD_GRID_COLS * BLOCK_WORLD_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * BLOCK_WORLD_HEIGHT / 2.0, 0.0 }, 2.0, RED);
                     }
                 }
@@ -2094,13 +2073,39 @@ derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block
         
         if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
         if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
-
-        // north_west_pos := Vector2.{ wall.pos.x };
-
-        // north_west_cover_exists, north_west_cover := table_find_new(*global_block_pos_to_block, vector2_to_string());
-
+        
         array_add(active_walls, wall);
     }
+}
+
+_derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
+    array_reset(active_blocks);
+    array_reset(active_walls);
+
+    window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+    window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
+
+    // print_vars(window_start, window_end, camera);
+
+    steps_x := cast(int) (abs(window_end.x - window_start.x)) / BLOCK_WORLD_WIDTH;
+    steps_y := cast(int) (abs(window_end.y - window_start.y)) / BLOCK_WORLD_HEIGHT;
+
+    for col: 0..steps_x {
+        for row: 0..steps_y {
+            x := window_start.x + (col * BLOCK_WORLD_WIDTH);
+            y := window_start.y + (row * BLOCK_WORLD_HEIGHT);
+            rect := create_rect_for_tile_from_point(Vector2.{ x, y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT);
+            pos  := get_rect_center(rect);
+
+            // print_vars(pos);
+            block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string(pos));
+            if block_exists {
+                // print_vars(block);
+                array_add(active_blocks, block);
+            }
+        }
+    }
+    // print_vars(steps_x, steps_y, active_blocks.count);
 }
 
 item_stack_is_empty :: (item_stack: ItemStack) -> bool {
@@ -3475,10 +3480,15 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
 get_neighbor :: (block_pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
     potential_neighbor_pos: Vector2;
     if direction == {
-        case .NORTH; potential_neighbor_pos = Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
-        case .SOUTH; potential_neighbor_pos = Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
-        case .EAST;  potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
-        case .WEST;  potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
+        case .NORTH;      potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y - BLOCK_WORLD_HEIGHT };
+        case .NORTH_EAST; potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y - BLOCK_WORLD_HEIGHT };
+        case .NORTH_WEST; potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y - BLOCK_WORLD_HEIGHT };
+        case .SOUTH;      potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y + BLOCK_WORLD_HEIGHT };
+        case .SOUTH_EAST; potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y + BLOCK_WORLD_HEIGHT };
+        case .SOUTH_WEST; potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y + BLOCK_WORLD_HEIGHT };
+        case .EAST;       potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
+        case .WEST;       potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
+        case .CENTER;     potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y };
         case;        assert(false, "Invalid direction");
     }
     neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
