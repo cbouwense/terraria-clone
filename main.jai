@@ -228,7 +228,7 @@ WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
 DEBUG_CAM_SPEED :: 5;
 
-MAX_BLOCKS_DIRT :: 1_000_000;
+MAX_BLOCKS_PER_TYPE :: 50_000;
 
 Sprite :: struct {
     map         : Texture;
@@ -368,6 +368,9 @@ vector2_to_string :: (v: Vector2) -> string {
 data_folder: string; 
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
+blocks_grass: [..] *Block;
+blocks_dirt:  [..] *Block;
+blocks_rock:  [..] *Block;
 
 main :: () {
     //
@@ -393,7 +396,7 @@ main :: () {
     
     player := spawn_player();
 
-    WORLD_GRID_COLS :: 100;
+    WORLD_GRID_COLS :: 1000;
 
     DIRT_PERLIN_NOISE_FREQUENCY :: 2; // How many grid nodes per map
     DIRT_PERLIN_NOISE_AMPLITUDE :: 150;
@@ -464,6 +467,8 @@ main :: () {
                 new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
                 table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                if block_type == BlockType.DIRT  array_add(*blocks_dirt,  new_block);
+                if block_type == BlockType.GRASS array_add(*blocks_grass, new_block);
             }
 
             // Generate wall behind block
@@ -572,6 +577,7 @@ main :: () {
                 new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
                 table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                array_add(*blocks_dirt, new_block);
             }      
         }
 
@@ -646,6 +652,7 @@ main :: () {
                 new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
                 table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                array_add(*blocks_rock, new_block);
             }
         }
 
@@ -728,9 +735,6 @@ main :: () {
 
     TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
 
-    blocks_pos_dirt: [MAX_BLOCKS_DIRT] Vector2;
-    
-
     active_blocks: [..] *Block;
     active_blocks.allocator = temp;
 
@@ -738,9 +742,6 @@ main :: () {
     active_walls.allocator = temp;
 
     derive_active_blocks(*active_blocks, *active_walls, camera);
-    // for global_block_pos_to_block {
-    //     print("%\n", it_index);
-    // }
 
     while !WindowShouldClose() {
         defer reset_temporary_storage();
@@ -879,7 +880,26 @@ main :: () {
                 if try_to_attack {
                     if debug_mode {
                         block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
-                        if block_mouse_is_over != null table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
+                        if block_mouse_is_over != null {
+                            block_type := block_mouse_is_over.block_type;
+                            
+                            table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
+
+                            if block_type == {
+                                case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
+                                case .GRASS; array_unordered_remove_by_value(*blocks_grass, block_mouse_is_over);
+                                case .ROCK;  array_unordered_remove_by_value(*blocks_rock,  block_mouse_is_over);
+                                case; assert(false, "forgot block type to remove");
+                            }
+
+                            try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+
+                            update_block_shadows_around_pos(block_mouse_is_over.pos);
+
+                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+
+                            free(block_mouse_is_over);
+                        }
                     }
                     else {
                         is_on_cooldown := player.cooldown_attack_current_ms > 0;
@@ -904,9 +924,17 @@ main :: () {
                                     }
                                     block_mouse_is_over.health_curr -= damage;
                                     
+                                    // @TODO: extract function
                                     // Destroy block
                                     if block_mouse_is_over.health_curr <= 0 {
                                         table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
+
+                                        if block_type == {
+                                            case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
+                                            case .GRASS; array_unordered_remove_by_value(*blocks_grass, block_mouse_is_over);
+                                            case .ROCK;  array_unordered_remove_by_value(*blocks_rock,  block_mouse_is_over);
+                                            case; assert(false, "forgot block type to remove");
+                                        }
 
                                         try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
 
@@ -914,7 +942,6 @@ main :: () {
 
                                         update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
 
-                                        // @TODO: does this work?
                                         free(block_mouse_is_over);
                                     }
                                 }
@@ -980,8 +1007,14 @@ main :: () {
                                 new_block.neighbor_west_count    = -1;
                                 new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
-                                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-            
+                                // table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                                if new_block_type == {
+                                    case .DIRT;  array_add(*blocks_dirt,  new_block);
+                                    case .GRASS; array_add(*blocks_grass, new_block);
+                                    case .ROCK;  array_add(*blocks_rock,  new_block);
+                                    case; assert(false, "forgot a block type");
+                                }
+
                                 player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
                                 player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
@@ -2057,7 +2090,7 @@ derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block
     array_reset(active_blocks);
     array_reset(active_walls);
     
-    for block: global_block_pos_to_block {
+    for block: blocks_dirt {
         if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
         if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
         
@@ -2067,15 +2100,35 @@ derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block
         array_add(active_blocks, block);
     }
 
-    for wall: global_wall_pos_to_wall {
-        if wall.pos.x + WALL_WORLD_WIDTH < window_start.x continue;
-        if wall.pos.x - WALL_WORLD_WIDTH > window_end.x continue;
+    for block: blocks_grass {
+        if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+        if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
         
-        if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
-        if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
-        
-        array_add(active_walls, wall);
+        if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+        if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+        array_add(active_blocks, block);
     }
+
+    for block: blocks_rock {
+        if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+        if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+        
+        if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+        if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+        array_add(active_blocks, block);
+    }
+
+    // for wall: global_wall_pos_to_wall {
+    //     if wall.pos.x + WALL_WORLD_WIDTH < window_start.x continue;
+    //     if wall.pos.x - WALL_WORLD_WIDTH > window_end.x continue;
+        
+    //     if wall.pos.y - WALL_WORLD_HEIGHT > window_end.y continue;
+    //     if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
+        
+    //     array_add(active_walls, wall);
+    // }
 }
 
 _derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
