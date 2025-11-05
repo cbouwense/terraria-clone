@@ -458,8 +458,8 @@ main :: () {
                 wall_type := BlockType.WALL_DIRT;
 
                 rect := Rectangle.{
-                    xx x,
-                    xx y,
+                    xx (x + WALL_WORLD_WIDTH  / 4),
+                    xx (y + WALL_WORLD_HEIGHT / 4),
                     xx WALL_WORLD_WIDTH,
                     xx WALL_WORLD_HEIGHT,
                 };
@@ -574,8 +574,8 @@ main :: () {
                 block_type := BlockType.DIRT;
 
                 rect := Rectangle.{
-                    xx x,
-                    xx y,
+                    xx (x + WALL_WORLD_WIDTH  / 4),
+                    xx (y + WALL_WORLD_HEIGHT / 4),
                     xx BLOCK_WORLD_WIDTH,
                     xx BLOCK_WORLD_HEIGHT,
                 };
