@@ -374,6 +374,11 @@ vector2_to_string :: (v: Vector2) -> string {
     return key;
 }
 
+vector2_to_string_temp :: (v: Vector2) -> string {
+    key := tprint("%,%", v.x, v.y);
+    return key;
+}
+
 data_folder: string; 
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
@@ -903,7 +908,7 @@ main :: () {
                         if block_mouse_is_over != null {
                             block_type := block_mouse_is_over.block_type;
 
-                            table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
+                            table_remove(*global_block_pos_to_block, vector2_to_string_temp(block_mouse_is_over.pos));
 
                             if block_type == {
                                 case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
@@ -947,7 +952,7 @@ main :: () {
                                     // @TODO: extract function
                                     // Destroy block
                                     if block_mouse_is_over.health_curr <= 0 {
-                                        table_remove(*global_block_pos_to_block, vector2_to_string(block_mouse_is_over.pos));
+                                        table_remove(*global_block_pos_to_block, vector2_to_string_temp(block_mouse_is_over.pos));
 
                                         if block_type == {
                                             case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
@@ -991,7 +996,7 @@ main :: () {
                             would_be_on_player := CheckCollisionRecs(new_rect, player.bounding_rect);
 
                             // Check if the new block would be placed on an existing block
-                            block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string(new_pos));
+                            block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
 
                             neighbor_exists_north, _ := get_neighbor(new_pos, .NORTH);
                             neighbor_exists_south, _ := get_neighbor(new_pos, .SOUTH);
@@ -1027,7 +1032,7 @@ main :: () {
                                 new_block.neighbor_west_count    = -1;
                                 new_block.texture_map_source_pos = Vector2.{ -1, -1 };
 
-                                // table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
+                                // table_add(*global_block_pos_to_block, vector2_to_string_temp(new_block.pos), new_block);
                                 if new_block_type == {
                                     case .DIRT;  array_add(*blocks_dirt,  new_block);
                                     case .GRASS; array_add(*blocks_grass, new_block);
@@ -2242,7 +2247,7 @@ _derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Bloc
             pos  := get_rect_center(rect);
 
             // print_vars(pos);
-            block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string(pos));
+            block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos));
             if block_exists {
                 // print_vars(block);
                 array_add(active_blocks, block);
@@ -3645,13 +3650,12 @@ get_neighbor :: (block_pos: Vector2, direction: Direction) -> neighbor_exists: b
         case .CENTER;     potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y };
         case;        assert(false, "Invalid direction");
     }
-    neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos));
+    neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos));
     // print_vars(block_pos, direction, potential_neighbor_pos, neighbor_exists, neighbor);
     return neighbor_exists, neighbor;
 }
 
 get_neighbor_wall :: (wall_pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
-    print("get_neighbor_wall\n");
     potential_neighbor_pos: Vector2;
     if direction == {
         // @NOTE: intentionally using BLOCK_WORLD_WIDTH and BLOCK_WORLD_HEIGHT instead of the wall variants since walls are still
@@ -3662,7 +3666,7 @@ get_neighbor_wall :: (wall_pos: Vector2, direction: Direction) -> neighbor_exist
         case .WEST;  potential_neighbor_pos = Vector2.{ wall_pos.x - BLOCK_WORLD_WIDTH, wall_pos.y };
         case;        assert(false, "Invalid direction");
     }
-    neighbor_exists, neighbor := table_find_new(*global_wall_pos_to_wall, vector2_to_string(potential_neighbor_pos));
+    neighbor_exists, neighbor := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(potential_neighbor_pos));
     // print_vars(neighbor_exists, neighbor);
     return neighbor_exists, neighbor;
 }
@@ -3800,15 +3804,15 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
 }
 
 set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
-    block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string(block_pos));
-    wall_exists,  wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(block_pos));
+    block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(block_pos));
+    wall_exists,  wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(block_pos));
     if !block_exists && !wall_exists return;
 
     block_or_wall := ifx block_exists then block else wall;
 
     neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
-    neighbor_north_block_exists, neighbor_north_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_north_pos));
-    neighbor_north_wall_exists,  neighbor_north_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_north_pos));
+    neighbor_north_block_exists, neighbor_north_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_north_pos));
+    neighbor_north_wall_exists,  neighbor_north_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_north_pos));
     min_neighbor_shadow_north : int;
     if neighbor_north_block_exists && neighbor_north_wall_exists {
         min_neighbor_shadow_north = min(neighbor_north_block.shadow, neighbor_north_wall.shadow);
@@ -3821,8 +3825,8 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     }
 
     neighbor_south_pos := Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
-    neighbor_south_block_exists, neighbor_south_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_south_pos));
-    neighbor_south_wall_exists,  neighbor_south_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_south_pos));
+    neighbor_south_block_exists, neighbor_south_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_south_pos));
+    neighbor_south_wall_exists,  neighbor_south_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_south_pos));
     min_neighbor_shadow_south : int;
     if neighbor_south_block_exists && neighbor_south_wall_exists {
         min_neighbor_shadow_south = min(neighbor_south_block.shadow, neighbor_south_wall.shadow);
@@ -3835,8 +3839,8 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     }
 
     neighbor_east_pos  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
-    neighbor_east_block_exists, neighbor_east_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_east_pos));
-    neighbor_east_wall_exists,  neighbor_east_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_east_pos));
+    neighbor_east_block_exists, neighbor_east_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_east_pos));
+    neighbor_east_wall_exists,  neighbor_east_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_east_pos));
     min_neighbor_shadow_east : int;
     if neighbor_east_block_exists && neighbor_east_wall_exists {
         min_neighbor_shadow_east = min(neighbor_east_block.shadow, neighbor_east_wall.shadow);
@@ -3849,8 +3853,8 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     }
 
     neighbor_west_pos  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
-    neighbor_west_block_exists, neighbor_west_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_west_pos));
-    neighbor_west_wall_exists,  neighbor_west_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_west_pos));
+    neighbor_west_block_exists, neighbor_west_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_west_pos));
+    neighbor_west_wall_exists,  neighbor_west_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_west_pos));
     min_neighbor_shadow_west : int;
     if neighbor_west_block_exists && neighbor_west_wall_exists {
         min_neighbor_shadow_west = min(neighbor_west_block.shadow, neighbor_west_wall.shadow);
@@ -3899,10 +3903,10 @@ update_texture_map_source_pos_around_pos :: (block_pos: Vector2) {
     potential_neighbor_pos_east  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
     potential_neighbor_pos_west  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
 
-    neighbor_exists_north, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_north));
-    neighbor_exists_south, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_south));
-    neighbor_exists_east,  neighbor_east  := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_east));
-    neighbor_exists_west,  neighbor_west  := table_find_new(*global_block_pos_to_block, vector2_to_string(potential_neighbor_pos_west));
+    neighbor_exists_north, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_north));
+    neighbor_exists_south, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_south));
+    neighbor_exists_east,  neighbor_east  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_east));
+    neighbor_exists_west,  neighbor_west  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_west));
 
     if neighbor_exists_north { neighbor_north.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_north); }
     if neighbor_exists_south { neighbor_south.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_south); }
