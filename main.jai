@@ -666,11 +666,19 @@ main :: () {
 
             derive_active_blocks(*active_blocks, *active_walls, camera);
 
-            window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
-            window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
+            should_update_player := true;
+            if debug_mode {
+                window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+                window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
 
+                if      player.pos.x + PLAYER_WORLD_BOUNDING_WIDTH  < window_start.x should_update_player = false;
+                else if player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH  > window_end.x   should_update_player = false;
+                else if player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT > window_end.y   should_update_player = false;
+                else if player.pos.y + PLAYER_WORLD_BOUNDING_HEIGHT < window_start.y should_update_player = false;
+            }
+           
             // Update player
-            if player.pos.x + PLAYER_WORLD_BOUNDING_WIDTH >= window_start.x && player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH <= window_end.x && player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT <= window_end.y && player.pos.y + PLAYER_WORLD_BOUNDING_HEIGHT >= window_start.y {
+            if should_update_player {
                 // Movement
                 {
                     player.vel.x = 0;
