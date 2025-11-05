@@ -54,6 +54,7 @@ copper_ore_item_texture   : Texture;
 pickaxe_texture           : Texture;
 axe_texture               : Texture;
 sword_texture             : Texture;
+hammer_texture            : Texture;
 wall_dirt_map             : Texture;
 wall_rock_map             : Texture;
 
@@ -99,6 +100,7 @@ item_sprite_copper_ore : Sprite;
 item_sprite_pickaxe    : Sprite;
 item_sprite_axe        : Sprite;
 item_sprite_sword      : Sprite;
+item_sprite_hammer     : Sprite;
 
 SCALE :: 2;
 
@@ -231,6 +233,11 @@ SWORD_TEXTURE_WIDTH     :: 32;
 SWORD_TEXTURE_HEIGHT    :: 32;
 SWORD_STACK_CAPACITY    :: -1;
 SWORD_MINING_MULTIPLIER :: 1.5;
+
+HAMMER_TEXTURE_WIDTH     :: 32;
+HAMMER_TEXTURE_HEIGHT    :: 32;
+HAMMER_STACK_CAPACITY    :: -1;
+HAMMER_MINING_MULTIPLIER :: 0; // @TODO: uhh
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
@@ -1260,6 +1267,7 @@ init_textures :: () {
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
     axe_texture               = LoadTexture("data/Axe.png");
     sword_texture             = LoadTexture("data/Sword.png");
+    hammer_texture            = LoadTexture("data/Hammer.png");
     wall_rock_map             = LoadTexture("data/Wall_1.png");
     wall_dirt_map             = LoadTexture("data/Wall_2.png");
 }
@@ -1524,6 +1532,11 @@ init_sprites :: () {
         map   = sword_texture,
         color = WHITE,
     };
+
+    item_sprite_hammer = Sprite.{
+        map   = hammer_texture,
+        color = WHITE,
+    };
 }
 
 control_down :: (haystack: [] Control) -> bool {
@@ -1763,11 +1776,16 @@ spawn_player :: () -> Player {
             stack_count    = AXE_STACK_CAPACITY,
         };
         player.inventory.item_stacks[3] = ItemStack.{
+            item_type     = .HAMMER,
+            stack_capacity = HAMMER_STACK_CAPACITY,
+            stack_count    = HAMMER_STACK_CAPACITY,
+        };
+        player.inventory.item_stacks[4] = ItemStack.{
             item_type     = .DIRT_ITEM,
             stack_capacity = DIRT_STACK_CAPACITY,
             stack_count    = DIRT_STACK_CAPACITY,
         };
-        player.inventory.item_stacks[4] = ItemStack.{
+        player.inventory.item_stacks[5] = ItemStack.{
             item_type     = .ROCK_ITEM,
             stack_capacity = ROCK_STACK_CAPACITY,
             stack_count    = ROCK_STACK_CAPACITY,
@@ -1946,6 +1964,7 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .PICKAXE;         return false;
         case .AXE;             return false;
         case .SWORD;           return false;
+        case .HAMMER;          return false;
 
         case;
             print_vars(item_type);
@@ -2035,6 +2054,7 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
         case .PICKAXE; #through;
         case .AXE;     #through;
         case .SWORD;   #through;
+        case .HAMMER;  #through;
         case;
             assert(false, "Invalid item type");
             return -1;
@@ -2052,6 +2072,7 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
         case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
         case .AXE;     return AXE_MINING_MULTIPLIER;
         case .SWORD;   return SWORD_MINING_MULTIPLIER;
+        case .HAMMER;  return HAMMER_MINING_MULTIPLIER;
 
         case;
             assert(false, "Invalid item type");
@@ -3245,6 +3266,15 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
                 SWORD_TEXTURE_HEIGHT,
             };
 
+        case .HAMMER;
+            map_texture = hammer_texture;
+            map_source  = Rectangle.{
+                HAMMER_TEXTURE_HEIGHT, // @TODO: wait what
+                HAMMER_TEXTURE_HEIGHT,
+                HAMMER_TEXTURE_HEIGHT,
+                HAMMER_TEXTURE_HEIGHT,
+            };
+
         case .DIRT_ITEM;
             map_texture = dirt_item_texture;
             map_source = Rectangle.{
@@ -3280,6 +3310,7 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
         case .PICKAXE;         return *item_sprite_pickaxe;
         case .AXE;             return *item_sprite_axe;
         case .SWORD;           return *item_sprite_sword;
+        case .HAMMER;          return *item_sprite_hammer;
         case;
             assert(false, "You forgot an item type in your switch statement");
             return null;
@@ -3294,6 +3325,7 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .PICKAXE;         return false;
         case .AXE;             return false;
         case .SWORD;           return false;
+        case .HAMMER;          return false;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -3313,6 +3345,7 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
         case .AXE;     return WIELDED_TOOL_WORLD_LENGTH;
         case .SWORD;   return WIELDED_TOOL_WORLD_LENGTH;
+        case .HAMMER;  return WIELDED_TOOL_WORLD_LENGTH;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -3345,6 +3378,7 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
         case .PICKAXE; #through;
         case .AXE;     #through;
         case .SWORD;   #through;
+        case .HAMMER;  #through;
         case;
             assert(false, "Forgot an item type in your switch statement");
             return BlockType.DIRT; // Unreachable

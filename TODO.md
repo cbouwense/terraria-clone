@@ -1,9 +1,11 @@
 # In progress
 
-- walls
+- hammer
 
 # Game
 
+- place walls
+- destroy walls
 - crafting
 - [ui] inventory
 - [world_gen] trees
