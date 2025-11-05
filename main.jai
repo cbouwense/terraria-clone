@@ -369,7 +369,7 @@ vector2_equal :: (v1: Vector2, v2: Vector2) -> bool {
     return v1.x == v2.x && v1.y == v2.y;
 }
 
-vector2_to_string :: (v: Vector2) -> string {
+vector2_to_string_permanent :: (v: Vector2) -> string {
     key := sprint("%,%", v.x, v.y);
     return key;
 }
@@ -453,74 +453,10 @@ main :: () {
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for row: 0..hill_dirt_blocks {
-            // Generate wall behind block
-            {
-                wall_type := BlockType.WALL_DIRT;
+            generate_block(.WALL_DIRT, xx (x + WALL_WORLD_WIDTH  / 4), xx (y + WALL_WORLD_HEIGHT / 4));
 
-                rect := Rectangle.{
-                    xx (x + WALL_WORLD_WIDTH  / 4),
-                    xx (y + WALL_WORLD_HEIGHT / 4),
-                    xx WALL_WORLD_WIDTH,
-                    xx WALL_WORLD_HEIGHT,
-                };
-
-                new_wall := New(Block);
-                new_wall.type          = Block;
-                new_wall.pos           = get_rect_center(rect);
-                new_wall.bounding_rect = rect;
-                new_wall.sprite_rect   = rect;
-                new_wall.health_max    = BLOCK_HEALTH_MAX;
-                new_wall.health_curr   = BLOCK_HEALTH_MAX;
-                new_wall.block_type    = wall_type;
-                new_wall.hardness      = get_block_hardness(wall_type);
-                new_wall.weak_to_tool  = get_block_weak_to_tool(wall_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_wall.neighbor_north_count   = -1;
-                new_wall.neighbor_south_count   = -1;
-                new_wall.neighbor_east_count    = -1;
-                new_wall.neighbor_west_count    = -1;
-                new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
-                array_add(*walls_dirt, new_wall);
-            }
-
-            // Generate block
-            {
-                block_type := BlockType.DIRT;
-                if row == hill_dirt_blocks {
-                    block_type = .GRASS;
-                }
-
-                rect := Rectangle.{
-                    xx x,
-                    xx y,
-                    xx BLOCK_WORLD_WIDTH,
-                    xx BLOCK_WORLD_HEIGHT,
-                };
-
-                // @TODO: maybe some sort of constructor could be nice like create_block(.DIRT, x, y, ...)
-                new_block := New(Block);
-                new_block.type          = Block;
-                new_block.pos           = get_rect_center(rect);
-                new_block.bounding_rect = rect;
-                new_block.sprite_rect   = rect;
-                new_block.health_max    = BLOCK_HEALTH_MAX;
-                new_block.health_curr   = BLOCK_HEALTH_MAX;
-                new_block.block_type    = block_type;
-                new_block.hardness      = get_block_hardness(block_type);
-                new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_block.neighbor_north_count   = -1;
-                new_block.neighbor_south_count   = -1;
-                new_block.neighbor_east_count    = -1;
-                new_block.neighbor_west_count    = -1;
-                new_block.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-                if block_type == BlockType.DIRT  array_add(*blocks_dirt,  new_block);
-                if block_type == BlockType.GRASS array_add(*blocks_grass, new_block);
-            }
+            block_type := ifx row == hill_dirt_blocks then BlockType.GRASS else BlockType.DIRT;
+            generate_block(block_type, xx x, xx y);
 
             y -= BLOCK_WORLD_HEIGHT;
         }
@@ -532,74 +468,14 @@ main :: () {
         for row: 0..ground_dirt_blocks-1 {
             defer y += BLOCK_WORLD_HEIGHT;
 
-            // Generate wall behind block
-            {
-                wall_type := BlockType.WALL_DIRT;
-
-                rect := Rectangle.{
-                    xx (x + WALL_WORLD_WIDTH  / 4),
-                    xx (y + WALL_WORLD_HEIGHT / 4),
-                    xx WALL_WORLD_WIDTH,
-                    xx WALL_WORLD_HEIGHT,
-                };
-
-                new_wall := New(Block);
-                new_wall.type          = Block;
-                new_wall.pos           = get_rect_center(rect);
-                new_wall.bounding_rect = rect;
-                new_wall.sprite_rect   = rect;
-                new_wall.health_max    = BLOCK_HEALTH_MAX;
-                new_wall.health_curr   = BLOCK_HEALTH_MAX;
-                new_wall.block_type    = wall_type;
-                new_wall.hardness      = get_block_hardness(wall_type);
-                new_wall.weak_to_tool  = get_block_weak_to_tool(wall_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_wall.neighbor_north_count   = -1;
-                new_wall.neighbor_south_count   = -1;
-                new_wall.neighbor_east_count    = -1;
-                new_wall.neighbor_west_count    = -1;
-                new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
-                array_add(*walls_rock, new_wall);
-            }
+            generate_block(.WALL_DIRT, xx (x + WALL_WORLD_WIDTH  / 4), xx (y + WALL_WORLD_HEIGHT / 4));
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
                 continue;
             }
 
-            // Generate block
-            {
-                block_type := BlockType.DIRT;
-
-                rect := Rectangle.{
-                    xx (x + WALL_WORLD_WIDTH  / 4),
-                    xx (y + WALL_WORLD_HEIGHT / 4),
-                    xx BLOCK_WORLD_WIDTH,
-                    xx BLOCK_WORLD_HEIGHT,
-                };
-
-                new_block := New(Block);
-                new_block.type          = Block;
-                new_block.pos           = get_rect_center(rect);
-                new_block.bounding_rect = rect;
-                new_block.sprite_rect   = rect;
-                new_block.health_max    = BLOCK_HEALTH_MAX;
-                new_block.health_curr   = BLOCK_HEALTH_MAX;
-                new_block.block_type    = block_type;
-                new_block.hardness      = get_block_hardness(block_type);
-                new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_block.neighbor_north_count   = -1;
-                new_block.neighbor_south_count   = -1;
-                new_block.neighbor_east_count    = -1;
-                new_block.neighbor_west_count    = -1;
-                new_block.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-                array_add(*blocks_dirt, new_block);
-            }      
+            generate_block(.DIRT, xx x, xx y);     
         }
 
         // Generate rock
@@ -608,75 +484,14 @@ main :: () {
         for row: 0..(100 - ground_dirt_blocks) {
             defer y += BLOCK_WORLD_HEIGHT;
             
-            // Generate wall behind block
-            {
-                wall_type := BlockType.WALL_ROCK;
-
-                rect := Rectangle.{
-                    xx (x + WALL_WORLD_WIDTH  / 4),
-                    xx (y + WALL_WORLD_HEIGHT / 4),
-                    xx WALL_WORLD_WIDTH,
-                    xx WALL_WORLD_HEIGHT,
-                };
-
-                new_wall := New(Block);
-                new_wall.type          = Block;
-                new_wall.pos           = get_rect_center(rect);
-                new_wall.bounding_rect = rect;
-                new_wall.sprite_rect   = rect;
-                new_wall.health_max    = BLOCK_HEALTH_MAX;
-                new_wall.health_curr   = BLOCK_HEALTH_MAX;
-                new_wall.block_type    = wall_type;
-                new_wall.hardness      = get_block_hardness(wall_type);
-                new_wall.weak_to_tool  = get_block_weak_to_tool(wall_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_wall.neighbor_north_count   = -1;
-                new_wall.neighbor_south_count   = -1;
-                new_wall.neighbor_east_count    = -1;
-                new_wall.neighbor_west_count    = -1;
-                new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
-                array_add(*walls_rock, new_wall);
-            }
+            generate_block(.WALL_ROCK, xx (x + WALL_WORLD_WIDTH  / 4), xx (y + WALL_WORLD_HEIGHT / 4));
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
                 continue;
             }
 
-            // Generate block
-            {
-                block_type := BlockType.ROCK;
-
-                rect := Rectangle.{
-                    xx x,
-                    xx y,
-                    xx BLOCK_WORLD_WIDTH,
-                    xx BLOCK_WORLD_HEIGHT,
-                };
-
-                new_block := New(Block);
-                new_block.type          = Block;
-                new_block.pos           = get_rect_center(rect);
-                new_block.bounding_rect = rect;
-                new_block.sprite_rect   = rect;
-                new_block.health_max    = BLOCK_HEALTH_MAX;
-                new_block.health_curr   = BLOCK_HEALTH_MAX;
-                new_block.block_type    = block_type;
-                new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
-                new_block.hardness      = get_block_hardness(block_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_block.neighbor_north_count   = -1;
-                new_block.neighbor_south_count   = -1;
-                new_block.neighbor_east_count    = -1;
-                new_block.neighbor_west_count    = -1;
-                new_block.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
-                array_add(*blocks_rock, new_block);
-            }
-        
+            generate_block(.ROCK, xx x, xx y);        
         }
 
         x += BLOCK_WORLD_WIDTH;
@@ -851,8 +666,11 @@ main :: () {
 
             derive_active_blocks(*active_blocks, *active_walls, camera);
 
+            window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
+            window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
+
             // Update player
-            {
+            if player.pos.x + PLAYER_WORLD_BOUNDING_WIDTH >= window_start.x && player.pos.x - PLAYER_WORLD_BOUNDING_WIDTH <= window_end.x && player.pos.y - PLAYER_WORLD_BOUNDING_HEIGHT <= window_end.y && player.pos.y + PLAYER_WORLD_BOUNDING_HEIGHT >= window_start.y {
                 // Movement
                 {
                     player.vel.x = 0;
@@ -1016,29 +834,7 @@ main :: () {
                             if can_place_block {
                                 new_block_type := item_type_to_block_type(selected_item_stack.item_type);
 
-                                new_block := New(Block);
-                                new_block.type          = Block;
-                                new_block.pos           = new_pos;
-                                new_block.bounding_rect = new_rect;
-                                new_block.sprite_rect   = new_rect;
-                                new_block.block_type    = new_block_type;
-                                new_block.health_max    = BLOCK_HEALTH_MAX;
-                                new_block.health_curr   = BLOCK_HEALTH_MAX;
-                                new_block.hardness      = get_block_hardness(new_block_type);
-                                new_block.weak_to_tool  = get_block_weak_to_tool(new_block_type);
-                                new_block.neighbor_north_count   = -1;
-                                new_block.neighbor_south_count   = -1;
-                                new_block.neighbor_east_count    = -1;
-                                new_block.neighbor_west_count    = -1;
-                                new_block.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                                // table_add(*global_block_pos_to_block, vector2_to_string_temp(new_block.pos), new_block);
-                                if new_block_type == {
-                                    case .DIRT;  array_add(*blocks_dirt,  new_block);
-                                    case .GRASS; array_add(*blocks_grass, new_block);
-                                    case .ROCK;  array_add(*blocks_rock,  new_block);
-                                    case; assert(false, "forgot a block type");
-                                }
+                                new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
 
                                 player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
@@ -1199,11 +995,6 @@ main :: () {
                         if debug_mode {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 block_to_debug = it;
-                                DrawText(tprint("%\0", it.shadow).data, xx it.sprite_rect.x, xx it.sprite_rect.y, 18, WHITE);
-                                DrawCircleV(it.pos, 5.0, RED);
-
-                                // Draw overlay
-                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
                             }
                         }
                     }
@@ -1236,14 +1027,6 @@ main :: () {
                                 block_to_debug = it;
                             }
                         }
-
-                        if debug_mode {
-                            DrawRectangleLinesEx(it.sprite_rect, 1.0, LIME);
-                        }
-                    }
-
-                    if debug_mode {
-                        DrawLineEx(Vector2.{-WORLD_GRID_COLS * BLOCK_WORLD_WIDTH / 2.0, 0.0 }, Vector2.{ WORLD_GRID_COLS * BLOCK_WORLD_HEIGHT / 2.0, 0.0 }, 2.0, RED);
                     }
                 }
 
@@ -2225,36 +2008,6 @@ derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block
             array_add(active_walls, wall);
         }
     }
-}
-
-_derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
-    array_reset(active_blocks);
-    array_reset(active_walls);
-
-    window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
-    window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
-
-    // print_vars(window_start, window_end, camera);
-
-    steps_x := cast(int) (abs(window_end.x - window_start.x)) / BLOCK_WORLD_WIDTH;
-    steps_y := cast(int) (abs(window_end.y - window_start.y)) / BLOCK_WORLD_HEIGHT;
-
-    for col: 0..steps_x {
-        for row: 0..steps_y {
-            x := window_start.x + (col * BLOCK_WORLD_WIDTH);
-            y := window_start.y + (row * BLOCK_WORLD_HEIGHT);
-            rect := create_rect_for_tile_from_point(Vector2.{ x, y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT);
-            pos  := get_rect_center(rect);
-
-            // print_vars(pos);
-            block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos));
-            if block_exists {
-                // print_vars(block);
-                array_add(active_blocks, block);
-            }
-        }
-    }
-    // print_vars(steps_x, steps_y, active_blocks.count);
 }
 
 item_stack_is_empty :: (item_stack: ItemStack) -> bool {
@@ -3913,3 +3666,48 @@ update_texture_map_source_pos_around_pos :: (block_pos: Vector2) {
     if neighbor_exists_east  { neighbor_east.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_east);  }
     if neighbor_exists_west  { neighbor_west.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_west);  }
 }
+
+generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
+    is_wall := get_is_wall(block_type);
+    
+    rect := Rectangle.{
+        xx x,
+        xx y,
+        xx ifx is_wall then WALL_WORLD_WIDTH else BLOCK_WORLD_WIDTH,
+        xx ifx is_wall then WALL_WORLD_HEIGHT else BLOCK_WORLD_HEIGHT,
+    };
+
+    new_block := New(Block);
+    new_block.type          = Block;
+    new_block.pos           = get_rect_center(rect);
+    new_block.bounding_rect = rect;
+    new_block.sprite_rect   = rect;
+    new_block.health_max    = BLOCK_HEALTH_MAX;
+    new_block.health_curr   = BLOCK_HEALTH_MAX;
+    new_block.block_type    = block_type;
+    new_block.hardness      = get_block_hardness(block_type);
+    new_block.weak_to_tool  = get_block_weak_to_tool(block_type);
+    // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+    new_block.neighbor_north_count   = -1;
+    new_block.neighbor_south_count   = -1;
+    new_block.neighbor_east_count    = -1;
+    new_block.neighbor_west_count    = -1;
+    new_block.texture_map_source_pos = Vector2.{ -1, -1 };
+
+    if is_wall {   
+        table_add(*global_wall_pos_to_wall, vector2_to_string_permanent(new_block.pos), new_block);
+    } else {
+        table_add(*global_block_pos_to_block, vector2_to_string_permanent(new_block.pos), new_block);
+    }
+
+    if block_type == {
+        case .DIRT;  array_add(*blocks_dirt,  new_block);
+        case .GRASS; array_add(*blocks_grass, new_block);
+        case .ROCK;  array_add(*blocks_grass, new_block);
+        case .WALL_DIRT; array_add(*walls_dirt, new_block);
+        case .WALL_ROCK; array_add(*walls_dirt, new_block);
+        case; assert(false, "Forgot a block type");
+    }
+
+    return new_block;
+} 
