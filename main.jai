@@ -399,6 +399,7 @@ main :: () {
 
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
+
     SetTargetFPS(144);
 
     base_path := path_strip_filename(get_path_of_running_executable());
@@ -447,6 +448,38 @@ main :: () {
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for row: 0..hill_dirt_blocks {
+            // Generate wall behind block
+            {
+                wall_type := BlockType.WALL_DIRT;
+
+                rect := Rectangle.{
+                    xx x,
+                    xx y,
+                    xx WALL_WORLD_WIDTH,
+                    xx WALL_WORLD_HEIGHT,
+                };
+
+                new_wall := New(Block);
+                new_wall.type          = Block;
+                new_wall.pos           = get_rect_center(rect);
+                new_wall.bounding_rect = rect;
+                new_wall.sprite_rect   = rect;
+                new_wall.health_max    = BLOCK_HEALTH_MAX;
+                new_wall.health_curr   = BLOCK_HEALTH_MAX;
+                new_wall.block_type    = wall_type;
+                new_wall.hardness      = get_block_hardness(wall_type);
+                new_wall.weak_to_tool  = get_block_weak_to_tool(wall_type);
+                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
+                new_wall.neighbor_north_count   = -1;
+                new_wall.neighbor_south_count   = -1;
+                new_wall.neighbor_east_count    = -1;
+                new_wall.neighbor_west_count    = -1;
+                new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
+
+                table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
+                array_add(*walls_dirt, new_wall);
+            }
+
             // Generate block
             {
                 block_type := BlockType.DIRT;
@@ -482,38 +515,6 @@ main :: () {
                 table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
                 if block_type == BlockType.DIRT  array_add(*blocks_dirt,  new_block);
                 if block_type == BlockType.GRASS array_add(*blocks_grass, new_block);
-            }
-
-            // Generate wall behind block
-            {
-                wall_type := BlockType.WALL_DIRT;
-
-                rect := Rectangle.{
-                    xx (x + WALL_WORLD_WIDTH  / 4),
-                    xx (y + WALL_WORLD_HEIGHT / 4),
-                    xx WALL_WORLD_WIDTH,
-                    xx WALL_WORLD_HEIGHT,
-                };
-
-                new_wall := New(Block);
-                new_wall.type          = Block;
-                new_wall.pos           = get_rect_center(rect);
-                new_wall.bounding_rect = rect;
-                new_wall.sprite_rect   = rect;
-                new_wall.health_max    = BLOCK_HEALTH_MAX;
-                new_wall.health_curr   = BLOCK_HEALTH_MAX;
-                new_wall.block_type    = wall_type;
-                new_wall.hardness      = get_block_hardness(wall_type);
-                new_wall.weak_to_tool  = get_block_weak_to_tool(wall_type);
-                // shadow is not defined here, we define it in a second pass since we need to know about neighbors
-                new_wall.neighbor_north_count   = -1;
-                new_wall.neighbor_south_count   = -1;
-                new_wall.neighbor_east_count    = -1;
-                new_wall.neighbor_west_count    = -1;
-                new_wall.texture_map_source_pos = Vector2.{ -1, -1 };
-
-                table_add(*global_wall_pos_to_wall, vector2_to_string(new_wall.pos), new_wall);
-                array_add(*walls_dirt, new_wall);
             }
 
             y -= BLOCK_WORLD_HEIGHT;
@@ -670,11 +671,36 @@ main :: () {
                 table_add(*global_block_pos_to_block, vector2_to_string(new_block.pos), new_block);
                 array_add(*blocks_rock, new_block);
             }
+        
         }
 
         x += BLOCK_WORLD_WIDTH;
     }
 
+    for wall: global_wall_pos_to_wall {
+        // Define initial shadows for walls
+        {
+            // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
+            wall.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(wall, .NORTH);
+            wall.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(wall, .SOUTH);
+            wall.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(wall, .EAST);
+            wall.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(wall, .WEST);
+
+            min_neighbor_count := min(
+                min(wall.neighbor_north_count, wall.neighbor_south_count),
+                min(wall.neighbor_east_count,  wall.neighbor_west_count)
+            );
+            // print_vars(wall, min_neighbor_count);
+            wall.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+        }
+
+        // Initialize texture source pos
+        {
+            wall.texture_map_source_pos = get_texture_map_source_coords_for_block(wall);
+        }
+    }
+
+    // @TODO: don't iterate through hash table like this
     for block: global_block_pos_to_block {
         // Define initial shadows for blocks
         {
@@ -694,28 +720,6 @@ main :: () {
         // Initialize texture source pos
         {
             block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
-        }
-    }
-
-    for wall: global_wall_pos_to_wall {
-        // Define initial shadows for walls
-        #if false {
-            // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
-            wall.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(wall, .NORTH);
-            wall.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(wall, .SOUTH);
-            wall.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(wall, .EAST);
-            wall.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(wall, .WEST);
-
-            min_neighbor_count := min(
-                min(wall.neighbor_north_count, wall.neighbor_south_count),
-                min(wall.neighbor_east_count,  wall.neighbor_west_count)
-            );
-            wall.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-        }
-
-        // Initialize texture source pos
-        {
-            wall.texture_map_source_pos = get_texture_map_source_coords_for_block(wall);
         }
     }
 
@@ -1164,6 +1168,8 @@ main :: () {
 
             ClearBackground(SKYBLUE);
 
+            block_to_debug : *Block = null;
+
             // Draw world
             {
                 BeginMode2D(camera);
@@ -1183,6 +1189,17 @@ main :: () {
                             frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
                             damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
                             DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        }
+
+                        if debug_mode {
+                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
+                                block_to_debug = it;
+                                DrawText(tprint("%\0", it.shadow).data, xx it.sprite_rect.x, xx it.sprite_rect.y, 18, WHITE);
+                                DrawCircleV(it.pos, 5.0, RED);
+
+                                // Draw overlay
+                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
+                            }
                         }
                     }
                 }
@@ -1209,6 +1226,14 @@ main :: () {
                             if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
                                 DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
                             }
+
+                            if debug_mode {
+                                block_to_debug = it;
+                            }
+                        }
+
+                        if debug_mode {
+                            DrawRectangleLinesEx(it.sprite_rect, 1.0, LIME);
                         }
                     }
 
@@ -1313,11 +1338,6 @@ main :: () {
                         DrawCircleV(player.pos, 3.0, RED);
                     }
                 }
-
-                // Draw cursor
-                if debug_mode {
-                    DrawRectangleRec(create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT), TRANSPARENT_WHITE);
-                }
             }
 
             // Draw UI
@@ -1366,6 +1386,33 @@ main :: () {
 
                 if debug_mode {
                     DrawText(tprint("(%, %)\0", mouse_pos_in_world.x, mouse_pos_in_world.y).data, 10, 30, 18, LIME);
+
+                    // Draw debug block
+                    if block_to_debug != null {
+                        y : s32 = 50;
+                        INCREMENT :: 20;
+                        FONT_SIZE :: 20;
+                        // @TODO: metaprogram?
+                        DrawRectangle(0, 0, GetScreenWidth() / 4, GetScreenHeight(), Color.{ 0, 0, 0, 150 });
+                        DrawText(tprint("id: %\0", block_to_debug.id).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("type: %\0", block_to_debug.type).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("pos: %\0", block_to_debug.pos).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("vel: %\0", block_to_debug.vel).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("is_facing_left: %\0", block_to_debug.is_facing_left).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("bounding_rect: %\0", block_to_debug.bounding_rect).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("sprite_rect: %\0", block_to_debug.sprite_rect).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("texture_map_source_pos: %\0", block_to_debug.texture_map_source_pos).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("health_max: %\0", block_to_debug.health_max).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("health_curr: %\0", block_to_debug.health_curr).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("block_type: %\0", block_to_debug.block_type).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("hardness: %\0", block_to_debug.hardness).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("weak_to_tool: %\0", block_to_debug.weak_to_tool).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("shadow: %\0", block_to_debug.shadow).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("neighbor_north_count: %\0", block_to_debug.neighbor_north_count).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("neighbor_south_count: %\0", block_to_debug.neighbor_south_count).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("neighbor_east_count: %\0", block_to_debug.neighbor_east_count).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                        DrawText(tprint("neighbor_west_count: %\0", block_to_debug.neighbor_west_count).data, 10, read_then_increment(*y, INCREMENT), FONT_SIZE, WHITE);
+                    }
                 }
 
                 // @TODO: Draw pause menu
@@ -1375,6 +1422,11 @@ main :: () {
             }
         }
     }
+}
+
+read_then_increment :: (x: *s32, increment: s32 = 1) -> s32 {
+    defer x.* += increment;
+    return x.*;
 }
 
 // @TODO: have function for getting width and height
@@ -2264,10 +2316,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
     north_exists, south_exists, east_exists, west_exists : bool;
     north, south, east, west : *Block;
     if is_wall {
-        north_exists, north = get_neighbor_wall(block, .NORTH);
-        south_exists, south = get_neighbor_wall(block, .SOUTH);
-        east_exists,  east  = get_neighbor_wall(block, .EAST);
-        west_exists,  west  = get_neighbor_wall(block, .WEST);
+        north_exists, north = get_neighbor_wall(block.pos, .NORTH);
+        south_exists, south = get_neighbor_wall(block.pos, .SOUTH);
+        east_exists,  east  = get_neighbor_wall(block.pos, .EAST);
+        west_exists,  west  = get_neighbor_wall(block.pos, .WEST);
     } else {
         north_exists, north = get_neighbor(block.pos, .NORTH);
         south_exists, south = get_neighbor(block.pos, .SOUTH);
@@ -3598,13 +3650,16 @@ get_neighbor :: (block_pos: Vector2, direction: Direction) -> neighbor_exists: b
     return neighbor_exists, neighbor;
 }
 
-get_neighbor_wall :: (wall: Block, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
+get_neighbor_wall :: (wall_pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
+    print("get_neighbor_wall\n");
     potential_neighbor_pos: Vector2;
     if direction == {
-        case .NORTH; potential_neighbor_pos = Vector2.{ wall.pos.x, wall.pos.y - WALL_WORLD_HEIGHT };
-        case .SOUTH; potential_neighbor_pos = Vector2.{ wall.pos.x, wall.pos.y + WALL_WORLD_HEIGHT };
-        case .EAST;  potential_neighbor_pos = Vector2.{ wall.pos.x + WALL_WORLD_WIDTH, wall.pos.y };
-        case .WEST;  potential_neighbor_pos = Vector2.{ wall.pos.x - WALL_WORLD_WIDTH, wall.pos.y };
+        // @NOTE: intentionally using BLOCK_WORLD_WIDTH and BLOCK_WORLD_HEIGHT instead of the wall variants since walls are still
+        // spaced every BLOCK_WORLD_WIDTH and BLOCK_WORLD_HEIGHT away from each other.
+        case .NORTH; potential_neighbor_pos = Vector2.{ wall_pos.x, wall_pos.y - BLOCK_WORLD_HEIGHT };
+        case .SOUTH; potential_neighbor_pos = Vector2.{ wall_pos.x, wall_pos.y + BLOCK_WORLD_HEIGHT };
+        case .EAST;  potential_neighbor_pos = Vector2.{ wall_pos.x + BLOCK_WORLD_WIDTH, wall_pos.y };
+        case .WEST;  potential_neighbor_pos = Vector2.{ wall_pos.x - BLOCK_WORLD_WIDTH, wall_pos.y };
         case;        assert(false, "Invalid direction");
     }
     neighbor_exists, neighbor := table_find_new(*global_wall_pos_to_wall, vector2_to_string(potential_neighbor_pos));
@@ -3613,73 +3668,127 @@ get_neighbor_wall :: (wall: Block, direction: Direction) -> neighbor_exists: boo
 }
 
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
-    neighbor_exists, neighbor := get_neighbor(block.pos, direction);
+    neighbor_block_exists, neighbor_block := get_neighbor(block.pos, direction);
+    neighbor_wall_exists,  neighbor_wall  := get_neighbor_wall(block.pos, direction);
 
+    // @TODO: DRY this up
     if direction == {
         case .NORTH;
-            if neighbor_exists {
+            if neighbor_block_exists {
                 // If this block already knows its north neighbor count, we don't need to keep going
-                if neighbor.neighbor_north_count > -1 {
-                    result := neighbor.neighbor_north_count + 1;
+                if neighbor_block.neighbor_north_count > -1 {
+                    result := neighbor_block.neighbor_north_count + 1;
                     block.neighbor_north_count = result;
                     return result;
                 } else {
-                    result := get_and_recursively_set_block_neighbor_counts(neighbor, direction) + 1;
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_block, direction) + 1;
                     block.neighbor_north_count = result;
                     return result;
                 }
-            } else {
+            }
+            else if neighbor_wall_exists {
+                // If this block already knows its north neighbor count, we don't need to keep going
+                if neighbor_wall.neighbor_north_count > -1 {
+                    result := neighbor_wall.neighbor_north_count + 1;
+                    block.neighbor_north_count = result;
+                    return result;
+                } else {
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_wall, direction) + 1;
+                    block.neighbor_north_count = result;
+                    return result;
+                }
+            }
+            else {
                 block.neighbor_north_count = 0;
                 block.shadow = 0;
                 return 0;
             }
         case .SOUTH;
-            if neighbor_exists {
+            if neighbor_block_exists {
                 // If this block already knows its south neighbor count, we don't need to keep going
-                if neighbor.neighbor_south_count > -1 {
-                    result := neighbor.neighbor_south_count + 1;
+                if neighbor_block.neighbor_south_count > -1 {
+                    result := neighbor_block.neighbor_south_count + 1;
                     block.neighbor_south_count = result;
                     return result;
                 } else {
-                    result := get_and_recursively_set_block_neighbor_counts(neighbor, direction) + 1;
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_block, direction) + 1;
                     block.neighbor_south_count = result;
                     return result;
                 }
-            } else {
+            }
+            else if neighbor_wall_exists {
+                // If this block already knows its south neighbor count, we don't need to keep going
+                if neighbor_wall.neighbor_south_count > -1 {
+                    result := neighbor_wall.neighbor_south_count + 1;
+                    block.neighbor_south_count = result;
+                    return result;
+                } else {
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_wall, direction) + 1;
+                    block.neighbor_south_count = result;
+                    return result;
+                }
+            }
+            else {
                 block.neighbor_south_count = 0;
                 block.shadow = 0;
                 return 0;
             }
         case .EAST;
-            if neighbor_exists {
+            if neighbor_block_exists {
                 // If this block already knows its east neighbor count, we don't need to keep going
-                if neighbor.neighbor_east_count > -1 {
-                    result := neighbor.neighbor_east_count + 1;
+                if neighbor_block.neighbor_east_count > -1 {
+                    result := neighbor_block.neighbor_east_count + 1;
                     block.neighbor_east_count = result;
                     return result;
                 } else {
-                    result := get_and_recursively_set_block_neighbor_counts(neighbor, direction) + 1;
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_block, direction) + 1;
                     block.neighbor_east_count = result;
                     return result;
                 }
-            } else {
+            }
+            else if neighbor_wall_exists {
+                // If this block already knows its east neighbor count, we don't need to keep going
+                if neighbor_wall.neighbor_east_count > -1 {
+                    result := neighbor_wall.neighbor_east_count + 1;
+                    block.neighbor_east_count = result;
+                    return result;
+                } else {
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_wall, direction) + 1;
+                    block.neighbor_east_count = result;
+                    return result;
+                }
+            }
+            else {
                 block.neighbor_east_count = 0;
                 block.shadow = 0;
                 return 0;
             }
         case .WEST;
-            if neighbor_exists {
+            if neighbor_block_exists {
                 // If this block already knows its east neighbor count, we don't need to keep going
-                if neighbor.neighbor_west_count > -1 {
-                    result := neighbor.neighbor_west_count + 1;
+                if neighbor_block.neighbor_west_count > -1 {
+                    result := neighbor_block.neighbor_west_count + 1;
                     block.neighbor_west_count = result;
                     return result;
                 } else {
-                    result := get_and_recursively_set_block_neighbor_counts(neighbor, direction) + 1;
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_block, direction) + 1;
                     block.neighbor_west_count = result;
                     return result;
                 }
-            } else {
+            }
+            else if neighbor_wall_exists {
+                // If this block already knows its west neighbor count, we don't need to keep going
+                if neighbor_wall.neighbor_west_count > -1 {
+                    result := neighbor_wall.neighbor_west_count + 1;
+                    block.neighbor_west_count = result;
+                    return result;
+                } else {
+                    result := get_and_recursively_set_block_neighbor_counts(neighbor_wall, direction) + 1;
+                    block.neighbor_west_count = result;
+                    return result;
+                }
+            }
+            else {
                 block.neighbor_west_count = 0;
                 block.shadow = 0;
                 return 0;
@@ -3692,30 +3801,73 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
 
 set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string(block_pos));
-    if !block_exists return;
+    wall_exists,  wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(block_pos));
+    if !block_exists && !wall_exists return;
+
+    block_or_wall := ifx block_exists then block else wall;
 
     neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
-    neighbor_north_exists, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_north_pos));
-    neighbor_shadow_north := ifx neighbor_north_exists then neighbor_north.shadow else -1;
+    neighbor_north_block_exists, neighbor_north_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_north_pos));
+    neighbor_north_wall_exists,  neighbor_north_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_north_pos));
+    min_neighbor_shadow_north : int;
+    if neighbor_north_block_exists && neighbor_north_wall_exists {
+        min_neighbor_shadow_north = min(neighbor_north_block.shadow, neighbor_north_wall.shadow);
+    } else if neighbor_north_block_exists {
+        min_neighbor_shadow_north = neighbor_north_block.shadow;
+    } else if neighbor_north_wall_exists {
+        min_neighbor_shadow_north = neighbor_north_wall.shadow;
+    } else {
+        min_neighbor_shadow_north = -1;
+    }
 
     neighbor_south_pos := Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
-    neighbor_south_exists, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_south_pos));
-    neighbor_shadow_south := ifx neighbor_south_exists then neighbor_south.shadow else -1;
+    neighbor_south_block_exists, neighbor_south_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_south_pos));
+    neighbor_south_wall_exists,  neighbor_south_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_south_pos));
+    min_neighbor_shadow_south : int;
+    if neighbor_south_block_exists && neighbor_south_wall_exists {
+        min_neighbor_shadow_south = min(neighbor_south_block.shadow, neighbor_south_wall.shadow);
+    } else if neighbor_south_block_exists {
+        min_neighbor_shadow_south = neighbor_south_block.shadow;
+    } else if neighbor_south_wall_exists {
+        min_neighbor_shadow_south = neighbor_south_wall.shadow;
+    } else {
+        min_neighbor_shadow_south = -1;
+    }
 
     neighbor_east_pos  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
-    neighbor_east_exists, neighbor_east := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_east_pos));
-    neighbor_shadow_east := ifx neighbor_east_exists then neighbor_east.shadow else -1;
+    neighbor_east_block_exists, neighbor_east_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_east_pos));
+    neighbor_east_wall_exists,  neighbor_east_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_east_pos));
+    min_neighbor_shadow_east : int;
+    if neighbor_east_block_exists && neighbor_east_wall_exists {
+        min_neighbor_shadow_east = min(neighbor_east_block.shadow, neighbor_east_wall.shadow);
+    } else if neighbor_east_block_exists {
+        min_neighbor_shadow_east = neighbor_east_block.shadow;
+    } else if neighbor_east_wall_exists {
+        min_neighbor_shadow_east = neighbor_east_wall.shadow;
+    } else {
+        min_neighbor_shadow_east = -1;
+    }
 
     neighbor_west_pos  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
-    neighbor_west_exists, neighbor_west := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_west_pos));
-    neighbor_shadow_west := ifx neighbor_west_exists then neighbor_west.shadow else -1;
+    neighbor_west_block_exists, neighbor_west_block := table_find_new(*global_block_pos_to_block, vector2_to_string(neighbor_west_pos));
+    neighbor_west_wall_exists,  neighbor_west_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string(neighbor_west_pos));
+    min_neighbor_shadow_west : int;
+    if neighbor_west_block_exists && neighbor_west_wall_exists {
+        min_neighbor_shadow_west = min(neighbor_west_block.shadow, neighbor_west_wall.shadow);
+    } else if neighbor_west_block_exists {
+        min_neighbor_shadow_west = neighbor_west_block.shadow;
+    } else if neighbor_west_wall_exists {
+        min_neighbor_shadow_west = neighbor_west_wall.shadow;
+    } else {
+        min_neighbor_shadow_west = -1;
+    }
 
     min_neighbor_shadow := min(
-        min(neighbor_shadow_north, neighbor_shadow_south),
-        min(neighbor_shadow_east,  neighbor_shadow_west),
+        min(min_neighbor_shadow_north, min_neighbor_shadow_south),
+        min(min_neighbor_shadow_east,  min_neighbor_shadow_west),
     );
 
-    block.shadow = ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
+    block_or_wall.shadow = ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
 }
 
 // @TODO: this is kinda hacky and I feel like there's probably some elegant recursive solution here that I'm going to have to
