@@ -47,16 +47,18 @@ dirt_map                  : Texture;
 grass_map                 : Texture;
 rock_map                  : Texture;
 copper_ore_map            : Texture;
+wall_dirt_map             : Texture;
+wall_rock_map             : Texture;
 damage_map                : Texture;
 dirt_item_texture         : Texture;
 rock_item_texture         : Texture;
 copper_ore_item_texture   : Texture;
+wall_dirt_item_texture    : Texture;
+wall_rock_item_texture    : Texture;
 pickaxe_texture           : Texture;
 axe_texture               : Texture;
 sword_texture             : Texture;
 hammer_texture            : Texture;
-wall_dirt_map             : Texture;
-wall_rock_map             : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -97,6 +99,8 @@ block_sprite_copper_ore : Sprite;
 item_sprite_dirt       : Sprite;
 item_sprite_rock       : Sprite;
 item_sprite_copper_ore : Sprite;
+item_sprite_wall_dirt  : Sprite;
+item_sprite_wall_rock  : Sprite;
 item_sprite_pickaxe    : Sprite;
 item_sprite_axe        : Sprite;
 item_sprite_sword      : Sprite;
@@ -237,10 +241,12 @@ SWORD_MINING_MULTIPLIER :: 1.5;
 HAMMER_TEXTURE_WIDTH     :: 32;
 HAMMER_TEXTURE_HEIGHT    :: 32;
 HAMMER_STACK_CAPACITY    :: -1;
-HAMMER_MINING_MULTIPLIER :: 0; // @TODO: uhh
+HAMMER_MINING_MULTIPLIER :: 1;
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
+
+TRANSPARENT_WHITE :: Color.{ 255, 255, 255, 100 };
 
 DEBUG_CAM_SPEED :: 5;
 
@@ -286,6 +292,8 @@ ItemType :: enum {
     DIRT_ITEM;
     ROCK_ITEM;
     COPPER_ORE_ITEM;
+    WALL_DIRT_ITEM;
+    WALL_ROCK_ITEM;
     PICKAXE;
     AXE;
     SWORD;
@@ -580,8 +588,6 @@ main :: () {
 
     global_swing_timer_ms : u32;
 
-    TRANSPARENT_WHITE := Color.{ WHITE.r, WHITE.b, WHITE.a, 100 };
-
     active_blocks: [..] *Block;
     active_blocks.allocator = temp;
 
@@ -764,43 +770,85 @@ main :: () {
 
                         if !is_on_cooldown {
                             if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
-                                // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block? 
+                                // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block?
+                                // As opposed to a wall
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
 
-                                if block_mouse_is_over != null {
+                                if block_mouse_is_over == null {
+                                    block_mouse_is_over = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
+
+                                    if block_mouse_is_over != null {
+                                        block_type := block_mouse_is_over.block_type;
+                                        selected_item_stack, result := get_selected_item_stack(player.inventory);
+                                        has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+
+                                        if has_an_item_selected && can_item_break_walls(selected_item_stack.item_type) {
+                                            tool_type      := selected_item_stack.item_type;
+                                            breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
+
+                                            damage := breaking_speed / block_mouse_is_over.hardness;
+                                            if block_mouse_is_over.weak_to_tool == tool_type {
+                                                damage *= BLOCK_WEAKNESS_MULTIPLIER;
+                                            }
+                                            block_mouse_is_over.health_curr -= damage;
+                                            
+                                            // @TODO: extract function
+                                            // Destroy block
+                                            if block_mouse_is_over.health_curr <= 0 {
+                                                table_remove(*global_wall_pos_to_wall, vector2_to_string_temp(block_mouse_is_over.pos));
+
+                                                if block_type == {
+                                                    case .WALL_DIRT; array_unordered_remove_by_value(*walls_dirt, block_mouse_is_over);
+                                                    case .WALL_ROCK; array_unordered_remove_by_value(*walls_rock, block_mouse_is_over);
+                                                    case; assert(false, "forgot wall type to remove");
+                                                }
+
+                                                try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+
+                                                update_block_shadows_around_pos(block_mouse_is_over.pos);
+
+                                                update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+
+                                                free(block_mouse_is_over);
+                                            }
+                                        }
+                                    }
+                                } else {
                                     block_type := block_mouse_is_over.block_type;
                                     // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
 
                                     selected_item_stack, result := get_selected_item_stack(player.inventory);
                                     has_an_item_selected := result == xx ReturnStatus.SUCCESS;
-                                    tool_type      := selected_item_stack.item_type;
-                                    breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
+                                    if has_an_item_selected && can_item_break_blocks(selected_item_stack.item_type) {
+                                        tool_type      := selected_item_stack.item_type;
+                                        breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
 
-                                    damage := breaking_speed / block_mouse_is_over.hardness;
-                                    if block_mouse_is_over.weak_to_tool == tool_type {
-                                        damage *= BLOCK_WEAKNESS_MULTIPLIER;
-                                    }
-                                    block_mouse_is_over.health_curr -= damage;
-                                    
-                                    // @TODO: extract function
-                                    // Destroy block
-                                    if block_mouse_is_over.health_curr <= 0 {
-                                        table_remove(*global_block_pos_to_block, vector2_to_string_temp(block_mouse_is_over.pos));
-
-                                        if block_type == {
-                                            case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
-                                            case .GRASS; array_unordered_remove_by_value(*blocks_grass, block_mouse_is_over);
-                                            case .ROCK;  array_unordered_remove_by_value(*blocks_rock,  block_mouse_is_over);
-                                            case; assert(false, "forgot block type to remove");
+                                        damage := breaking_speed / block_mouse_is_over.hardness;
+                                        if block_mouse_is_over.weak_to_tool == tool_type {
+                                            damage *= BLOCK_WEAKNESS_MULTIPLIER;
                                         }
+                                        block_mouse_is_over.health_curr -= damage;
+                                        
+                                        // @TODO: extract function
+                                        // Destroy block
+                                        if block_mouse_is_over.health_curr <= 0 {
+                                            table_remove(*global_block_pos_to_block, vector2_to_string_temp(block_mouse_is_over.pos));
 
-                                        try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+                                            if block_type == {
+                                                case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
+                                                case .GRASS; array_unordered_remove_by_value(*blocks_grass, block_mouse_is_over);
+                                                case .ROCK;  array_unordered_remove_by_value(*blocks_rock,  block_mouse_is_over);
+                                                case; assert(false, "forgot block type to remove");
+                                            }
 
-                                        update_block_shadows_around_pos(block_mouse_is_over.pos);
+                                            try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
 
-                                        update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+                                            update_block_shadows_around_pos(block_mouse_is_over.pos);
 
-                                        free(block_mouse_is_over);
+                                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+
+                                            free(block_mouse_is_over);
+                                        }
                                     }
                                 }
                             }
@@ -990,58 +1038,18 @@ main :: () {
             {
                 BeginMode2D(camera);
                 defer EndMode2D();
-
+                
                 // Draw walls
-                {
-                    for active_walls {
-                        wall_map_texture, wall_map_source := get_texture_map_for_block(it);
-                        color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
-
-                        // Draw wall texture
-                        DrawTexturePro(wall_map_texture, wall_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
-
-                        // Damage block overlay (cracks)
-                        if it.health_curr < it.health_max {
-                            frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
-                            damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
-                            DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                        }
-
-                        if debug_mode {
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                block_to_debug = it;
-                            }
-                        }
+                for active_walls {
+                    if draw_block(it, player, mouse_pos_in_world) {
+                        block_to_debug = it;
                     }
                 }
 
                 // Draw blocks
-                {
-                    for active_blocks {
-                        block_map_texture, block_map_source := get_texture_map_for_block(it);
-                        color : Color = ifx debug_mode then WHITE else Color.{ 255 - it.shadow * 36, 255 - it.shadow * 36, 255 - it.shadow * 36, 255 };
-
-                        // Draw block texture
-                        DrawTexturePro(block_map_texture, block_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
-
-                        // Damage block overlay (cracks)
-                        if it.health_curr < it.health_max {
-                            frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) it.health_curr * DAMAGE_MAP_COLS / it.health_max);
-                            damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
-                            DrawTexturePro(damage_map, damage_map_source, it.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                        }
-
-                        // Mouse block overlay (hover)
-                        show_block_hover := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE || debug_mode;
-                        if show_block_hover {
-                            if CheckCollisionPointRec(mouse_pos_in_world, it.bounding_rect) {
-                                DrawRectangleRec(it.sprite_rect, TRANSPARENT_WHITE);
-                            }
-
-                            if debug_mode {
-                                block_to_debug = it;
-                            }
-                        }
+                for active_blocks {
+                    if draw_block(it, player, mouse_pos_in_world) {
+                        block_to_debug = it;
                     }
                 }
 
@@ -1260,16 +1268,18 @@ init_textures :: () {
     rock_map                  = LoadTexture("data/Tiles_1.png");
     grass_map                 = LoadTexture("data/Tiles_2.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
+    wall_rock_map             = LoadTexture("data/Wall_1.png");
+    wall_dirt_map             = LoadTexture("data/Wall_2.png");
     damage_map                = LoadTexture("data/Damage.png");
     dirt_item_texture         = LoadTexture("data/Dirt_Item.png");
     rock_item_texture         = LoadTexture("data/Rock_Item.png");
     copper_ore_item_texture   = LoadTexture("data/Copper_Ore_Item.png");
+    wall_rock_item_texture    = LoadTexture("data/Rock_Wall_Item.png"); // @TODO
+    wall_dirt_item_texture    = LoadTexture("data/Rock_Wall_Item.png");
     pickaxe_texture           = LoadTexture("data/Pickaxe.png");
     axe_texture               = LoadTexture("data/Axe.png");
     sword_texture             = LoadTexture("data/Sword.png");
     hammer_texture            = LoadTexture("data/Hammer.png");
-    wall_rock_map             = LoadTexture("data/Wall_1.png");
-    wall_dirt_map             = LoadTexture("data/Wall_2.png");
 }
 
 init_sprites :: () {
@@ -1961,10 +1971,50 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .DIRT_ITEM;       return true;
         case .ROCK_ITEM;       return true;
         case .COPPER_ORE_ITEM; return false;
+        case .WALL_DIRT_ITEM;  return true;
+        case .WALL_ROCK_ITEM;  return true;
         case .PICKAXE;         return false;
         case .AXE;             return false;
         case .SWORD;           return false;
         case .HAMMER;          return false;
+
+        case;
+            print_vars(item_type);
+            assert(false, "Invalid block type");
+            return false; // Unreachable
+    }
+}
+
+can_item_break_blocks :: (item_type: ItemType) -> bool {
+    if item_type == {
+        case .DIRT_ITEM;       return false;
+        case .ROCK_ITEM;       return false;
+        case .COPPER_ORE_ITEM; return false;
+        case .WALL_DIRT_ITEM;  return false;
+        case .WALL_ROCK_ITEM;  return false;
+        case .PICKAXE;         return true;
+        case .AXE;             return true;
+        case .SWORD;           return false;
+        case .HAMMER;          return false;
+
+        case;
+            print_vars(item_type);
+            assert(false, "Invalid block type");
+            return false; // Unreachable
+    }
+}
+
+can_item_break_walls :: (item_type: ItemType) -> bool {
+    if item_type == {
+        case .DIRT_ITEM;       return false;
+        case .ROCK_ITEM;       return false;
+        case .COPPER_ORE_ITEM; return false;
+        case .WALL_DIRT_ITEM;  return false;
+        case .WALL_ROCK_ITEM;  return false;
+        case .PICKAXE;         return false;
+        case .AXE;             return false;
+        case .SWORD;           return false;
+        case .HAMMER;          return true;
 
         case;
             print_vars(item_type);
@@ -2050,6 +2100,8 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
         case .DIRT_ITEM;       return DIRT_STACK_CAPACITY;
         case .ROCK_ITEM;       return ROCK_STACK_CAPACITY;
         case .COPPER_ORE_ITEM; return COPPER_ORE_STACK_CAPACITY;
+        case .WALL_DIRT_ITEM;  return WALL_DIRT_STACK_CAPACITY;
+        case .WALL_ROCK_ITEM;  return WALL_ROCK_STACK_CAPACITY;
 
         case .PICKAXE; #through;
         case .AXE;     #through;
@@ -2067,6 +2119,8 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
         case .DIRT_ITEM;       return 1;
         case .ROCK_ITEM;       return 1;
         case .COPPER_ORE_ITEM; return 1;
+        case .WALL_DIRT_ITEM;  return 1;
+        case .WALL_ROCK_ITEM;  return 1;
 
         // Tools
         case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
@@ -3293,6 +3347,18 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
                 0, 0, COPPER_ORE_ITEM_TEXTURE_WIDTH, COPPER_ORE_ITEM_TEXTURE_HEIGHT,
             };
 
+        case .WALL_DIRT_ITEM;
+            map_texture = wall_dirt_item_texture;
+            map_source = Rectangle.{
+                0, 0, DIRT_ITEM_TEXTURE_WIDTH, DIRT_ITEM_TEXTURE_HEIGHT,
+            };
+
+        case .WALL_ROCK_ITEM;
+            map_texture = wall_rock_item_texture;
+            map_source = Rectangle.{
+                0, 0, ROCK_ITEM_TEXTURE_WIDTH, ROCK_ITEM_TEXTURE_HEIGHT,
+            };
+
         case;
             assert(false, "You forgot an item type in your switch statement");
     }
@@ -3307,6 +3373,8 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
         case .DIRT_ITEM;       return *item_sprite_dirt;
         case .ROCK_ITEM;       return *item_sprite_rock;
         case .COPPER_ORE_ITEM; return *item_sprite_copper_ore;
+        case .WALL_DIRT_ITEM;  return *item_sprite_wall_dirt;
+        case .WALL_ROCK_ITEM;  return *item_sprite_wall_rock;
         case .PICKAXE;         return *item_sprite_pickaxe;
         case .AXE;             return *item_sprite_axe;
         case .SWORD;           return *item_sprite_sword;
@@ -3322,6 +3390,8 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .DIRT_ITEM;       return true;
         case .ROCK_ITEM;       return true;
         case .COPPER_ORE_ITEM; return true;
+        case .WALL_DIRT_ITEM;  return true;
+        case .WALL_ROCK_ITEM;  return true;
         case .PICKAXE;         return false;
         case .AXE;             return false;
         case .SWORD;           return false;
@@ -3339,7 +3409,8 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .DIRT_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
         case .ROCK_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
         case .COPPER_ORE_ITEM; return WIELDED_BLOCK_WORLD_LENGTH;
-        // case .WALL_DIRT;       return WIELDED_BLOCK_WORLD_LENGTH;
+        case .WALL_DIRT_ITEM;  return WIELDED_BLOCK_WORLD_LENGTH;
+        case .WALL_ROCK_ITEM;  return WIELDED_BLOCK_WORLD_LENGTH;
 
         // Items
         case .PICKAXE; return WIELDED_TOOL_WORLD_LENGTH;
@@ -3374,6 +3445,8 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
         case ItemType.DIRT_ITEM;       return BlockType.DIRT;
         case ItemType.ROCK_ITEM;       return BlockType.ROCK;
         case ItemType.COPPER_ORE_ITEM; return BlockType.COPPER_ORE;
+        case ItemType.WALL_DIRT_ITEM;  return BlockType.WALL_DIRT;
+        case ItemType.WALL_ROCK_ITEM;  return BlockType.WALL_ROCK;
 
         case .PICKAXE; #through;
         case .AXE;     #through;
@@ -3391,6 +3464,8 @@ block_type_to_item_type :: (block_type: BlockType) -> ItemType {
         case BlockType.GRASS;      return ItemType.DIRT_ITEM;
         case BlockType.ROCK;       return ItemType.ROCK_ITEM;
         case BlockType.COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
+        case BlockType.WALL_DIRT;  return ItemType.WALL_DIRT_ITEM;
+        case BlockType.WALL_ROCK;  return ItemType.WALL_ROCK_ITEM;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -3752,4 +3827,37 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     }
 
     return new_block;
-} 
+}
+
+draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> should_debug_block: bool {
+    block_map_texture, block_map_source := get_texture_map_for_block(block);
+    color : Color = ifx debug_mode then WHITE else Color.{ 255 - block.shadow * 36, 255 - block.shadow * 36, 255 - block.shadow * 36, 255 };
+
+    // Draw block texture
+    DrawTexturePro(block_map_texture, block_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
+
+    // Damage block overlay (cracks)
+    if block.health_curr < block.health_max {
+        frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) block.health_curr * DAMAGE_MAP_COLS / block.health_max);
+        damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
+        DrawTexturePro(damage_map, damage_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+    }
+
+    // Mouse block overlay (hover)
+    is_within_reach  := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+
+    selected_item_stack, result := get_selected_item_stack(player.inventory);
+    has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+    is_wielding_tool_for_block_type := has_an_item_selected && can_item_break_blocks(selected_item_stack.item_type);
+    
+    show_block_hover := debug_mode || is_wielding_tool_for_block_type && is_within_reach;
+    if show_block_hover {
+        if CheckCollisionPointRec(mouse_pos_in_world, block.bounding_rect) {
+            DrawRectangleRec(block.sprite_rect, TRANSPARENT_WHITE);
+        }
+
+        return debug_mode;
+    }
+
+    return false;
+}
