@@ -468,7 +468,7 @@ main :: () {
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for row: 0..hill_dirt_blocks {
-            generate_block(.WALL_DIRT, xx x, xx y);
+            generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
 
             block_type := ifx row == hill_dirt_blocks then BlockType.GRASS else BlockType.DIRT;
             generate_block(block_type, xx x, xx y);
@@ -483,7 +483,7 @@ main :: () {
         for row: 0..ground_dirt_blocks-1 {
             defer y += BLOCK_WORLD_HEIGHT;
 
-            generate_block(.WALL_DIRT, xx (x + WALL_WORLD_WIDTH  / 4), xx (y + WALL_WORLD_HEIGHT / 4));
+            generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
@@ -499,7 +499,7 @@ main :: () {
         for row: 0..(100 - ground_dirt_blocks) {
             defer y += BLOCK_WORLD_HEIGHT;
             
-            generate_block(.WALL_ROCK, xx (x + WALL_WORLD_WIDTH  / 4), xx (y + WALL_WORLD_HEIGHT / 4));
+            generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
@@ -868,9 +868,10 @@ main :: () {
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected        := result == xx ReturnStatus.SUCCESS;
                         item_can_be_placed_down     := can_item_be_placed_down(selected_item_stack.item_type);
+                        is_wall                     := get_is_wall_item(selected_item_stack.item_type);
 
                         if has_an_item_selected && selected_item_stack.stack_count > 0 && item_can_be_placed_down {
-                            new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT);
+                            new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, is_wall);
                             new_pos  := get_rect_center(new_rect);
                             
                             // Check if the new block would be placed on the player
@@ -878,21 +879,35 @@ main :: () {
 
                             // Check if the new block would be placed on an existing block
                             block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
+                            wall_already_exists_at_location, _  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(new_pos));
+                            tile_already_exists_at_location     := ifx is_wall then wall_already_exists_at_location else block_already_exists_at_location;
 
-                            neighbor_exists_north, _ := get_neighbor(new_pos, .NORTH);
-                            neighbor_exists_south, _ := get_neighbor(new_pos, .SOUTH);
-                            neighbor_exists_east,  _ := get_neighbor(new_pos, .EAST);
-                            neighbor_exists_west,  _ := get_neighbor(new_pos, .WEST);
+                            neighbor_exists_north_block, _ := get_neighbor(new_pos, .NORTH);
+                            neighbor_exists_south_block, _ := get_neighbor(new_pos, .SOUTH);
+                            neighbor_exists_east_block,  _ := get_neighbor(new_pos, .EAST);
+                            neighbor_exists_west_block,  _ := get_neighbor(new_pos, .WEST);
+
+                            neighbor_exists_north_wall, _ := get_neighbor_wall(new_pos, .NORTH);
+                            neighbor_exists_south_wall, _ := get_neighbor_wall(new_pos, .SOUTH);
+                            neighbor_exists_east_wall,  _ := get_neighbor_wall(new_pos, .EAST);
+                            neighbor_exists_west_wall,  _ := get_neighbor_wall(new_pos, .WEST);
+
+                            neighbor_exists_north := ifx is_wall then neighbor_exists_north_wall else neighbor_exists_north_block;
+                            neighbor_exists_south := ifx is_wall then neighbor_exists_south_wall else neighbor_exists_south_block;
+                            neighbor_exists_east  := ifx is_wall then neighbor_exists_east_wall  else neighbor_exists_east_block;
+                            neighbor_exists_west  := ifx is_wall then neighbor_exists_west_wall  else neighbor_exists_west_block;
 
                             is_position_placeable :=
                                 !would_be_on_player &&
-                                !block_already_exists_at_location &&
+                                !tile_already_exists_at_location &&
                                 (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
 
                             is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
                             can_place_block := debug_mode || (is_position_placeable && is_within_reach);
+
                             print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, new_pos, new_rect);
+
                             // Place block down
                             if can_place_block {
                                 new_block_type := item_type_to_block_type(selected_item_stack.item_type);
@@ -1660,10 +1675,15 @@ update_camera_center_smooth_follow :: (camera: *Camera2D, player: *Player, delta
     }
 }
 
-create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: s32) -> Rectangle {
+create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: s32, is_wall: bool) -> Rectangle {
     // First of all, chop off any decimal info from the pos. Placing blocks should only ever occur with on int coords.
     int_pos_x : int = cast(int) floor(pos.x);
     int_pos_y : int = cast(int) floor(pos.y);
+
+    if is_wall {
+        // int_pos_x -= tile_width;
+        int_pos_y -= tile_height;
+    }
 
     // Next calculate the amount we need to subtract to the position to get axis aligned.
     // In this diagram, dX is the amount to shift the pos to the left, and dY is the amount to shift up.
@@ -1686,8 +1706,8 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     new_rect := Rectangle.{
         x      = xx x,
         y      = xx y,
-        width  = xx tile_width,
-        height = xx tile_height,
+        width  = xx ifx is_wall then tile_width  * 2 else tile_width,
+        height = xx ifx is_wall then tile_height * 2 else tile_height,
     };
 
     return new_rect;
@@ -2147,6 +2167,26 @@ get_is_wall :: (block_type: BlockType) -> bool {
         case;
             print_vars(block_type);
             assert(false, "Invalid block type");
+            return false; // Unreachable
+    }
+}
+
+get_is_wall_item :: (item_type: ItemType) -> bool {
+    if item_type == {
+        case .PICKAXE;         return false;
+        case .SWORD;           return false;
+        case .AXE;             return false;
+        case .HAMMER;          return false;
+        case .DIRT_ITEM;       return false;
+        case .ROCK_ITEM;       return false;
+        case .COPPER_ORE_ITEM; return false;
+
+        case .WALL_DIRT_ITEM;  return true;
+        case .WALL_ROCK_ITEM;  return true;
+    
+        case;
+            print_vars(item_type);
+            assert(false, "Invalid item type");
             return false; // Unreachable
     }
 }
@@ -3799,23 +3839,12 @@ update_texture_map_source_pos_around_pos :: (block_pos: Vector2, is_wall: bool) 
 generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     is_wall := get_is_wall(block_type);
     
-    rect : Rectangle;
-    
-    if is_wall {
-        rect = Rectangle.{
-            xx (x + BLOCK_WORLD_WIDTH / 2),
-            xx (y + BLOCK_WORLD_HEIGHT / 2),
-            xx WALL_WORLD_WIDTH,
-            xx WALL_WORLD_HEIGHT,
-        };
-    } else {
-        rect = Rectangle.{
-            xx x,
-            xx y,
-            xx BLOCK_WORLD_WIDTH,
-            xx BLOCK_WORLD_HEIGHT,
-        };
-    }
+    rect := Rectangle.{
+        xx x,
+        xx y,
+        xx ifx is_wall then WALL_WORLD_WIDTH else BLOCK_WORLD_WIDTH,
+        xx ifx is_wall then WALL_WORLD_HEIGHT else BLOCK_WORLD_HEIGHT,
+    };
 
     new_block := New(Block);
     new_block.type          = Block;

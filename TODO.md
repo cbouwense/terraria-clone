@@ -1,6 +1,6 @@
 # In progress
 
-- place/destroy walls
+- place walls
 
 # Game
 
