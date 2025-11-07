@@ -468,7 +468,7 @@ main :: () {
         // Generate hills
         hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
         for row: 0..hill_dirt_blocks {
-            generate_block(.WALL_DIRT, xx (x + WALL_WORLD_WIDTH  / 4), xx (y + WALL_WORLD_HEIGHT / 4));
+            generate_block(.WALL_DIRT, xx x, xx y);
 
             block_type := ifx row == hill_dirt_blocks then BlockType.GRASS else BlockType.DIRT;
             generate_block(block_type, xx x, xx y);
@@ -760,7 +760,7 @@ main :: () {
 
                             update_block_shadows_around_pos(block_mouse_is_over.pos);
 
-                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos, false);
 
                             free(block_mouse_is_over);
                         }
@@ -807,7 +807,7 @@ main :: () {
 
                                                 update_block_shadows_around_pos(block_mouse_is_over.pos);
 
-                                                update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+                                                update_texture_map_source_pos_around_pos(block_mouse_is_over.pos, true);
 
                                                 free(block_mouse_is_over);
                                             }
@@ -845,7 +845,7 @@ main :: () {
 
                                             update_block_shadows_around_pos(block_mouse_is_over.pos);
 
-                                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos);
+                                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos, false);
 
                                             free(block_mouse_is_over);
                                         }
@@ -908,7 +908,7 @@ main :: () {
                                 update_block_shadows_around_pos(new_pos);
 
                                 new_block.texture_map_source_pos = get_texture_map_source_coords_for_block(new_block);
-                                update_texture_map_source_pos_around_pos(new_pos);
+                                update_texture_map_source_pos_around_pos(new_pos, false);
                             }
                         }
                     }
@@ -3767,32 +3767,55 @@ update_block_shadows_around_pos :: (block_pos: Vector2) {
     }
 }
 
-update_texture_map_source_pos_around_pos :: (block_pos: Vector2) {
+update_texture_map_source_pos_around_pos :: (block_pos: Vector2, is_wall: bool) {
     potential_neighbor_pos_north := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
     potential_neighbor_pos_south := Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
     potential_neighbor_pos_east  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
     potential_neighbor_pos_west  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
 
-    neighbor_exists_north, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_north));
-    neighbor_exists_south, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_south));
-    neighbor_exists_east,  neighbor_east  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_east));
-    neighbor_exists_west,  neighbor_west  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_west));
+    if is_wall {
+        neighbor_exists_north, neighbor_north := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(potential_neighbor_pos_north));
+        neighbor_exists_south, neighbor_south := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(potential_neighbor_pos_south));
+        neighbor_exists_east,  neighbor_east  := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(potential_neighbor_pos_east));
+        neighbor_exists_west,  neighbor_west  := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(potential_neighbor_pos_west));
 
-    if neighbor_exists_north { neighbor_north.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_north); }
-    if neighbor_exists_south { neighbor_south.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_south); }
-    if neighbor_exists_east  { neighbor_east.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_east);  }
-    if neighbor_exists_west  { neighbor_west.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_west);  }
+        if neighbor_exists_north { neighbor_north.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_north); }
+        if neighbor_exists_south { neighbor_south.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_south); }
+        if neighbor_exists_east  { neighbor_east.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_east);  }
+        if neighbor_exists_west  { neighbor_west.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_west);  }
+    } else {
+        neighbor_exists_north, neighbor_north := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_north));
+        neighbor_exists_south, neighbor_south := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_south));
+        neighbor_exists_east,  neighbor_east  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_east));
+        neighbor_exists_west,  neighbor_west  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos_west));
+
+        if neighbor_exists_north { neighbor_north.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_north); }
+        if neighbor_exists_south { neighbor_south.texture_map_source_pos = get_texture_map_source_coords_for_block(neighbor_south); }
+        if neighbor_exists_east  { neighbor_east.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_east);  }
+        if neighbor_exists_west  { neighbor_west.texture_map_source_pos  = get_texture_map_source_coords_for_block(neighbor_west);  }
+    }
 }
 
 generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     is_wall := get_is_wall(block_type);
     
-    rect := Rectangle.{
-        xx x,
-        xx y,
-        xx ifx is_wall then WALL_WORLD_WIDTH else BLOCK_WORLD_WIDTH,
-        xx ifx is_wall then WALL_WORLD_HEIGHT else BLOCK_WORLD_HEIGHT,
-    };
+    rect : Rectangle;
+    
+    if is_wall {
+        rect = Rectangle.{
+            xx (x + BLOCK_WORLD_WIDTH / 2),
+            xx (y + BLOCK_WORLD_HEIGHT / 2),
+            xx WALL_WORLD_WIDTH,
+            xx WALL_WORLD_HEIGHT,
+        };
+    } else {
+        rect = Rectangle.{
+            xx x,
+            xx y,
+            xx BLOCK_WORLD_WIDTH,
+            xx BLOCK_WORLD_HEIGHT,
+        };
+    }
 
     new_block := New(Block);
     new_block.type          = Block;

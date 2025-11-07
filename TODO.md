@@ -1,11 +1,9 @@
 # In progress
 
-- hammer
+- place/destroy walls
 
 # Game
 
-- place walls
-- destroy walls
 - crafting
 - [ui] inventory
 - [world_gen] trees
@@ -34,6 +32,7 @@
 
 - hot reloading
 - metaprogram for required fields
+- remap curly brackets, underscore, esc
 
 # Bugs
 
