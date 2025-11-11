@@ -19,6 +19,7 @@ window_height := 800;
 should_quit_game := false;
 paused           := false;
 debug_mode       := false;
+shadows_enabled  := true;
 free_cam_pos     := Vector2.{ 0, 0 };
 
 // Controls
@@ -512,7 +513,8 @@ main :: () {
         x += BLOCK_WORLD_WIDTH;
     }
 
-    for wall: global_wall_pos_to_wall {
+    for wall: global_wall_pos_to_wall 
+    {
         // Define initial shadows for walls
         {
             // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
@@ -618,9 +620,10 @@ main :: () {
         // Input
         //
         {
-            if IsKeyPressed(.KEY_P) paused     = !paused;
-            if IsKeyPressed(.KEY_G) debug_mode = !debug_mode;
-            if IsKeyPressed(.KEY_R) player     = spawn_player();
+            if IsKeyPressed(.KEY_P) paused          = !paused;
+            if IsKeyPressed(.KEY_G) debug_mode      = !debug_mode;
+            if IsKeyPressed(.KEY_L) shadows_enabled = !shadows_enabled;
+            if IsKeyPressed(.KEY_R) player          = spawn_player();
 
             move_player_left   = control_down(controls.move_player_left);
             move_player_right  = control_down(controls.move_player_right);
@@ -867,63 +870,68 @@ main :: () {
 
                         selected_item_stack, result := get_selected_item_stack(player.inventory);
                         has_an_item_selected        := result == xx ReturnStatus.SUCCESS;
-                        item_can_be_placed_down     := can_item_be_placed_down(selected_item_stack.item_type);
-                        is_wall                     := get_is_wall_item(selected_item_stack.item_type);
 
-                        if has_an_item_selected && selected_item_stack.stack_count > 0 && item_can_be_placed_down {
-                            new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, is_wall);
-                            new_pos  := get_rect_center(new_rect);
-                            
-                            // Check if the new block would be placed on the player
-                            would_be_on_player := CheckCollisionRecs(new_rect, player.bounding_rect);
+                        if has_an_item_selected {
 
-                            // Check if the new block would be placed on an existing block
-                            block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
-                            wall_already_exists_at_location, _  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(new_pos));
-                            tile_already_exists_at_location     := ifx is_wall then wall_already_exists_at_location else block_already_exists_at_location;
+                            item_can_be_placed_down     := can_item_be_placed_down(selected_item_stack.item_type);
+                            is_wall                     := get_is_wall_item(selected_item_stack.item_type);
 
-                            neighbor_exists_north_block, _ := get_neighbor(new_pos, .NORTH);
-                            neighbor_exists_south_block, _ := get_neighbor(new_pos, .SOUTH);
-                            neighbor_exists_east_block,  _ := get_neighbor(new_pos, .EAST);
-                            neighbor_exists_west_block,  _ := get_neighbor(new_pos, .WEST);
+                            if selected_item_stack.stack_count > 0 && item_can_be_placed_down {
 
-                            neighbor_exists_north_wall, _ := get_neighbor_wall(new_pos, .NORTH);
-                            neighbor_exists_south_wall, _ := get_neighbor_wall(new_pos, .SOUTH);
-                            neighbor_exists_east_wall,  _ := get_neighbor_wall(new_pos, .EAST);
-                            neighbor_exists_west_wall,  _ := get_neighbor_wall(new_pos, .WEST);
-
-                            neighbor_exists_north := ifx is_wall then neighbor_exists_north_wall else neighbor_exists_north_block;
-                            neighbor_exists_south := ifx is_wall then neighbor_exists_south_wall else neighbor_exists_south_block;
-                            neighbor_exists_east  := ifx is_wall then neighbor_exists_east_wall  else neighbor_exists_east_block;
-                            neighbor_exists_west  := ifx is_wall then neighbor_exists_west_wall  else neighbor_exists_west_block;
-
-                            is_position_placeable :=
-                                !would_be_on_player &&
-                                !tile_already_exists_at_location &&
-                                (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
-
-                            is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
-
-                            can_place_block := debug_mode || (is_position_placeable && is_within_reach);
-
-                            print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, new_pos, new_rect);
-
-                            // Place block down
-                            if can_place_block {
-                                new_block_type := item_type_to_block_type(selected_item_stack.item_type);
-
-                                new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
-
-                                player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
-
-                                player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
-
-                                set_block_shadow_relative_to_neighbors(new_pos);
+                                new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, is_wall);
+                                new_pos  := get_rect_center(new_rect);
                                 
-                                update_block_shadows_around_pos(new_pos);
+                                // Check if the new block would be placed on the player
+                                would_be_on_player := !is_wall && CheckCollisionRecs(new_rect, player.bounding_rect);
 
-                                new_block.texture_map_source_pos = get_texture_map_source_coords_for_block(new_block);
-                                update_texture_map_source_pos_around_pos(new_pos, false);
+                                // Check if the new block would be placed on an existing block
+                                block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
+                                wall_already_exists_at_location, _  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(new_pos));
+                                tile_already_exists_at_location     := ifx is_wall then wall_already_exists_at_location else block_already_exists_at_location;
+
+                                neighbor_exists_north_block, _ := get_neighbor(new_pos, .NORTH, false);
+                                neighbor_exists_south_block, _ := get_neighbor(new_pos, .SOUTH, false);
+                                neighbor_exists_east_block,  _ := get_neighbor(new_pos, .EAST,  false);
+                                neighbor_exists_west_block,  _ := get_neighbor(new_pos, .WEST,  false);
+
+                                neighbor_exists_north_wall, _ := get_neighbor(new_pos, .NORTH, true);
+                                neighbor_exists_south_wall, _ := get_neighbor(new_pos, .SOUTH, true);
+                                neighbor_exists_east_wall,  _ := get_neighbor(new_pos, .EAST,  true);
+                                neighbor_exists_west_wall,  _ := get_neighbor(new_pos, .WEST,  true);
+
+                                neighbor_exists_north := ifx is_wall then neighbor_exists_north_wall else neighbor_exists_north_block;
+                                neighbor_exists_south := ifx is_wall then neighbor_exists_south_wall else neighbor_exists_south_block;
+                                neighbor_exists_east  := ifx is_wall then neighbor_exists_east_wall  else neighbor_exists_east_block;
+                                neighbor_exists_west  := ifx is_wall then neighbor_exists_west_wall  else neighbor_exists_west_block;
+
+                                is_position_placeable :=
+                                    !would_be_on_player &&
+                                    !tile_already_exists_at_location &&
+                                    (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
+
+                                is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+
+                                can_place_block := debug_mode || (is_position_placeable && is_within_reach);
+
+                                print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, new_pos, new_rect);
+
+                                // Place block down
+                                if can_place_block {
+                                    new_block_type := item_type_to_block_type(selected_item_stack.item_type);
+
+                                    new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
+
+                                    player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
+
+                                    player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
+
+                                    set_block_shadow_relative_to_neighbors(new_pos);
+                                    
+                                    update_block_shadows_around_pos(new_pos);
+
+                                    new_block.texture_map_source_pos = get_texture_map_source_coords_for_block(new_block);
+                                    update_texture_map_source_pos_around_pos(new_pos, false);
+                                }
                             }
                         }
                     }
@@ -1163,6 +1171,31 @@ main :: () {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
                         DrawCircleV(player.pos, 3.0, RED);
                     }
+                }
+
+                if debug_mode {
+                    
+                    north_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y - BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                    north_pos  := get_rect_center(north_rect);
+                    DrawCircleV(north_pos, 5.0, RED);
+                    DrawRectangleLinesEx(north_rect, 2.0, YELLOW);
+
+                    south_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y + BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                    south_pos  := get_rect_center(south_rect);
+                    DrawCircleV(south_pos, 5.0, RED);
+                    DrawRectangleLinesEx(south_rect, 2.0, YELLOW);
+
+                    east_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x + BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                    east_pos  := get_rect_center(east_rect);
+                    DrawCircleV(east_pos, 5.0, RED);
+                    DrawRectangleLinesEx(east_rect, 2.0, YELLOW);
+
+                    west_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x - BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                    west_pos  := get_rect_center(west_rect);
+                    DrawCircleV(west_pos, 5.0, RED);
+                    DrawRectangleLinesEx(west_rect, 2.0, YELLOW);
+
+                    DrawRectangleLinesEx(create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true), 2.0, RED);
                 }
             }
 
@@ -1680,11 +1713,6 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     int_pos_x : int = cast(int) floor(pos.x);
     int_pos_y : int = cast(int) floor(pos.y);
 
-    if is_wall {
-        // int_pos_x -= tile_width;
-        int_pos_y -= tile_height;
-    }
-
     // Next calculate the amount we need to subtract to the position to get axis aligned.
     // In this diagram, dX is the amount to shift the pos to the left, and dY is the amount to shift up.
     //  +-----------+
@@ -1694,11 +1722,16 @@ create_rect_for_tile_from_point :: (pos: Vector2, tile_width: s32, tile_height: 
     //  |<~~o       |
     //  |           |
     //  +-----------+
-    d_x : int = int_pos_x % tile_width;
-    d_y : int = int_pos_y % tile_height;
+    d_x : int = int_pos_x % (tile_width );
+    d_y : int = int_pos_y % (tile_height);
 
     if d_x < 0 { d_x += tile_width;  };
     if d_y < 0 { d_y += tile_height; };
+
+    if is_wall {
+        d_x += BLOCK_WORLD_WIDTH  / 2;
+        d_y += BLOCK_WORLD_HEIGHT / 2;
+    }
 
     x := int_pos_x - d_x;
     y := int_pos_y - d_y;
@@ -1819,6 +1852,11 @@ spawn_player :: () -> Player {
             item_type     = .ROCK_ITEM,
             stack_capacity = ROCK_STACK_CAPACITY,
             stack_count    = ROCK_STACK_CAPACITY,
+        };
+        player.inventory.item_stacks[6] = ItemStack.{
+            item_type     = .WALL_DIRT_ITEM,
+            stack_capacity = WALL_DIRT_STACK_CAPACITY,
+            stack_count    = WALL_DIRT_STACK_CAPACITY,
         };
     
     }
@@ -2194,19 +2232,10 @@ get_is_wall_item :: (item_type: ItemType) -> bool {
 get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
     is_wall := get_is_wall(block.block_type);
 
-    north_exists, south_exists, east_exists, west_exists : bool;
-    north, south, east, west : *Block;
-    if is_wall {
-        north_exists, north = get_neighbor_wall(block.pos, .NORTH);
-        south_exists, south = get_neighbor_wall(block.pos, .SOUTH);
-        east_exists,  east  = get_neighbor_wall(block.pos, .EAST);
-        west_exists,  west  = get_neighbor_wall(block.pos, .WEST);
-    } else {
-        north_exists, north = get_neighbor(block.pos, .NORTH);
-        south_exists, south = get_neighbor(block.pos, .SOUTH);
-        east_exists,  east  = get_neighbor(block.pos, .EAST);
-        west_exists,  west  = get_neighbor(block.pos, .WEST);
-    }
+    north_exists, north := get_neighbor(block.pos, .NORTH, is_wall);
+    south_exists, south := get_neighbor(block.pos, .SOUTH, is_wall);
+    east_exists,  east  := get_neighbor(block.pos, .EAST , is_wall);
+    west_exists,  west  := get_neighbor(block.pos, .WEST , is_wall);
     
     x := -1;
     y := -1;
@@ -3546,44 +3575,33 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
 }
 
-get_neighbor :: (block_pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
+get_neighbor :: (pos: Vector2, direction: Direction, is_wall: bool) -> neighbor_exists: bool, neighbor: *Block {
     potential_neighbor_pos: Vector2;
     if direction == {
-        case .NORTH;      potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y - BLOCK_WORLD_HEIGHT };
-        case .NORTH_EAST; potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y - BLOCK_WORLD_HEIGHT };
-        case .NORTH_WEST; potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y - BLOCK_WORLD_HEIGHT };
-        case .SOUTH;      potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y + BLOCK_WORLD_HEIGHT };
-        case .SOUTH_EAST; potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y + BLOCK_WORLD_HEIGHT };
-        case .SOUTH_WEST; potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y + BLOCK_WORLD_HEIGHT };
-        case .EAST;       potential_neighbor_pos = Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
-        case .WEST;       potential_neighbor_pos = Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
-        case .CENTER;     potential_neighbor_pos = Vector2.{ block_pos.x,                     block_pos.y };
+        case .NORTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y - BLOCK_WORLD_HEIGHT };
+        case .NORTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + BLOCK_WORLD_WIDTH, pos.y - BLOCK_WORLD_HEIGHT };
+        case .NORTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - BLOCK_WORLD_WIDTH, pos.y - BLOCK_WORLD_HEIGHT };
+        case .SOUTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y + BLOCK_WORLD_HEIGHT };
+        case .SOUTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + BLOCK_WORLD_WIDTH, pos.y + BLOCK_WORLD_HEIGHT };
+        case .SOUTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - BLOCK_WORLD_WIDTH, pos.y + BLOCK_WORLD_HEIGHT };
+        case .EAST;       potential_neighbor_pos = Vector2.{ pos.x + BLOCK_WORLD_WIDTH, pos.y };
+        case .WEST;       potential_neighbor_pos = Vector2.{ pos.x - BLOCK_WORLD_WIDTH, pos.y };
+        case .CENTER;     potential_neighbor_pos = Vector2.{ pos.x,                     pos.y };
         case;        assert(false, "Invalid direction");
     }
-    neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos));
-    // print_vars(block_pos, direction, potential_neighbor_pos, neighbor_exists, neighbor);
-    return neighbor_exists, neighbor;
-}
-
-get_neighbor_wall :: (wall_pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Block {
-    potential_neighbor_pos: Vector2;
-    if direction == {
-        // @NOTE: intentionally using BLOCK_WORLD_WIDTH and BLOCK_WORLD_HEIGHT instead of the wall variants since walls are still
-        // spaced every BLOCK_WORLD_WIDTH and BLOCK_WORLD_HEIGHT away from each other.
-        case .NORTH; potential_neighbor_pos = Vector2.{ wall_pos.x, wall_pos.y - BLOCK_WORLD_HEIGHT };
-        case .SOUTH; potential_neighbor_pos = Vector2.{ wall_pos.x, wall_pos.y + BLOCK_WORLD_HEIGHT };
-        case .EAST;  potential_neighbor_pos = Vector2.{ wall_pos.x + BLOCK_WORLD_WIDTH, wall_pos.y };
-        case .WEST;  potential_neighbor_pos = Vector2.{ wall_pos.x - BLOCK_WORLD_WIDTH, wall_pos.y };
-        case;        assert(false, "Invalid direction");
+    
+    if is_wall {
+        neighbor_exists, neighbor := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(potential_neighbor_pos));
+        return neighbor_exists, neighbor;
+    } else {
+        neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos));
+        return neighbor_exists, neighbor;
     }
-    neighbor_exists, neighbor := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(potential_neighbor_pos));
-    // print_vars(neighbor_exists, neighbor);
-    return neighbor_exists, neighbor;
 }
 
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
-    neighbor_block_exists, neighbor_block := get_neighbor(block.pos, direction);
-    neighbor_wall_exists,  neighbor_wall  := get_neighbor_wall(block.pos, direction);
+    neighbor_block_exists, neighbor_block := get_neighbor(block.pos, direction, false);
+    neighbor_wall_exists,  neighbor_wall  := get_neighbor(block.pos, direction, true);
 
     // @TODO: DRY this up
     if direction == {
@@ -3883,7 +3901,10 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
 
 draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> should_debug_block: bool {
     block_map_texture, block_map_source := get_texture_map_for_block(block);
-    color : Color = ifx debug_mode then WHITE else Color.{ 255 - block.shadow * 36, 255 - block.shadow * 36, 255 - block.shadow * 36, 255 };
+    color : Color = WHITE;
+    if shadows_enabled {
+        color = Color.{ 255 - block.shadow * 36, 255 - block.shadow * 36, 255 - block.shadow * 36, 255 };
+    }
 
     // Draw block texture
     DrawTexturePro(block_map_texture, block_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
@@ -3893,6 +3914,10 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
         frame := DAMAGE_MAP_COLS-1 - floor(cast(float32) block.health_curr * DAMAGE_MAP_COLS / block.health_max);
         damage_map_source := Rectangle.{cast(float32) frame * DAMAGE_MAP_TILE_WIDTH, 0, DAMAGE_MAP_TILE_WIDTH, DAMAGE_MAP_TILE_HEIGHT};
         DrawTexturePro(damage_map, damage_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+    }
+
+    if debug_mode {
+        DrawCircleV(block.pos, 3.0, LIME);
     }
 
     // Mouse block overlay (hover)
@@ -3906,9 +3931,8 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
     if show_block_hover {
         if CheckCollisionPointRec(mouse_pos_in_world, block.bounding_rect) {
             DrawRectangleRec(block.sprite_rect, TRANSPARENT_WHITE);
+            return true;
         }
-
-        return debug_mode;
     }
 
     return false;
