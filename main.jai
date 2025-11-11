@@ -513,52 +513,12 @@ main :: () {
         x += BLOCK_WORLD_WIDTH;
     }
 
-    for wall: global_wall_pos_to_wall 
-    {
-        // Define initial shadows for walls
-        {
-            // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
-            wall.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(wall, .NORTH);
-            wall.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(wall, .SOUTH);
-            wall.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(wall, .EAST);
-            wall.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(wall, .WEST);
+    for walls_dirt initialize_block(it);
+    for walls_rock initialize_block(it);
 
-            min_neighbor_count := min(
-                min(wall.neighbor_north_count, wall.neighbor_south_count),
-                min(wall.neighbor_east_count,  wall.neighbor_west_count)
-            );
-            // print_vars(wall, min_neighbor_count);
-            wall.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-        }
-
-        // Initialize texture source pos
-        {
-            wall.texture_map_source_pos = get_texture_map_source_coords_for_block(wall);
-        }
-    }
-
-    // @TODO: don't iterate through hash table like this
-    for block: global_block_pos_to_block {
-        // Define initial shadows for blocks
-        {
-            // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
-            block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
-            block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
-            block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
-            block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
-
-            min_neighbor_count := min(
-                min(block.neighbor_north_count, block.neighbor_south_count),
-                min(block.neighbor_east_count,  block.neighbor_west_count)
-            );
-            block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-        }
-
-        // Initialize texture source pos
-        {
-            block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
-        }
-    }
+    for blocks_dirt  initialize_block(it);
+    for blocks_grass initialize_block(it);
+    for blocks_rock  initialize_block(it);
 
     // Initialize camera
     camera: Camera2D;
@@ -774,83 +734,32 @@ main :: () {
                         if !is_on_cooldown {
                             if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
                                 // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block?
-                                // As opposed to a wall
                                 block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
+                                wall_mouse_is_over  : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
+                                tile_mouse_is_over  : *Block = ifx block_mouse_is_over != null then block_mouse_is_over else wall_mouse_is_over;
 
-                                if block_mouse_is_over == null {
-                                    block_mouse_is_over = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
-
-                                    if block_mouse_is_over != null {
-                                        block_type := block_mouse_is_over.block_type;
-                                        selected_item_stack, result := get_selected_item_stack(player.inventory);
-                                        has_an_item_selected := result == xx ReturnStatus.SUCCESS;
-
-                                        if has_an_item_selected && can_item_break_walls(selected_item_stack.item_type) {
-                                            tool_type      := selected_item_stack.item_type;
-                                            breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
-
-                                            damage := breaking_speed / block_mouse_is_over.hardness;
-                                            if block_mouse_is_over.weak_to_tool == tool_type {
-                                                damage *= BLOCK_WEAKNESS_MULTIPLIER;
-                                            }
-                                            block_mouse_is_over.health_curr -= damage;
-                                            
-                                            // @TODO: extract function
-                                            // Destroy block
-                                            if block_mouse_is_over.health_curr <= 0 {
-                                                table_remove(*global_wall_pos_to_wall, vector2_to_string_temp(block_mouse_is_over.pos));
-
-                                                if block_type == {
-                                                    case .WALL_DIRT; array_unordered_remove_by_value(*walls_dirt, block_mouse_is_over);
-                                                    case .WALL_ROCK; array_unordered_remove_by_value(*walls_rock, block_mouse_is_over);
-                                                    case; assert(false, "forgot wall type to remove");
-                                                }
-
-                                                try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
-
-                                                update_block_shadows_around_pos(block_mouse_is_over.pos);
-
-                                                update_texture_map_source_pos_around_pos(block_mouse_is_over.pos, true);
-
-                                                free(block_mouse_is_over);
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    block_type := block_mouse_is_over.block_type;
-                                    // @TODO: kicking off some little animation of it being sized bigger and smaller like modern terraria does could be cool
-
+                                if tile_mouse_is_over != null {
+                                    block_type := tile_mouse_is_over.block_type;
+                                    is_wall    := get_is_wall(block_type);
                                     selected_item_stack, result := get_selected_item_stack(player.inventory);
                                     has_an_item_selected := result == xx ReturnStatus.SUCCESS;
-                                    if has_an_item_selected && can_item_break_blocks(selected_item_stack.item_type) {
-                                        tool_type      := selected_item_stack.item_type;
-                                        breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
 
-                                        damage := breaking_speed / block_mouse_is_over.hardness;
-                                        if block_mouse_is_over.weak_to_tool == tool_type {
-                                            damage *= BLOCK_WEAKNESS_MULTIPLIER;
-                                        }
-                                        block_mouse_is_over.health_curr -= damage;
-                                        
-                                        // @TODO: extract function
-                                        // Destroy block
-                                        if block_mouse_is_over.health_curr <= 0 {
-                                            table_remove(*global_block_pos_to_block, vector2_to_string_temp(block_mouse_is_over.pos));
+                                    if has_an_item_selected {
+                                        tool_type := selected_item_stack.item_type;
+                                        can_item_break_tile := ifx is_wall then can_item_break_walls(tool_type) else can_item_break_blocks(tool_type);
 
-                                            if block_type == {
-                                                case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
-                                                case .GRASS; array_unordered_remove_by_value(*blocks_grass, block_mouse_is_over);
-                                                case .ROCK;  array_unordered_remove_by_value(*blocks_rock,  block_mouse_is_over);
-                                                case; assert(false, "forgot block type to remove");
+                                        if can_item_break_tile {
+                                            breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
+
+                                            damage := breaking_speed / tile_mouse_is_over.hardness;
+                                            if tile_mouse_is_over.weak_to_tool == tool_type {
+                                                damage *= BLOCK_WEAKNESS_MULTIPLIER;
                                             }
-
-                                            try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
-
-                                            update_block_shadows_around_pos(block_mouse_is_over.pos);
-
-                                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos, false);
-
-                                            free(block_mouse_is_over);
+                                            tile_mouse_is_over.health_curr -= damage;
+                                            
+                                            if tile_mouse_is_over.health_curr <= 0 {
+                                                destroy_block(tile_mouse_is_over, *player);
+                                            }
                                         }
                                     }
                                 }
@@ -899,21 +808,19 @@ main :: () {
                                 neighbor_exists_east_wall,  _ := get_neighbor(new_pos, .EAST,  true);
                                 neighbor_exists_west_wall,  _ := get_neighbor(new_pos, .WEST,  true);
 
-                                neighbor_exists_north := ifx is_wall then neighbor_exists_north_wall else neighbor_exists_north_block;
-                                neighbor_exists_south := ifx is_wall then neighbor_exists_south_wall else neighbor_exists_south_block;
-                                neighbor_exists_east  := ifx is_wall then neighbor_exists_east_wall  else neighbor_exists_east_block;
-                                neighbor_exists_west  := ifx is_wall then neighbor_exists_west_wall  else neighbor_exists_west_block;
+                                neighbor_exists_north := neighbor_exists_north_wall || neighbor_exists_north_block;
+                                neighbor_exists_south := neighbor_exists_south_wall || neighbor_exists_south_block;
+                                neighbor_exists_east  := neighbor_exists_east_wall  || neighbor_exists_east_block;
+                                neighbor_exists_west  := neighbor_exists_west_wall  || neighbor_exists_west_block;
 
                                 is_position_placeable :=
                                     !would_be_on_player &&
-                                    !tile_already_exists_at_location &&
+                                    (!is_wall && !block_already_exists_at_location) &&
                                     (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
 
                                 is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
                                 can_place_block := debug_mode || (is_position_placeable && is_within_reach);
-
-                                print_vars(can_place_block, is_position_placeable, is_within_reach, would_be_on_player, block_already_exists_at_location, neighbor_exists_north, neighbor_exists_south, neighbor_exists_east, neighbor_exists_west, new_pos, new_rect);
 
                                 // Place block down
                                 if can_place_block {
@@ -1169,7 +1076,7 @@ main :: () {
 
                     if debug_mode {
                         DrawRectangleLinesEx(player.bounding_rect, 1.0, LIME);
-                        DrawCircleV(player.pos, 3.0, RED);
+                        // DrawCircleV(player.pos, 3.0, RED);
                     }
                 }
 
@@ -3916,9 +3823,9 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
         DrawTexturePro(damage_map, damage_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
     }
 
-    if debug_mode {
-        DrawCircleV(block.pos, 3.0, LIME);
-    }
+    // if debug_mode {
+    //     DrawCircleV(block.pos, 3.0, LIME);
+    // }
 
     // Mouse block overlay (hover)
     is_within_reach  := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
@@ -3936,4 +3843,53 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
     }
 
     return false;
+}
+
+initialize_block :: (block: *Block) {
+    // Define initial shadows for walls
+    {
+        // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
+        block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
+        block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
+        block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
+        block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
+
+        min_neighbor_count := min(
+            min(block.neighbor_north_count, block.neighbor_south_count),
+            min(block.neighbor_east_count,  block.neighbor_west_count)
+        );
+        // print_vars(wall, min_neighbor_count);
+        block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+    }
+
+    // Initialize texture source pos
+    {
+        block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
+    }
+}
+
+destroy_block :: (block: *Block, player: *Player) {
+    is_wall := get_is_wall(block.block_type);
+
+    if is_wall table_remove(*global_wall_pos_to_wall,   vector2_to_string_temp(block.pos));
+    else       table_remove(*global_block_pos_to_block, vector2_to_string_temp(block.pos));
+
+    if block.block_type == {
+        case .DIRT;       array_unordered_remove_by_value(*blocks_dirt,  block);
+        case .GRASS;      array_unordered_remove_by_value(*blocks_grass, block);
+        case .ROCK;       array_unordered_remove_by_value(*blocks_rock,  block);
+        case .COPPER_ORE; array_unordered_remove_by_value(*blocks_rock,  block);
+
+        case .WALL_DIRT;  array_unordered_remove_by_value(*walls_dirt, block);
+        case .WALL_ROCK;  array_unordered_remove_by_value(*walls_rock, block);
+        case; assert(false, "forgot wall type to remove");
+    }
+
+    try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block.block_type));
+
+    update_block_shadows_around_pos(block.pos);
+
+    update_texture_map_source_pos_around_pos(block.pos, true);
+
+    free(block);
 }

@@ -1,26 +1,32 @@
 # In progress
 
-- place walls
+- only break walls on edge
 
 # Game
 
 - crafting
+
 - [ui] inventory
+
 - [world_gen] trees
 - [world_gen] dirt cave gen
 - [world_gen] flood fill ore gen
 - [world_gen] loading screen
-- [lighting] world day / night cycle
+
 - [menus] make player color customizable
 - [menus] main menu
 - [menus] settings menu
 - [menus] death menu
+
 - [sound_effects] placing blocks
 - [sound_effects] attacking blocks
+
 - game saves
 - background image
 - background parallax
 - multiplayer
+
+- [juice] world day / night cycle
 - [juice] font
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
@@ -36,6 +42,7 @@
 
 # Bugs
 
+- wall tiling is a bit off
 - player can spawn inside ground
 - linux build doesn't work
 - player can fall into the ground, usually on corners
