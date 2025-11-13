@@ -3655,9 +3655,8 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
 set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(block_pos));
     wall_exists,  wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(block_pos));
-    if !block_exists && !wall_exists return;
 
-    block_or_wall := ifx block_exists then block else wall;
+    if !block_exists && !wall_exists return;
 
     neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
     neighbor_north_block_exists, neighbor_north_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_north_pos));
@@ -3719,12 +3718,12 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
         min(min_neighbor_shadow_north, min_neighbor_shadow_south),
         min(min_neighbor_shadow_east,  min_neighbor_shadow_west),
     );
+    shadow := ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
 
-    block_or_wall.shadow = ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
+    if block_exists { block.shadow = shadow; }
+    if wall_exists  { wall.shadow  = shadow; }
 }
 
-// @TODO: this is kinda hacky and I feel like there's probably some elegant recursive solution here that I'm going to have to
-// eventually uncover.
 update_block_shadows_around_pos :: (block_pos: Vector2) {
     for col: -7..7 {
         for row: -7..7 {

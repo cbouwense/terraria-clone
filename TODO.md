@@ -1,6 +1,6 @@
 # In progress
 
-- shadows don't propagate to walls perfectly
+
 
 # Game
 
