@@ -62,6 +62,7 @@ pickaxe_texture           : Texture;
 axe_texture               : Texture;
 sword_texture             : Texture;
 hammer_texture            : Texture;
+torch_texture             : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -108,6 +109,7 @@ item_sprite_pickaxe    : Sprite;
 item_sprite_axe        : Sprite;
 item_sprite_sword      : Sprite;
 item_sprite_hammer     : Sprite;
+item_sprite_torch      : Sprite;
 
 SCALE :: 2;
 
@@ -246,6 +248,11 @@ HAMMER_TEXTURE_HEIGHT    :: 32;
 HAMMER_STACK_CAPACITY    :: -1;
 HAMMER_MINING_MULTIPLIER :: 1;
 
+TORCH_TEXTURE_WIDTH     :: 14;
+TORCH_TEXTURE_HEIGHT    :: 16;
+TORCH_STACK_CAPACITY    :: 64;
+TORCH_MINING_MULTIPLIER :: 1;
+
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
@@ -301,6 +308,7 @@ ItemType :: enum {
     AXE;
     SWORD;
     HAMMER;
+    TORCH;
 }
 
 ItemStack :: struct {
@@ -1249,6 +1257,7 @@ init_textures :: () {
     axe_texture               = LoadTexture("data/Axe.png");
     sword_texture             = LoadTexture("data/Sword.png");
     hammer_texture            = LoadTexture("data/Hammer.png");
+    torch_texture             = LoadTexture("data/Torch.png");
 }
 
 init_sprites :: () {
@@ -1516,6 +1525,11 @@ init_sprites :: () {
         map   = hammer_texture,
         color = WHITE,
     };
+
+    item_sprite_torch = Sprite.{
+        map   = torch_texture,
+        color = WHITE,
+    };
 }
 
 control_down :: (haystack: [] Control) -> bool {
@@ -1779,6 +1793,11 @@ spawn_player :: () -> Player {
             stack_capacity = WALL_DIRT_STACK_CAPACITY,
             stack_count    = WALL_DIRT_STACK_CAPACITY,
         };
+        player.inventory.item_stacks[7] = ItemStack.{
+            item_type     = .TORCH,
+            stack_capacity = TORCH_STACK_CAPACITY,
+            stack_count    = TORCH_STACK_CAPACITY,
+        };
     
     }
 
@@ -1956,6 +1975,7 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .AXE;             return false;
         case .SWORD;           return false;
         case .HAMMER;          return false;
+        case .TORCH;           return true;
 
         case;
             print_vars(item_type);
@@ -1975,6 +1995,7 @@ can_item_break_blocks :: (item_type: ItemType) -> bool {
         case .AXE;             return true;
         case .SWORD;           return false;
         case .HAMMER;          return false;
+        case .TORCH;           return false;
 
         case;
             print_vars(item_type);
@@ -1994,6 +2015,7 @@ can_item_break_walls :: (item_type: ItemType) -> bool {
         case .AXE;             return false;
         case .SWORD;           return false;
         case .HAMMER;          return true;
+        case .TORCH;           return false;
 
         case;
             print_vars(item_type);
@@ -2081,6 +2103,7 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
         case .COPPER_ORE_ITEM; return COPPER_ORE_STACK_CAPACITY;
         case .WALL_DIRT_ITEM;  return WALL_DIRT_STACK_CAPACITY;
         case .WALL_ROCK_ITEM;  return WALL_ROCK_STACK_CAPACITY;
+        case .TORCH;           return TORCH_STACK_CAPACITY;
 
         case .PICKAXE; #through;
         case .AXE;     #through;
@@ -2100,6 +2123,7 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
         case .COPPER_ORE_ITEM; return 1;
         case .WALL_DIRT_ITEM;  return 1;
         case .WALL_ROCK_ITEM;  return 1;
+        case .TORCH;           return 1;
 
         // Tools
         case .PICKAXE; return PICKAXE_MINING_MULTIPLIER;
@@ -2139,6 +2163,7 @@ get_is_wall_item :: (item_type: ItemType) -> bool {
         case .DIRT_ITEM;       return false;
         case .ROCK_ITEM;       return false;
         case .COPPER_ORE_ITEM; return false;
+        case .TORCH;           return false;
 
         case .WALL_DIRT_ITEM;  return true;
         case .WALL_ROCK_ITEM;  return true;
@@ -3319,6 +3344,15 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
                 HAMMER_TEXTURE_HEIGHT,
             };
 
+        case .TORCH;
+            map_texture = torch_texture;
+            map_source  = Rectangle.{
+                TORCH_TEXTURE_HEIGHT, // @TODO: wait what
+                TORCH_TEXTURE_HEIGHT,
+                TORCH_TEXTURE_HEIGHT,
+                TORCH_TEXTURE_HEIGHT,
+            };
+
         case .DIRT_ITEM;
             map_texture = dirt_item_texture;
             map_source = Rectangle.{
@@ -3369,6 +3403,7 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
         case .AXE;             return *item_sprite_axe;
         case .SWORD;           return *item_sprite_sword;
         case .HAMMER;          return *item_sprite_hammer;
+        case .TORCH;           return *item_sprite_torch;
         case;
             assert(false, "You forgot an item type in your switch statement");
             return null;
@@ -3386,6 +3421,7 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .AXE;             return false;
         case .SWORD;           return false;
         case .HAMMER;          return false;
+        case .TORCH;           return true;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -3407,6 +3443,7 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .AXE;     return WIELDED_TOOL_WORLD_LENGTH;
         case .SWORD;   return WIELDED_TOOL_WORLD_LENGTH;
         case .HAMMER;  return WIELDED_TOOL_WORLD_LENGTH;
+        case .TORCH;   return WIELDED_TOOL_WORLD_LENGTH;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -3432,18 +3469,19 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
 
 item_type_to_block_type :: (item_type: ItemType) -> BlockType {
     if item_type == {
-        case ItemType.DIRT_ITEM;       return BlockType.DIRT;
-        case ItemType.ROCK_ITEM;       return BlockType.ROCK;
-        case ItemType.COPPER_ORE_ITEM; return BlockType.COPPER_ORE;
-        case ItemType.WALL_DIRT_ITEM;  return BlockType.WALL_DIRT;
-        case ItemType.WALL_ROCK_ITEM;  return BlockType.WALL_ROCK;
+        case .DIRT_ITEM;       return BlockType.DIRT;
+        case .ROCK_ITEM;       return BlockType.ROCK;
+        case .COPPER_ORE_ITEM; return BlockType.COPPER_ORE;
+        case .WALL_DIRT_ITEM;  return BlockType.WALL_DIRT;
+        case .WALL_ROCK_ITEM;  return BlockType.WALL_ROCK;
+        case .TORCH;            return BlockType.ROCK; // @TODO: probably need a concept for non block placeable things
 
         case .PICKAXE; #through;
         case .AXE;     #through;
         case .SWORD;   #through;
         case .HAMMER;  #through;
         case;
-            assert(false, "Forgot an item type in your switch statement");
+            assert(false, "Forgot an item type in your switch statement, or tried to place unplaceable thing");
             return BlockType.DIRT; // Unreachable
     }
 }
@@ -3904,5 +3942,5 @@ destroy_block :: (block: *Block, player: *Player) {
 
     update_texture_map_source_pos_around_pos(block.pos, is_wall);
 
-    free(block);
+    // free(block);
 }
