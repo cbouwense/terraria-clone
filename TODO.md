@@ -1,6 +1,6 @@
 # In progress
 
-- only break walls on edge
+- shadows don't propagate to walls perfectly
 
 # Game
 

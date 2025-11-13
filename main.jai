@@ -20,6 +20,8 @@ should_quit_game := false;
 paused           := false;
 debug_mode       := false;
 shadows_enabled  := true;
+render_blocks    := true;
+render_walls     := true;
 free_cam_pos     := Vector2.{ 0, 0 };
 
 // Controls
@@ -583,6 +585,8 @@ main :: () {
             if IsKeyPressed(.KEY_P) paused          = !paused;
             if IsKeyPressed(.KEY_G) debug_mode      = !debug_mode;
             if IsKeyPressed(.KEY_L) shadows_enabled = !shadows_enabled;
+            if IsKeyPressed(.KEY_N) render_blocks   = !render_blocks;
+            if IsKeyPressed(.KEY_M) render_walls    = !render_walls;
             if IsKeyPressed(.KEY_R) player          = spawn_player();
 
             move_player_left   = control_down(controls.move_player_left);
@@ -705,68 +709,75 @@ main :: () {
                 }
 
                 if try_to_attack {
-                    if debug_mode {
+                    is_on_cooldown := player.cooldown_attack_current_ms > 0;
+
+                    if debug_mode || (!is_on_cooldown && Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE) {
                         block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
+
                         if block_mouse_is_over != null {
                             block_type := block_mouse_is_over.block_type;
+                            selected_item_stack, result := get_selected_item_stack(player.inventory);
+                            has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
-                            table_remove(*global_block_pos_to_block, vector2_to_string_temp(block_mouse_is_over.pos));
+                            if has_an_item_selected {
+                                tool_type := selected_item_stack.item_type;
+                                can_item_break_block := can_item_break_blocks(tool_type);
 
-                            if block_type == {
-                                case .DIRT;  array_unordered_remove_by_value(*blocks_dirt,  block_mouse_is_over);
-                                case .GRASS; array_unordered_remove_by_value(*blocks_grass, block_mouse_is_over);
-                                case .ROCK;  array_unordered_remove_by_value(*blocks_rock,  block_mouse_is_over);
-                                case; assert(false, "forgot block type to remove");
+                                if can_item_break_block {
+                                    breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
+
+                                    damage := breaking_speed / block_mouse_is_over.hardness;
+                                    if block_mouse_is_over.weak_to_tool == tool_type {
+                                        damage *= BLOCK_WEAKNESS_MULTIPLIER;
+                                    }
+                                    block_mouse_is_over.health_curr -= damage;
+                                    
+                                    if block_mouse_is_over.health_curr <= 0 {
+                                        destroy_block(block_mouse_is_over, *player);
+                                    }
+                                }
                             }
-
-                            try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
-
-                            update_block_shadows_around_pos(block_mouse_is_over.pos);
-
-                            update_texture_map_source_pos_around_pos(block_mouse_is_over.pos, false);
-
-                            free(block_mouse_is_over);
                         }
-                    }
-                    else {
-                        is_on_cooldown := player.cooldown_attack_current_ms > 0;
+                        // No block, so check walls
+                        else {
+                            wall_mouse_is_over  : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
 
-                        if !is_on_cooldown {
-                            if Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE {
-                                // @TODO: is there a way in Jai to have some sort of generic whereby I can tell this function that it returns a *Block?
-                                block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
-                                wall_mouse_is_over  : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
-                                tile_mouse_is_over  : *Block = ifx block_mouse_is_over != null then block_mouse_is_over else wall_mouse_is_over;
+                            if wall_mouse_is_over != null {
+                                block_type := wall_mouse_is_over.block_type;
+                                selected_item_stack, result := get_selected_item_stack(player.inventory);
+                                has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
-                                if tile_mouse_is_over != null {
-                                    block_type := tile_mouse_is_over.block_type;
-                                    is_wall    := get_is_wall(block_type);
-                                    selected_item_stack, result := get_selected_item_stack(player.inventory);
-                                    has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+                                if has_an_item_selected {
+                                    tool_type := selected_item_stack.item_type;
+                                    can_item_break_wall := can_item_break_walls(tool_type);
 
-                                    if has_an_item_selected {
-                                        tool_type := selected_item_stack.item_type;
-                                        can_item_break_tile := ifx is_wall then can_item_break_walls(tool_type) else can_item_break_blocks(tool_type);
+                                    if can_item_break_wall {
+                                        neighbor_exists_north_wall, _ := get_neighbor(wall_mouse_is_over.pos, .NORTH, true);
+                                        neighbor_exists_south_wall, _ := get_neighbor(wall_mouse_is_over.pos, .SOUTH, true);
+                                        neighbor_exists_east_wall,  _ := get_neighbor(wall_mouse_is_over.pos, .EAST,  true);
+                                        neighbor_exists_west_wall,  _ := get_neighbor(wall_mouse_is_over.pos, .WEST,  true);
+                                        is_completely_surrounded_by_neighbors := neighbor_exists_north_wall && neighbor_exists_south_wall && neighbor_exists_east_wall && neighbor_exists_west_wall;
 
-                                        if can_item_break_tile {
+                                        if !is_completely_surrounded_by_neighbors {
+
                                             breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
 
-                                            damage := breaking_speed / tile_mouse_is_over.hardness;
-                                            if tile_mouse_is_over.weak_to_tool == tool_type {
+                                            damage := breaking_speed / wall_mouse_is_over.hardness;
+                                            if wall_mouse_is_over.weak_to_tool == tool_type {
                                                 damage *= BLOCK_WEAKNESS_MULTIPLIER;
                                             }
-                                            tile_mouse_is_over.health_curr -= damage;
+                                            wall_mouse_is_over.health_curr -= damage;
                                             
-                                            if tile_mouse_is_over.health_curr <= 0 {
-                                                destroy_block(tile_mouse_is_over, *player);
+                                            if wall_mouse_is_over.health_curr <= 0 {
+                                                destroy_block(wall_mouse_is_over, *player);
                                             }
                                         }
                                     }
                                 }
                             }
-
-                            player.cooldown_attack_current_ms = PLAYER_COOLDOWN_ATTACK_DURATION_MS;
                         }
+
+                        player.cooldown_attack_current_ms = PLAYER_COOLDOWN_ATTACK_DURATION_MS;
                     }
                 }
 
@@ -969,16 +980,20 @@ main :: () {
                 defer EndMode2D();
                 
                 // Draw walls
-                for active_walls {
-                    if draw_block(it, player, mouse_pos_in_world) {
-                        block_to_debug = it;
+                if render_walls {
+                    for active_walls {
+                        if draw_block(it, player, mouse_pos_in_world) {
+                            block_to_debug = it;
+                        }
                     }
                 }
 
                 // Draw blocks
-                for active_blocks {
-                    if draw_block(it, player, mouse_pos_in_world) {
-                        block_to_debug = it;
+                if render_blocks {
+                    for active_blocks {
+                        if draw_block(it, player, mouse_pos_in_world) {
+                            block_to_debug = it;
+                        }
                     }
                 }
 
@@ -1079,30 +1094,30 @@ main :: () {
                     }
                 }
 
-                if debug_mode {
+                // if debug_mode {
                     
-                    north_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y - BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                    north_pos  := get_rect_center(north_rect);
-                    DrawCircleV(north_pos, 5.0, RED);
-                    DrawRectangleLinesEx(north_rect, 2.0, YELLOW);
+                //     north_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y - BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                //     north_pos  := get_rect_center(north_rect);
+                //     DrawCircleV(north_pos, 5.0, RED);
+                //     DrawRectangleLinesEx(north_rect, 2.0, YELLOW);
 
-                    south_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y + BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                    south_pos  := get_rect_center(south_rect);
-                    DrawCircleV(south_pos, 5.0, RED);
-                    DrawRectangleLinesEx(south_rect, 2.0, YELLOW);
+                //     south_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y + BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                //     south_pos  := get_rect_center(south_rect);
+                //     DrawCircleV(south_pos, 5.0, RED);
+                //     DrawRectangleLinesEx(south_rect, 2.0, YELLOW);
 
-                    east_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x + BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                    east_pos  := get_rect_center(east_rect);
-                    DrawCircleV(east_pos, 5.0, RED);
-                    DrawRectangleLinesEx(east_rect, 2.0, YELLOW);
+                //     east_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x + BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                //     east_pos  := get_rect_center(east_rect);
+                //     DrawCircleV(east_pos, 5.0, RED);
+                //     DrawRectangleLinesEx(east_rect, 2.0, YELLOW);
 
-                    west_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x - BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                    west_pos  := get_rect_center(west_rect);
-                    DrawCircleV(west_pos, 5.0, RED);
-                    DrawRectangleLinesEx(west_rect, 2.0, YELLOW);
+                //     west_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x - BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
+                //     west_pos  := get_rect_center(west_rect);
+                //     DrawCircleV(west_pos, 5.0, RED);
+                //     DrawRectangleLinesEx(west_rect, 2.0, YELLOW);
 
-                    DrawRectangleLinesEx(create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true), 2.0, RED);
-                }
+                //     DrawRectangleLinesEx(create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true), 2.0, RED);
+                // }
             }
 
             // Draw UI
@@ -3822,16 +3837,16 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
         DrawTexturePro(damage_map, damage_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
     }
 
-    // if debug_mode {
-    //     DrawCircleV(block.pos, 3.0, LIME);
-    // }
-
     // Mouse block overlay (hover)
     is_within_reach  := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
     selected_item_stack, result := get_selected_item_stack(player.inventory);
     has_an_item_selected := result == xx ReturnStatus.SUCCESS;
-    is_wielding_tool_for_block_type := has_an_item_selected && can_item_break_blocks(selected_item_stack.item_type);
+    is_wall := get_is_wall(block.block_type);
+    is_wielding_tool_for_block_type := ifx is_wall
+        // then has_an_item_selected && can_item_break_walls(selected_item_stack.item_type)
+        then false
+        else has_an_item_selected && can_item_break_blocks(selected_item_stack.item_type);
     
     show_block_hover := debug_mode || is_wielding_tool_for_block_type && is_within_reach;
     if show_block_hover {
@@ -3888,7 +3903,7 @@ destroy_block :: (block: *Block, player: *Player) {
 
     update_block_shadows_around_pos(block.pos);
 
-    update_texture_map_source_pos_around_pos(block.pos, true);
+    update_texture_map_source_pos_around_pos(block.pos, is_wall);
 
     free(block);
 }
