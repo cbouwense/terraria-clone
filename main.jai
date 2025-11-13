@@ -796,7 +796,6 @@ main :: () {
                                 // Check if the new block would be placed on an existing block
                                 block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
                                 wall_already_exists_at_location, _  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(new_pos));
-                                tile_already_exists_at_location     := ifx is_wall then wall_already_exists_at_location else block_already_exists_at_location;
 
                                 neighbor_exists_north_block, _ := get_neighbor(new_pos, .NORTH, false);
                                 neighbor_exists_south_block, _ := get_neighbor(new_pos, .SOUTH, false);
@@ -815,7 +814,7 @@ main :: () {
 
                                 is_position_placeable :=
                                     !would_be_on_player &&
-                                    (!is_wall && !block_already_exists_at_location) &&
+                                    ((!is_wall && !block_already_exists_at_location) || (is_wall && !wall_already_exists_at_location)) &&
                                     (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
 
                                 is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
