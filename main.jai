@@ -63,6 +63,7 @@ axe_texture               : Texture;
 sword_texture             : Texture;
 hammer_texture            : Texture;
 torch_texture             : Texture;
+torch_map                 : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -212,6 +213,14 @@ DAMAGE_MAP_COLS :: 10;
 DAMAGE_MAP_ROWS :: 1;
 DAMAGE_MAP_TILE_WIDTH  :: 16;
 DAMAGE_MAP_TILE_HEIGHT :: 16;
+
+TORCH_MAP_COLS :: 3;
+TORCH_MAP_ROWS :: 1;
+TORCH_MAP_TILE_WIDTH  :: 20;
+TORCH_MAP_TILE_HEIGHT :: 20;
+TORCH_MAP_TILE_PADDING :: 2;
+TORCH_WORLD_WIDTH  :: 16 * SCALE;
+TORCH_WORLD_HEIGHT :: 16 * SCALE;
 
 DIRT_ITEM_TEXTURE_WIDTH     :: 16;
 DIRT_ITEM_TEXTURE_HEIGHT    :: 16;
@@ -368,6 +377,10 @@ Block :: struct {
     neighbor_west_count  : s32; // -1 for uninitialized
 }
 
+Torch :: struct {
+    #as using entity : Entity;
+}
+
 Control :: struct {
     type:  Type;
     value: s32; // KeyboardKey | MouseButton;
@@ -405,16 +418,22 @@ vector2_to_string_temp :: (v: Vector2) -> string {
     return key;
 }
 
-data_folder: string; 
+data_folder: string;
+
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
+global_torch_pos_to_torch : Table(string, *Entity);
+
+// Placeable entities
 
 blocks_grass : [..] *Block;
 blocks_dirt  : [..] *Block;
 blocks_rock  : [..] *Block;
 
-walls_dirt :  [..] *Block;
-walls_rock :  [..] *Block;
+walls_dirt : [..] *Block;
+walls_rock : [..] *Block;
+
+torches : [..] *Torch;
 
 main :: () {
     //
@@ -741,7 +760,9 @@ main :: () {
                                     block_mouse_is_over.health_curr -= damage;
                                     
                                     if block_mouse_is_over.health_curr <= 0 {
-                                        destroy_block(block_mouse_is_over, *player);
+                                        try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+
+                                        destroy_block(block_mouse_is_over);
                                     }
                                 }
                             }
@@ -777,7 +798,9 @@ main :: () {
                                             wall_mouse_is_over.health_curr -= damage;
                                             
                                             if wall_mouse_is_over.health_curr <= 0 {
-                                                destroy_block(wall_mouse_is_over, *player);
+                                                try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+
+                                                destroy_block(wall_mouse_is_over);
                                             }
                                         }
                                     }
@@ -806,56 +829,93 @@ main :: () {
 
                             if selected_item_stack.stack_count > 0 && item_can_be_placed_down {
 
-                                new_rect := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, is_wall);
-                                new_pos  := get_rect_center(new_rect);
-                                
-                                // Check if the new block would be placed on the player
-                                would_be_on_player := !is_wall && CheckCollisionRecs(new_rect, player.bounding_rect);
+                                new_rect    := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, is_wall);
+                                new_pos     := get_rect_center(new_rect);
+                                entity_type := item_type_to_entity_type(selected_item_stack.item_type);
 
-                                // Check if the new block would be placed on an existing block
-                                block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
-                                wall_already_exists_at_location, _  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(new_pos));
+                                if entity_type == {
+                                    case Block;
+                                        // Check if the new block would be placed on the player
+                                        would_be_on_player := !is_wall && CheckCollisionRecs(new_rect, player.bounding_rect);
 
-                                neighbor_exists_north_block, _ := get_neighbor(new_pos, .NORTH, false);
-                                neighbor_exists_south_block, _ := get_neighbor(new_pos, .SOUTH, false);
-                                neighbor_exists_east_block,  _ := get_neighbor(new_pos, .EAST,  false);
-                                neighbor_exists_west_block,  _ := get_neighbor(new_pos, .WEST,  false);
+                                        // Check if the new block would be placed on an existing block
+                                        block_already_exists_at_location, _ := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(new_pos));
+                                        wall_already_exists_at_location, _  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(new_pos));
 
-                                neighbor_exists_north_wall, _ := get_neighbor(new_pos, .NORTH, true);
-                                neighbor_exists_south_wall, _ := get_neighbor(new_pos, .SOUTH, true);
-                                neighbor_exists_east_wall,  _ := get_neighbor(new_pos, .EAST,  true);
-                                neighbor_exists_west_wall,  _ := get_neighbor(new_pos, .WEST,  true);
+                                        neighbor_exists_north_block, _ := get_neighbor(new_pos, .NORTH, false);
+                                        neighbor_exists_south_block, _ := get_neighbor(new_pos, .SOUTH, false);
+                                        neighbor_exists_east_block,  _ := get_neighbor(new_pos, .EAST,  false);
+                                        neighbor_exists_west_block,  _ := get_neighbor(new_pos, .WEST,  false);
 
-                                neighbor_exists_north := neighbor_exists_north_wall || neighbor_exists_north_block;
-                                neighbor_exists_south := neighbor_exists_south_wall || neighbor_exists_south_block;
-                                neighbor_exists_east  := neighbor_exists_east_wall  || neighbor_exists_east_block;
-                                neighbor_exists_west  := neighbor_exists_west_wall  || neighbor_exists_west_block;
+                                        neighbor_exists_north_wall, _ := get_neighbor(new_pos, .NORTH, true);
+                                        neighbor_exists_south_wall, _ := get_neighbor(new_pos, .SOUTH, true);
+                                        neighbor_exists_east_wall,  _ := get_neighbor(new_pos, .EAST,  true);
+                                        neighbor_exists_west_wall,  _ := get_neighbor(new_pos, .WEST,  true);
 
-                                is_position_placeable :=
-                                    !would_be_on_player &&
-                                    ((!is_wall && !block_already_exists_at_location) || (is_wall && !wall_already_exists_at_location)) &&
-                                    (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
+                                        neighbor_exists_north := neighbor_exists_north_wall || neighbor_exists_north_block;
+                                        neighbor_exists_south := neighbor_exists_south_wall || neighbor_exists_south_block;
+                                        neighbor_exists_east  := neighbor_exists_east_wall  || neighbor_exists_east_block;
+                                        neighbor_exists_west  := neighbor_exists_west_wall  || neighbor_exists_west_block;
 
-                                is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+                                        is_position_placeable :=
+                                            !would_be_on_player &&
+                                            ((!is_wall && !block_already_exists_at_location) || (is_wall && !wall_already_exists_at_location)) &&
+                                            (neighbor_exists_north || neighbor_exists_south || neighbor_exists_east || neighbor_exists_west);
 
-                                can_place_block := debug_mode || (is_position_placeable && is_within_reach);
+                                        is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
-                                // Place block down
-                                if can_place_block {
-                                    new_block_type := item_type_to_block_type(selected_item_stack.item_type);
+                                        can_place_block := debug_mode || (is_position_placeable && is_within_reach);
 
-                                    new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
+                                        // Place block down
+                                        if can_place_block {
+                                            new_block_type := item_type_to_block_type(selected_item_stack.item_type);
 
-                                    player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
+                                            new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
 
-                                    player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
+                                            player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
-                                    set_block_shadow_relative_to_neighbors(new_pos);
+                                            player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
+
+                                            set_block_shadow_relative_to_neighbors(new_pos);
+                                            
+                                            update_block_shadows_around_pos(new_pos);
+
+                                            new_block.texture_map_source_pos = get_texture_map_source_coords_for_block(new_block);
+                                            update_texture_map_source_pos_around_pos(new_pos, false);
+                                        }
                                     
-                                    update_block_shadows_around_pos(new_pos);
+                                    case Torch;
+                                        torch_already_exists_at_location, _ := table_find_new(*global_torch_pos_to_torch, vector2_to_string_temp(new_pos));
 
-                                    new_block.texture_map_source_pos = get_texture_map_source_coords_for_block(new_block);
-                                    update_texture_map_source_pos_around_pos(new_pos, false);
+                                        south_block_exists,  _ := get_neighbor(new_pos, .SOUTH,  false);
+                                        east_block_exists,   _ := get_neighbor(new_pos, .EAST,   false);
+                                        west_block_exists,   _ := get_neighbor(new_pos, .WEST,   false);
+                                        wall_exists,         _ := get_neighbor(new_pos, .CENTER, true);
+
+                                        is_position_placeable :=
+                                            !torch_already_exists_at_location &&
+                                            (south_block_exists || east_block_exists || west_block_exists || wall_exists);
+
+                                        is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+
+                                        can_place_torch := debug_mode || (is_position_placeable && is_within_reach);
+
+                                        // Place torch down
+                                        if can_place_torch {
+                                            new_torch := generate_torch(new_rect.x, new_rect.y);
+
+                                            player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
+
+                                            player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
+
+                                            // set_block_shadow_relative_to_neighbors(new_pos);
+                                            
+                                            // @TODO
+                                            update_block_shadows_around_pos(new_pos);
+                                        }
+
+                                    case;
+                                        assert(false, "forgot entity type to place down.");
                                 }
                             }
                         }
@@ -1003,6 +1063,11 @@ main :: () {
                             block_to_debug = it;
                         }
                     }
+                }
+
+                // Draw blocks
+                for torches {
+                    draw_torch(it);
                 }
 
                 // Draw player
@@ -1258,6 +1323,7 @@ init_textures :: () {
     sword_texture             = LoadTexture("data/Sword.png");
     hammer_texture            = LoadTexture("data/Hammer.png");
     torch_texture             = LoadTexture("data/Torch.png");
+    torch_map                 = LoadTexture("data/Tiles_4.png");
 }
 
 init_sprites :: () {
@@ -2172,6 +2238,45 @@ get_is_wall_item :: (item_type: ItemType) -> bool {
             print_vars(item_type);
             assert(false, "Invalid item type");
             return false; // Unreachable
+    }
+}
+
+get_texture_map_source_coords_for_entity :: (entity: Entity) -> Vector2 {
+    if entity.type == {
+        case Block;
+            return get_texture_map_source_coords_for_block(cast(Block) entity);
+
+        case Torch;
+            // If there are walls on either side, attach it to them, otherwise attach it to the wall behind it.
+            // If there's neither walls on one of its sides nor a wall behind it, then we're in an error state.
+
+            south_block_exists, _ := get_neighbor(entity.pos, .SOUTH , false);
+            if south_block_exists {
+               return Vector2.{ cast(float) (1 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+            }
+
+            east_block_exists, _ := get_neighbor(entity.pos, .EAST , false);
+            if east_block_exists {
+               return Vector2.{ cast(float) (3 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+            }
+            
+            west_block_exists, _ := get_neighbor(entity.pos, .WEST , false);
+            if west_block_exists {
+               return Vector2.{ cast(float) (2 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+            }
+
+            wall_exists, _ := get_neighbor(entity.pos, .CENTER , true);
+            if wall_exists {
+               return Vector2.{ cast(float) (1 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+            }
+
+            // @TODO: if torch exists and we hit this point, I think we actually want to destroy it.
+            assert(false, "Tried placing a torch down without anything to put it on");
+            return Vector2.{}; 
+
+        case;
+            assert(false, "You forgot some entity type for which to get source coords");
+            return Vector2.{}; 
     }
 }
 
@@ -3235,10 +3340,36 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
     return Vector2.{ cast(float) (x * width), cast(float) (y * height) };
 }
 
+get_texture_map_for_entity :: (entity: Entity) -> texture: Texture, source: Rectangle {
+    if entity.type == {
+        case Block;
+            map_texture, map_source := get_texture_map_for_block(cast(Block) entity);
+            return map_texture, map_source;
+
+        case Torch;
+            source_x := get_texture_map_source_coords_for_entity(entity).x;
+            source_y := get_texture_map_source_coords_for_entity(entity).y;
+            map_source := Rectangle.{
+                source_x, source_y,
+                TORCH_MAP_TILE_WIDTH  - TORCH_MAP_TILE_PADDING,
+                TORCH_MAP_TILE_HEIGHT - TORCH_MAP_TILE_PADDING,
+            };
+
+            map_texture := torch_texture;
+
+            return map_texture, map_source;
+        
+        case;
+            assert(false, "You forgot some entity type to get a texture map for");
+            return Texture.{}, Rectangle.{};
+    }
+}
+
 get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectangle {
     map_texture : Texture;
     map_source  : Rectangle;
 
+    // TODO: dont do that twice?
     source_x := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1
         then get_texture_map_source_coords_for_block(block).x
         else block.texture_map_source_pos.x;
@@ -3467,6 +3598,26 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
     } 
 }
 
+item_type_to_entity_type :: (item_type: ItemType) -> Type {
+    if item_type == {
+        case .DIRT_ITEM;       return Block;
+        case .ROCK_ITEM;       return Block;
+        case .COPPER_ORE_ITEM; return Block;
+        case .WALL_DIRT_ITEM;  return Block;
+        case .WALL_ROCK_ITEM;  return Block;
+
+        case .TORCH; return Torch;
+
+        case .PICKAXE; #through;
+        case .AXE;     #through;
+        case .SWORD;   #through;
+        case .HAMMER;  #through;
+        case;
+            assert(false, "Forgot an item type in your switch statement, or tried to place unplaceable thing");
+            return Entity; // Unreachable
+    }
+}
+
 item_type_to_block_type :: (item_type: ItemType) -> BlockType {
     if item_type == {
         case .DIRT_ITEM;       return BlockType.DIRT;
@@ -3474,7 +3625,7 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
         case .COPPER_ORE_ITEM; return BlockType.COPPER_ORE;
         case .WALL_DIRT_ITEM;  return BlockType.WALL_DIRT;
         case .WALL_ROCK_ITEM;  return BlockType.WALL_ROCK;
-        case .TORCH;            return BlockType.ROCK; // @TODO: probably need a concept for non block placeable things
+        case .TORCH;           return BlockType.ROCK; // @TODO: probably need a concept for non block placeable things
 
         case .PICKAXE; #through;
         case .AXE;     #through;
@@ -3812,6 +3963,32 @@ update_texture_map_source_pos_around_pos :: (block_pos: Vector2, is_wall: bool) 
     }
 }
 
+generate_torch :: (x: float32, y: float32) -> *Torch {
+    rect := Rectangle.{
+        xx x,
+        xx y,
+        xx TORCH_WORLD_WIDTH,
+        xx TORCH_WORLD_HEIGHT,
+    }; 
+
+    new_torch := New(Torch);
+    // new_torch.id                     = s32;
+    new_torch.type                   = Torch;
+    new_torch.pos                    = get_rect_center(rect);
+    new_torch.vel                    = Vector2.{ 0, 0 };
+    new_torch.is_facing_left         = false;
+    new_torch.bounding_rect          = rect;
+    new_torch.sprite_rect            = rect;
+    new_torch.texture_map_source_pos = get_texture_map_source_coords_for_entity(new_torch);
+    new_torch.health_max             = 1;
+    new_torch.health_curr            = 1;
+
+    table_add(*global_torch_pos_to_torch, vector2_to_string_permanent(new_torch.pos), new_torch);
+    array_add(*torches,  new_torch);
+
+    return new_torch;
+}
+
 generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     is_wall := get_is_wall(block_type);
     
@@ -3846,15 +4023,21 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     }
 
     if block_type == {
-        case .DIRT;  array_add(*blocks_dirt,  new_block);
-        case .GRASS; array_add(*blocks_grass, new_block);
-        case .ROCK;  array_add(*blocks_rock,  new_block);
+        case .DIRT;      array_add(*blocks_dirt,  new_block);
+        case .GRASS;     array_add(*blocks_grass, new_block);
+        case .ROCK;      array_add(*blocks_rock,  new_block);
         case .WALL_DIRT; array_add(*walls_dirt, new_block);
         case .WALL_ROCK; array_add(*walls_dirt, new_block);
         case; assert(false, "Forgot a block type");
     }
 
     return new_block;
+}
+
+draw_torch :: (torch: Torch) {
+    map_texture, map_source := get_texture_map_for_entity(torch);
+
+    DrawTexturePro(map_texture, map_source, torch.sprite_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
 }
 
 draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> should_debug_block: bool {
@@ -3881,8 +4064,7 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
     has_an_item_selected := result == xx ReturnStatus.SUCCESS;
     is_wall := get_is_wall(block.block_type);
     is_wielding_tool_for_block_type := ifx is_wall
-        // then has_an_item_selected && can_item_break_walls(selected_item_stack.item_type)
-        then false
+        then false // Never show hover for walls, it's messy. 
         else has_an_item_selected && can_item_break_blocks(selected_item_stack.item_type);
     
     show_block_hover := debug_mode || is_wielding_tool_for_block_type && is_within_reach;
@@ -3895,6 +4077,31 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
 
     return false;
 }
+
+initialize_torch :: (torch: *Torch) {
+    // TODO
+    // Define initial shadows for walls
+    #if false {
+        // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
+        block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
+        block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
+        block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
+        block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
+
+        min_neighbor_count := min(
+            min(block.neighbor_north_count, block.neighbor_south_count),
+            min(block.neighbor_east_count,  block.neighbor_west_count)
+        );
+        // print_vars(wall, min_neighbor_count);
+        block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
+    }
+
+    // Initialize texture source pos
+    #if false {
+        block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
+    }
+}
+
 
 initialize_block :: (block: *Block) {
     // Define initial shadows for walls
@@ -3919,7 +4126,23 @@ initialize_block :: (block: *Block) {
     }
 }
 
-destroy_block :: (block: *Block, player: *Player) {
+destroy_entity :: (entity: *Entity) {
+     if entity.type == {
+        case Block;
+            destroy_block(cast(*Block) entity);
+
+        case Torch;
+            table_remove(*global_torch_pos_to_torch, vector2_to_string_temp(entity.pos));
+            array_unordered_remove_by_value(*torches, cast(*Torch) entity);
+            update_block_shadows_around_pos(entity.pos);
+            free(entity);
+
+        case;
+            assert(false, "You forgot some entity type for which to get source coords");
+    }
+}
+
+destroy_block :: (block: *Block) {
     is_wall := get_is_wall(block.block_type);
 
     if is_wall table_remove(*global_wall_pos_to_wall,   vector2_to_string_temp(block.pos));
@@ -3936,11 +4159,9 @@ destroy_block :: (block: *Block, player: *Player) {
         case; assert(false, "forgot wall type to remove");
     }
 
-    try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block.block_type));
-
     update_block_shadows_around_pos(block.pos);
 
     update_texture_map_source_pos_around_pos(block.pos, is_wall);
 
-    // free(block);
+    free(block);
 }

@@ -1,11 +1,10 @@
 # In progress
 
-- bug with rocks where you cant destroy them
+- torches
 
 # Game
 
 - crafting
-- torches
 
 - [ui] inventory
 
@@ -33,7 +32,6 @@
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
-- [juice] little block pops out on destroying
 - [juice] particles
 
 # Tech
@@ -41,6 +39,7 @@
 - hot reloading
 - metaprogram for required fields
 - remap curly brackets, underscore, esc
+- lighting shader
 
 # Bugs
 
