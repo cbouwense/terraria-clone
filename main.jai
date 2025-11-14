@@ -3848,7 +3848,7 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     if block_type == {
         case .DIRT;  array_add(*blocks_dirt,  new_block);
         case .GRASS; array_add(*blocks_grass, new_block);
-        case .ROCK;  array_add(*blocks_grass, new_block);
+        case .ROCK;  array_add(*blocks_rock,  new_block);
         case .WALL_DIRT; array_add(*walls_dirt, new_block);
         case .WALL_ROCK; array_add(*walls_dirt, new_block);
         case; assert(false, "Forgot a block type");
