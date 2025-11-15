@@ -887,16 +887,16 @@ main :: () {
                                     case Torch;
                                         torch_already_exists_at_location, _ := table_find_new(*global_torch_pos_to_torch, vector2_to_string_temp(new_pos));
 
-                                        south_block_exists,  _ := get_neighbor(new_pos, .SOUTH,  false);
-                                        east_block_exists,   _ := get_neighbor(new_pos, .EAST,   false);
-                                        west_block_exists,   _ := get_neighbor(new_pos, .WEST,   false);
-                                        block_exists,        _ := get_neighbor(new_pos, .CENTER, false);
-                                        wall_exists,         _ := get_neighbor(new_pos, .CENTER, true);
+                                        center_block_exists, center_block := get_neighbor(new_pos, .CENTER, false);
+                                        south_block_exists,  south_block  := get_neighbor(new_pos, .SOUTH,  false);
+                                        east_block_exists,   east_block   := get_neighbor(new_pos, .EAST,   false);
+                                        west_block_exists,   west_block   := get_neighbor(new_pos, .WEST,   false);
+                                        center_wall_exists,  center_wall  := get_neighbor(new_pos, .CENTER, true);
 
                                         is_position_placeable :=
                                             !torch_already_exists_at_location &&
-                                            !block_exists &&
-                                            (south_block_exists || east_block_exists || west_block_exists || wall_exists);
+                                            !center_block_exists &&
+                                            (south_block_exists || east_block_exists || west_block_exists || center_wall_exists);
 
                                         is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
@@ -910,9 +910,24 @@ main :: () {
 
                                             player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
 
-                                            // set_block_shadow_relative_to_neighbors(new_pos);
+                                            // Illuminate blocks and walls within one hop.
+                                            north_block_exists, north_block := get_neighbor(new_pos, .NORTH, false);
+                                            north_wall_exists,  north_wall  := get_neighbor(new_pos, .NORTH, true);
+                                            south_wall_exists,  south_wall  := get_neighbor(new_pos, .SOUTH, true);
+                                            east_wall_exists,   east_wall   := get_neighbor(new_pos, .EAST,  true);
+                                            west_wall_exists,   west_wall   := get_neighbor(new_pos, .WEST,  true);
+
+                                            if center_block_exists { center_block.shadow = 0; }
+                                            // if north_block_exists  { north_block.shadow  = 0; }
+                                            // if south_block_exists  { south_block.shadow  = 0; }
+                                            // if east_block_exists   { east_block.shadow   = 0; }
+                                            // if west_block_exists   { west_block.shadow   = 0; }
+                                            if center_wall_exists  { center_wall.shadow  = 0; }
+                                            // if north_wall_exists   { north_wall.shadow   = 0; }
+                                            // if south_wall_exists   { south_wall.shadow   = 0; }
+                                            // if east_wall_exists    { east_wall.shadow    = 0; }
+                                            // if west_wall_exists    { west_wall.shadow    = 0; }
                                             
-                                            // @TODO
                                             update_block_shadows_around_pos(new_pos);
                                         }
 
@@ -3708,6 +3723,7 @@ get_neighbor :: (pos: Vector2, direction: Direction, is_wall: bool) -> neighbor_
     }
 }
 
+// @TODO: max_hops is probably the way to stop the stack overflows
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
     neighbor_block_exists, neighbor_block := get_neighbor(block.pos, direction, false);
     neighbor_wall_exists,  neighbor_wall  := get_neighbor(block.pos, direction, true);
@@ -3835,7 +3851,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case;
-            assert(false, "Invalid direction");
+            assert(false, "Invalid direction for doing neighbor count thing");
             return -1;
     }
 }
@@ -3849,62 +3865,62 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
     neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
     neighbor_north_block_exists, neighbor_north_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_north_pos));
     neighbor_north_wall_exists,  neighbor_north_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_north_pos));
-    min_neighbor_shadow_north : int;
+    neighbor_shadow_north : int;
     if neighbor_north_block_exists && neighbor_north_wall_exists {
-        min_neighbor_shadow_north = min(neighbor_north_block.shadow, neighbor_north_wall.shadow);
+        neighbor_shadow_north = min(neighbor_north_block.shadow, neighbor_north_wall.shadow);
     } else if neighbor_north_block_exists {
-        min_neighbor_shadow_north = neighbor_north_block.shadow;
+        neighbor_shadow_north = neighbor_north_block.shadow;
     } else if neighbor_north_wall_exists {
-        min_neighbor_shadow_north = neighbor_north_wall.shadow;
+        neighbor_shadow_north = neighbor_north_wall.shadow;
     } else {
-        min_neighbor_shadow_north = -1;
+        neighbor_shadow_north = -1;
     }
 
     neighbor_south_pos := Vector2.{ block_pos.x, block_pos.y + BLOCK_WORLD_HEIGHT };
     neighbor_south_block_exists, neighbor_south_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_south_pos));
     neighbor_south_wall_exists,  neighbor_south_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_south_pos));
-    min_neighbor_shadow_south : int;
+    neighbor_shadow_south : int;
     if neighbor_south_block_exists && neighbor_south_wall_exists {
-        min_neighbor_shadow_south = min(neighbor_south_block.shadow, neighbor_south_wall.shadow);
+        neighbor_shadow_south = min(neighbor_south_block.shadow, neighbor_south_wall.shadow);
     } else if neighbor_south_block_exists {
-        min_neighbor_shadow_south = neighbor_south_block.shadow;
+        neighbor_shadow_south = neighbor_south_block.shadow;
     } else if neighbor_south_wall_exists {
-        min_neighbor_shadow_south = neighbor_south_wall.shadow;
+        neighbor_shadow_south = neighbor_south_wall.shadow;
     } else {
-        min_neighbor_shadow_south = -1;
+        neighbor_shadow_south = -1;
     }
 
-    neighbor_east_pos  := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
+    neighbor_east_pos := Vector2.{ block_pos.x + BLOCK_WORLD_WIDTH, block_pos.y };
     neighbor_east_block_exists, neighbor_east_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_east_pos));
     neighbor_east_wall_exists,  neighbor_east_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_east_pos));
-    min_neighbor_shadow_east : int;
+    neighbor_shadow_east : int;
     if neighbor_east_block_exists && neighbor_east_wall_exists {
-        min_neighbor_shadow_east = min(neighbor_east_block.shadow, neighbor_east_wall.shadow);
+        neighbor_shadow_east = min(neighbor_east_block.shadow, neighbor_east_wall.shadow);
     } else if neighbor_east_block_exists {
-        min_neighbor_shadow_east = neighbor_east_block.shadow;
+        neighbor_shadow_east = neighbor_east_block.shadow;
     } else if neighbor_east_wall_exists {
-        min_neighbor_shadow_east = neighbor_east_wall.shadow;
+        neighbor_shadow_east = neighbor_east_wall.shadow;
     } else {
-        min_neighbor_shadow_east = -1;
+        neighbor_shadow_east = -1;
     }
 
-    neighbor_west_pos  := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
+    neighbor_west_pos := Vector2.{ block_pos.x - BLOCK_WORLD_WIDTH, block_pos.y };
     neighbor_west_block_exists, neighbor_west_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_west_pos));
     neighbor_west_wall_exists,  neighbor_west_wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(neighbor_west_pos));
-    min_neighbor_shadow_west : int;
+    neighbor_shadow_west : int;
     if neighbor_west_block_exists && neighbor_west_wall_exists {
-        min_neighbor_shadow_west = min(neighbor_west_block.shadow, neighbor_west_wall.shadow);
+        neighbor_shadow_west = min(neighbor_west_block.shadow, neighbor_west_wall.shadow);
     } else if neighbor_west_block_exists {
-        min_neighbor_shadow_west = neighbor_west_block.shadow;
+        neighbor_shadow_west = neighbor_west_block.shadow;
     } else if neighbor_west_wall_exists {
-        min_neighbor_shadow_west = neighbor_west_wall.shadow;
+        neighbor_shadow_west = neighbor_west_wall.shadow;
     } else {
-        min_neighbor_shadow_west = -1;
+        neighbor_shadow_west = -1;
     }
 
     min_neighbor_shadow := min(
-        min(min_neighbor_shadow_north, min_neighbor_shadow_south),
-        min(min_neighbor_shadow_east,  min_neighbor_shadow_west),
+        min(neighbor_shadow_north, neighbor_shadow_south),
+        min(neighbor_shadow_east,  neighbor_shadow_west),
     );
     shadow := ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
 
