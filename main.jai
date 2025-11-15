@@ -216,8 +216,8 @@ DAMAGE_MAP_TILE_HEIGHT :: 16;
 
 TORCH_MAP_COLS :: 3;
 TORCH_MAP_ROWS :: 1;
-TORCH_MAP_TILE_WIDTH  :: 20;
-TORCH_MAP_TILE_HEIGHT :: 20;
+TORCH_MAP_TILE_WIDTH  :: 22;
+TORCH_MAP_TILE_HEIGHT :: 22;
 TORCH_MAP_TILE_PADDING :: 2;
 TORCH_WORLD_WIDTH  :: 16 * SCALE;
 TORCH_WORLD_HEIGHT :: 16 * SCALE;
@@ -890,10 +890,12 @@ main :: () {
                                         south_block_exists,  _ := get_neighbor(new_pos, .SOUTH,  false);
                                         east_block_exists,   _ := get_neighbor(new_pos, .EAST,   false);
                                         west_block_exists,   _ := get_neighbor(new_pos, .WEST,   false);
+                                        block_exists,        _ := get_neighbor(new_pos, .CENTER, false);
                                         wall_exists,         _ := get_neighbor(new_pos, .CENTER, true);
 
                                         is_position_placeable :=
                                             !torch_already_exists_at_location &&
+                                            !block_exists &&
                                             (south_block_exists || east_block_exists || west_block_exists || wall_exists);
 
                                         is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
@@ -2252,22 +2254,22 @@ get_texture_map_source_coords_for_entity :: (entity: Entity) -> Vector2 {
 
             south_block_exists, _ := get_neighbor(entity.pos, .SOUTH , false);
             if south_block_exists {
-               return Vector2.{ cast(float) (1 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+               return Vector2.{ cast(float) (0 * TORCH_MAP_TILE_WIDTH), 0.0 };
             }
 
             east_block_exists, _ := get_neighbor(entity.pos, .EAST , false);
             if east_block_exists {
-               return Vector2.{ cast(float) (3 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+               return Vector2.{ cast(float) (2 * TORCH_MAP_TILE_WIDTH), 0.0 };
             }
             
             west_block_exists, _ := get_neighbor(entity.pos, .WEST , false);
             if west_block_exists {
-               return Vector2.{ cast(float) (2 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+               return Vector2.{ cast(float) (1 * TORCH_MAP_TILE_WIDTH), 0.0 };
             }
 
             wall_exists, _ := get_neighbor(entity.pos, .CENTER , true);
             if wall_exists {
-               return Vector2.{ cast(float) (1 * TORCH_MAP_TILE_WIDTH), cast(float) TORCH_MAP_TILE_HEIGHT };
+               return Vector2.{ cast(float) (0 * TORCH_MAP_TILE_WIDTH), 0.0 };
             }
 
             // @TODO: if torch exists and we hit this point, I think we actually want to destroy it.
@@ -3347,17 +3349,14 @@ get_texture_map_for_entity :: (entity: Entity) -> texture: Texture, source: Rect
             return map_texture, map_source;
 
         case Torch;
-            source_x := get_texture_map_source_coords_for_entity(entity).x;
-            source_y := get_texture_map_source_coords_for_entity(entity).y;
             map_source := Rectangle.{
-                source_x, source_y,
+                get_texture_map_source_coords_for_entity(entity).x,
+                0.0,
                 TORCH_MAP_TILE_WIDTH  - TORCH_MAP_TILE_PADDING,
                 TORCH_MAP_TILE_HEIGHT - TORCH_MAP_TILE_PADDING,
             };
 
-            map_texture := torch_texture;
-
-            return map_texture, map_source;
+            return torch_map, map_source;
         
         case;
             assert(false, "You forgot some entity type to get a texture map for");
