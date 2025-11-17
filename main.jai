@@ -917,18 +917,28 @@ main :: () {
                                             east_wall_exists,   east_wall   := get_neighbor(new_pos, .EAST,  true);
                                             west_wall_exists,   west_wall   := get_neighbor(new_pos, .WEST,  true);
 
-                                            if center_block_exists { center_block.shadow = 0; }
-                                            // if north_block_exists  { north_block.shadow  = 0; }
-                                            // if south_block_exists  { south_block.shadow  = 0; }
-                                            // if east_block_exists   { east_block.shadow   = 0; }
-                                            // if west_block_exists   { west_block.shadow   = 0; }
-                                            if center_wall_exists  { center_wall.shadow  = 0; }
-                                            // if north_wall_exists   { north_wall.shadow   = 0; }
-                                            // if south_wall_exists   { south_wall.shadow   = 0; }
-                                            // if east_wall_exists    { east_wall.shadow    = 0; }
-                                            // if west_wall_exists    { west_wall.shadow    = 0; }
-                                            
-                                            update_block_shadows_around_pos(new_pos);
+                                            row_hops := 0;
+                                            for col: -6..6 {
+                                                for row: (row_hops*-1)..-1 {
+                                                    pos := Vector2.{ new_pos.x + col * BLOCK_WORLD_WIDTH, xx (new_pos.y + row * BLOCK_WORLD_HEIGHT) };
+
+                                                    block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos));
+                                                    wall_exists, wall := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(pos));
+
+                                                    if block_exists block.shadow = min(cast(u8) (abs(col) - row), block.shadow);
+                                                    if wall_exists  wall.shadow  = min(cast(u8) (abs(col) - row), wall.shadow);
+                                                }
+                                                for row: 0..row_hops {
+                                                    pos := Vector2.{ new_pos.x + col * BLOCK_WORLD_WIDTH, xx (new_pos.y + row * BLOCK_WORLD_HEIGHT) };
+
+                                                    block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos));
+                                                    wall_exists, wall := table_find_new(*global_wall_pos_to_wall, vector2_to_string_temp(pos));
+
+                                                    if block_exists block.shadow = min(cast(u8) (abs(col) + row), block.shadow);
+                                                    if wall_exists  wall.shadow  = min(cast(u8) (abs(col) + row), wall.shadow);
+                                                }
+                                                row_hops += 1;
+                                            }
                                         }
 
                                     case;
@@ -1082,7 +1092,7 @@ main :: () {
                     }
                 }
 
-                // Draw blocks
+                // Draw torches
                 for torches {
                     draw_torch(it);
                 }
@@ -1184,30 +1194,25 @@ main :: () {
                     }
                 }
 
-                // if debug_mode {
-                    
-                //     north_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y - BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                //     north_pos  := get_rect_center(north_rect);
-                //     DrawCircleV(north_pos, 5.0, RED);
-                //     DrawRectangleLinesEx(north_rect, 2.0, YELLOW);
-
-                //     south_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x, mouse_pos_in_world.y + BLOCK_WORLD_HEIGHT }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                //     south_pos  := get_rect_center(south_rect);
-                //     DrawCircleV(south_pos, 5.0, RED);
-                //     DrawRectangleLinesEx(south_rect, 2.0, YELLOW);
-
-                //     east_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x + BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                //     east_pos  := get_rect_center(east_rect);
-                //     DrawCircleV(east_pos, 5.0, RED);
-                //     DrawRectangleLinesEx(east_rect, 2.0, YELLOW);
-
-                //     west_rect := create_rect_for_tile_from_point(Vector2.{ mouse_pos_in_world.x - BLOCK_WORLD_WIDTH, mouse_pos_in_world.y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true);
-                //     west_pos  := get_rect_center(west_rect);
-                //     DrawCircleV(west_pos, 5.0, RED);
-                //     DrawRectangleLinesEx(west_rect, 2.0, YELLOW);
-
-                //     DrawRectangleLinesEx(create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, true), 2.0, RED);
-                // }
+                if debug_mode {
+                    for col: -7..7 {
+                        for row: -7..7 {
+                            block_to_update_pos := Vector2.{ mouse_pos_in_world.x + col * BLOCK_WORLD_WIDTH, mouse_pos_in_world.y + row * BLOCK_WORLD_HEIGHT };
+                            rect := create_rect_for_tile_from_point(block_to_update_pos, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, false);
+                            pos  := get_rect_center(rect);
+                            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos));
+                            if neighbor_exists {
+                                DrawText(
+                                    tprint("%\0", neighbor.shadow).data,
+                                    xx (neighbor.pos.x),    
+                                    xx (neighbor.pos.y),
+                                    18,
+                                    WHITE,
+                                );
+                            }
+                        }
+                    }
+                }
             }
 
             // Draw UI
