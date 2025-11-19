@@ -422,7 +422,7 @@ data_folder: string;
 
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
-global_torch_pos_to_torch : Table(string, *Entity);
+global_torch_pos_to_torch : Table(string, *Torch);
 
 // Placeable entities
 
@@ -3728,6 +3728,25 @@ get_neighbor :: (pos: Vector2, direction: Direction, is_wall: bool) -> neighbor_
     }
 }
 
+get_neighbor_torch :: (pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Torch {
+    potential_neighbor_pos: Vector2;
+    if direction == {
+        case .NORTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y - TORCH_WORLD_HEIGHT };
+        case .NORTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + TORCH_WORLD_WIDTH, pos.y - TORCH_WORLD_HEIGHT };
+        case .NORTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - TORCH_WORLD_WIDTH, pos.y - TORCH_WORLD_HEIGHT };
+        case .SOUTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y + TORCH_WORLD_HEIGHT };
+        case .SOUTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + TORCH_WORLD_WIDTH, pos.y + TORCH_WORLD_HEIGHT };
+        case .SOUTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - TORCH_WORLD_WIDTH, pos.y + TORCH_WORLD_HEIGHT };
+        case .EAST;       potential_neighbor_pos = Vector2.{ pos.x + TORCH_WORLD_WIDTH, pos.y };
+        case .WEST;       potential_neighbor_pos = Vector2.{ pos.x - TORCH_WORLD_WIDTH, pos.y };
+        case .CENTER;     potential_neighbor_pos = Vector2.{ pos.x,                     pos.y };
+        case;        assert(false, "Invalid direction");
+    }
+
+    neighbor_exists, neighbor := table_find_new(*global_torch_pos_to_torch, vector2_to_string_temp(potential_neighbor_pos));
+    return neighbor_exists, neighbor;
+}
+
 // @TODO: max_hops is probably the way to stop the stack overflows
 get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Direction) -> s32 {
     neighbor_block_exists, neighbor_block := get_neighbor(block.pos, direction, false);
@@ -3862,10 +3881,13 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
 }
 
 set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
-    block_exists, block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(block_pos));
-    wall_exists,  wall  := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(block_pos));
+    block_pos_string := vector2_to_string_temp(block_pos);
 
-    if !block_exists && !wall_exists return;
+    block_exists, block := table_find_new(*global_block_pos_to_block, block_pos_string);
+    wall_exists,  wall  := table_find_new(*global_wall_pos_to_wall,   block_pos_string);
+    torch_exists,    _  := table_find_new(*global_torch_pos_to_torch, block_pos_string);
+
+    if (!block_exists && !wall_exists) || torch_exists return;
 
     neighbor_north_pos := Vector2.{ block_pos.x, block_pos.y - BLOCK_WORLD_HEIGHT };
     neighbor_north_block_exists, neighbor_north_block := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(neighbor_north_pos));
@@ -3927,7 +3949,7 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
         min(neighbor_shadow_north, neighbor_shadow_south),
         min(neighbor_shadow_east,  neighbor_shadow_west),
     );
-    shadow := ifx min_neighbor_shadow < 7 then cast(u8) (min_neighbor_shadow + 1) else 7;
+    shadow := cast(u8) clamp(0, min_neighbor_shadow + 1, 7);
 
     if block_exists { block.shadow = shadow; }
     if wall_exists  { wall.shadow  = shadow; }
@@ -4004,7 +4026,7 @@ generate_torch :: (x: float32, y: float32) -> *Torch {
     new_torch.health_curr            = 1;
 
     table_add(*global_torch_pos_to_torch, vector2_to_string_permanent(new_torch.pos), new_torch);
-    array_add(*torches,  new_torch);
+    array_add(*torches, new_torch);
 
     return new_torch;
 }
