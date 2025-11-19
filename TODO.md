@@ -1,6 +1,6 @@
 # In progress
 
-- removing / adding blocks messes up lighting
+- torch destruction
 
 # Game
 
@@ -43,7 +43,6 @@
 
 # Bugs
 
-- wall tiling is a bit off
 - player can spawn inside ground
 - linux build doesn't work
 - player can fall into the ground, usually on corners

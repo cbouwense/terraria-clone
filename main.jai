@@ -739,68 +739,84 @@ main :: () {
                     is_on_cooldown := player.cooldown_attack_current_ms > 0;
 
                     if debug_mode || (!is_on_cooldown && Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE) {
-                        block_mouse_is_over : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
+                        torch_mouse_is_over := get_colliding_entity_by_vec2(mouse_pos_in_world, torches); // TODO: active torches
 
-                        if block_mouse_is_over != null {
-                            block_type := block_mouse_is_over.block_type;
-                            selected_item_stack, result := get_selected_item_stack(player.inventory);
-                            has_an_item_selected := result == xx ReturnStatus.SUCCESS;
-
-                            if has_an_item_selected {
-                                tool_type := selected_item_stack.item_type;
-                                can_item_break_block := can_item_break_blocks(tool_type);
-
-                                if can_item_break_block {
-                                    breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
-
-                                    damage := breaking_speed / block_mouse_is_over.hardness;
-                                    if block_mouse_is_over.weak_to_tool == tool_type {
-                                        damage *= BLOCK_WEAKNESS_MULTIPLIER;
-                                    }
-                                    block_mouse_is_over.health_curr -= damage;
-                                    
-                                    if block_mouse_is_over.health_curr <= 0 {
-                                        try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
-
-                                        destroy_block(block_mouse_is_over);
-                                    }
-                                }
-                            }
+                        if torch_mouse_is_over != null {
+                            try_to_add_to_inventory(*player.inventory, .TORCH);
+                            destroy_entity(torch_mouse_is_over);
                         }
-                        // No block, so check walls
+                        // No torches, so check blocks next
                         else {
-                            wall_mouse_is_over  : *Block = cast(*Block) get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
+                            block_mouse_is_over : *Block = get_colliding_entity_by_vec2(mouse_pos_in_world, active_blocks);
 
-                            if wall_mouse_is_over != null {
-                                block_type := wall_mouse_is_over.block_type;
+                            if block_mouse_is_over != null {
+                                block_type := block_mouse_is_over.block_type;
                                 selected_item_stack, result := get_selected_item_stack(player.inventory);
                                 has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
                                 if has_an_item_selected {
                                     tool_type := selected_item_stack.item_type;
-                                    can_item_break_wall := can_item_break_walls(tool_type);
+                                    can_item_break_block := can_item_break_blocks(tool_type);
 
-                                    if can_item_break_wall {
-                                        neighbor_exists_north_wall, _ := get_neighbor(wall_mouse_is_over.pos, .NORTH, true);
-                                        neighbor_exists_south_wall, _ := get_neighbor(wall_mouse_is_over.pos, .SOUTH, true);
-                                        neighbor_exists_east_wall,  _ := get_neighbor(wall_mouse_is_over.pos, .EAST,  true);
-                                        neighbor_exists_west_wall,  _ := get_neighbor(wall_mouse_is_over.pos, .WEST,  true);
-                                        is_completely_surrounded_by_neighbors := neighbor_exists_north_wall && neighbor_exists_south_wall && neighbor_exists_east_wall && neighbor_exists_west_wall;
+                                    if debug_mode || can_item_break_block {
+                                        breaking_speed : float32;
+                                        if debug_mode {
+                                            breaking_speed = 9000.1;
+                                        } else if has_an_item_selected {
+                                            breaking_speed = get_item_breaking_speed(tool_type);
+                                        } else {
+                                            breaking_speed = 1.0;  
+                                        }
 
-                                        if !is_completely_surrounded_by_neighbors {
+                                        damage := breaking_speed / block_mouse_is_over.hardness;
+                                        if block_mouse_is_over.weak_to_tool == tool_type {
+                                            damage *= BLOCK_WEAKNESS_MULTIPLIER;
+                                        }
+                                        block_mouse_is_over.health_curr -= damage;
+                                        
+                                        if block_mouse_is_over.health_curr <= 0 {
+                                            try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
 
-                                            breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
+                                            destroy_block(block_mouse_is_over);
+                                        }
+                                    }
+                                }
+                            }
+                            // No block, so check walls next
+                            else {
+                                wall_mouse_is_over := get_colliding_entity_by_vec2(mouse_pos_in_world, active_walls);
 
-                                            damage := breaking_speed / wall_mouse_is_over.hardness;
-                                            if wall_mouse_is_over.weak_to_tool == tool_type {
-                                                damage *= BLOCK_WEAKNESS_MULTIPLIER;
-                                            }
-                                            wall_mouse_is_over.health_curr -= damage;
-                                            
-                                            if wall_mouse_is_over.health_curr <= 0 {
-                                                try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+                                if wall_mouse_is_over != null {
+                                    block_type := wall_mouse_is_over.block_type;
+                                    selected_item_stack, result := get_selected_item_stack(player.inventory);
+                                    has_an_item_selected := result == xx ReturnStatus.SUCCESS;
 
-                                                destroy_block(wall_mouse_is_over);
+                                    if has_an_item_selected {
+                                        tool_type := selected_item_stack.item_type;
+                                        can_item_break_wall := can_item_break_walls(tool_type);
+
+                                        if can_item_break_wall {
+                                            neighbor_exists_north_wall, _ := get_neighbor(wall_mouse_is_over.pos, .NORTH, true);
+                                            neighbor_exists_south_wall, _ := get_neighbor(wall_mouse_is_over.pos, .SOUTH, true);
+                                            neighbor_exists_east_wall,  _ := get_neighbor(wall_mouse_is_over.pos, .EAST,  true);
+                                            neighbor_exists_west_wall,  _ := get_neighbor(wall_mouse_is_over.pos, .WEST,  true);
+                                            is_completely_surrounded_by_neighbors := neighbor_exists_north_wall && neighbor_exists_south_wall && neighbor_exists_east_wall && neighbor_exists_west_wall;
+
+                                            if !is_completely_surrounded_by_neighbors {
+
+                                                breaking_speed := ifx has_an_item_selected then get_item_breaking_speed(tool_type) else 1;
+
+                                                damage := breaking_speed / wall_mouse_is_over.hardness;
+                                                if wall_mouse_is_over.weak_to_tool == tool_type {
+                                                    damage *= BLOCK_WEAKNESS_MULTIPLIER;
+                                                }
+                                                wall_mouse_is_over.health_curr -= damage;
+                                                
+                                                if wall_mouse_is_over.health_curr <= 0 {
+                                                    try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
+
+                                                    destroy_block(wall_mouse_is_over);
+                                                }
                                             }
                                         }
                                     }
@@ -1660,7 +1676,7 @@ get_colliding_by_rect :: (subject_rect: Rectangle, collidables: [] $T/interface 
     return null;
 }
 
-get_colliding_entity_by_vec2 :: (subject_vec2: Vector2, collidables: [] $T/interface *Entity) -> result: *Entity {
+get_colliding_entity_by_vec2 :: (subject_vec2: Vector2, collidables: [] *$T/interface Entity) -> result: *T {
     for collidables {
         if CheckCollisionPointRec(subject_vec2, it.bounding_rect) {
             return it;
@@ -3956,6 +3972,22 @@ set_block_shadow_relative_to_neighbors :: (block_pos: Vector2) {
 }
 
 update_block_shadows_around_pos :: (block_pos: Vector2) {
+    // First, darken all the blocks and walls in the splash zone.
+    for col: -7..7 {
+        for row: -7..7 {
+            pos_to_update       := Vector2.{ block_pos.x + col * BLOCK_WORLD_WIDTH, block_pos.y + row * BLOCK_WORLD_HEIGHT };
+
+            block_exists, block  := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos_to_update));
+            wall_exists,  wall   := table_find_new(*global_wall_pos_to_wall,   vector2_to_string_temp(pos_to_update));
+            torch_exists,  torch := table_find_new(*global_torch_pos_to_torch, vector2_to_string_temp(pos_to_update));
+
+            if !torch_exists {
+                if block_exists block.shadow = 7;
+                if wall_exists  wall.shadow  = 7;
+            }
+        }
+    }
+
     for col: -7..7 {
         for row: -7..7 {
             block_to_update_pos := Vector2.{ block_pos.x + col * BLOCK_WORLD_WIDTH, block_pos.y + row * BLOCK_WORLD_HEIGHT };
@@ -4119,31 +4151,6 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
 
     return false;
 }
-
-initialize_torch :: (torch: *Torch) {
-    // TODO
-    // Define initial shadows for walls
-    #if false {
-        // @TODO: add a max_depth param, probably, I think that'd fix the stack overflow
-        block.neighbor_north_count = get_and_recursively_set_block_neighbor_counts(block, .NORTH);
-        block.neighbor_south_count = get_and_recursively_set_block_neighbor_counts(block, .SOUTH);
-        block.neighbor_east_count  = get_and_recursively_set_block_neighbor_counts(block, .EAST);
-        block.neighbor_west_count  = get_and_recursively_set_block_neighbor_counts(block, .WEST);
-
-        min_neighbor_count := min(
-            min(block.neighbor_north_count, block.neighbor_south_count),
-            min(block.neighbor_east_count,  block.neighbor_west_count)
-        );
-        // print_vars(wall, min_neighbor_count);
-        block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
-    }
-
-    // Initialize texture source pos
-    #if false {
-        block.texture_map_source_pos = get_texture_map_source_coords_for_block(block);
-    }
-}
-
 
 initialize_block :: (block: *Block) {
     // Define initial shadows for walls
