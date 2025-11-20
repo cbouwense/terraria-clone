@@ -263,6 +263,7 @@ TORCH_STACK_CAPACITY    :: 64;
 TORCH_MINING_MULTIPLIER :: 1;
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
+WIELDED_TORCH_WORLD_LENGTH :: 30;
 WIELDED_BLOCK_WORLD_LENGTH :: 30;
 
 TRANSPARENT_WHITE :: Color.{ 255, 255, 255, 100 };
@@ -741,9 +742,10 @@ main :: () {
                     if debug_mode || (!is_on_cooldown && Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE) {
                         torch_mouse_is_over := get_colliding_entity_by_vec2(mouse_pos_in_world, torches); // TODO: active torches
 
+                        // Destroy torch
                         if torch_mouse_is_over != null {
                             try_to_add_to_inventory(*player.inventory, .TORCH);
-                            destroy_entity(torch_mouse_is_over);
+                            destroy_entity(torch_mouse_is_over, *player);
                         }
                         // No torches, so check blocks next
                         else {
@@ -774,10 +776,11 @@ main :: () {
                                         }
                                         block_mouse_is_over.health_curr -= damage;
                                         
+                                        // Destroy block
                                         if block_mouse_is_over.health_curr <= 0 {
                                             try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
 
-                                            destroy_block(block_mouse_is_over);
+                                            destroy_block(block_mouse_is_over, *player);
                                         }
                                     }
                                 }
@@ -815,7 +818,7 @@ main :: () {
                                                 if wall_mouse_is_over.health_curr <= 0 {
                                                     try_to_add_to_inventory(*player.inventory, block_type_to_item_type(block_type));
 
-                                                    destroy_block(wall_mouse_is_over);
+                                                    destroy_block(wall_mouse_is_over, *player);
                                                 }
                                             }
                                         }
@@ -3609,7 +3612,7 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .AXE;     return WIELDED_TOOL_WORLD_LENGTH;
         case .SWORD;   return WIELDED_TOOL_WORLD_LENGTH;
         case .HAMMER;  return WIELDED_TOOL_WORLD_LENGTH;
-        case .TORCH;   return WIELDED_TOOL_WORLD_LENGTH;
+        case .TORCH;   return WIELDED_TORCH_WORLD_LENGTH;
 
         case;
             assert(false, "Forgot an item type in your switch statement");
@@ -4175,10 +4178,10 @@ initialize_block :: (block: *Block) {
     }
 }
 
-destroy_entity :: (entity: *Entity) {
+destroy_entity :: (entity: *Entity, player: *Player) {
      if entity.type == {
         case Block;
-            destroy_block(cast(*Block) entity);
+            destroy_block(cast(*Block) entity, player);
 
         case Torch;
             table_remove(*global_torch_pos_to_torch, vector2_to_string_temp(entity.pos));
@@ -4191,7 +4194,7 @@ destroy_entity :: (entity: *Entity) {
     }
 }
 
-destroy_block :: (block: *Block) {
+destroy_block :: (block: *Block, player: *Player) {
     is_wall := get_is_wall(block.block_type);
 
     if is_wall table_remove(*global_wall_pos_to_wall,   vector2_to_string_temp(block.pos));
@@ -4212,5 +4215,32 @@ destroy_block :: (block: *Block) {
 
     update_texture_map_source_pos_around_pos(block.pos, is_wall);
 
+    // Destroy torch if this block was the last anchor for it
+    if is_wall {
+        torch_exists_center, torch_center := get_neighbor_torch(block.pos, .CENTER);
+        if torch_exists_center destroy_torch_if_it_has_no_anchor(torch_center, player);
+    } else {
+        torch_exists_north, torch_north := get_neighbor_torch(block.pos, .NORTH);
+        if torch_exists_north destroy_torch_if_it_has_no_anchor(torch_north, player);
+
+        torch_exists_east, torch_east := get_neighbor_torch(block.pos, .EAST);
+        if torch_exists_east destroy_torch_if_it_has_no_anchor(torch_east, player);
+
+        torch_exists_west, torch_west := get_neighbor_torch(block.pos, .WEST);
+        if torch_exists_west destroy_torch_if_it_has_no_anchor(torch_west, player);
+    }
+    
     free(block);
+}
+
+destroy_torch_if_it_has_no_anchor :: (torch: *Torch, player: *Player) {
+    neighbor_block_exists_south, _ := get_neighbor(torch.pos, .SOUTH,  false);
+    neighbor_block_exists_east,  _ := get_neighbor(torch.pos, .EAST,   false);
+    neighbor_block_exists_west,  _ := get_neighbor(torch.pos, .WEST,   false);
+    neighbor_wall_exists_center, _ := get_neighbor(torch.pos, .CENTER, true);
+
+    if !neighbor_block_exists_south && !neighbor_block_exists_east && !neighbor_block_exists_west && !neighbor_wall_exists_center {
+        try_to_add_to_inventory(*player.inventory, .TORCH);
+        destroy_entity(torch, player);
+    }
 }
