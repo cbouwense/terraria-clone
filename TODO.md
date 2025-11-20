@@ -1,6 +1,6 @@
 # In progress
 
-
+- [juice] particles
 
 # Game
 
@@ -31,7 +31,6 @@
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
-- [juice] particles
 
 # Tech
 

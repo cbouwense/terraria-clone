@@ -382,6 +382,11 @@ Torch :: struct {
     #as using entity : Entity;
 }
 
+Particle :: struct {
+    #as using entity  : Entity;
+    time_remaining_ms : s32;
+}
+
 Control :: struct {
     type:  Type;
     value: s32; // KeyboardKey | MouseButton;
@@ -435,6 +440,8 @@ walls_dirt : [..] *Block;
 walls_rock : [..] *Block;
 
 torches : [..] *Torch;
+
+particles : [..] *Particle;
 
 main :: () {
     //
@@ -1075,6 +1082,49 @@ main :: () {
                     }
                 }
             }
+
+            // Update torches
+            {
+                for torches {
+                    // Generate spark particles
+                    if cast(int)time % 1000 < 10 {
+                        print("pooped out a spark!");
+                        rect := Rectangle.{  it.pos.x, it.pos.y, 5, 5 };
+
+                        new_particle := New(Particle);
+                        new_particle.type                   = Particle;
+                        new_particle.pos                    = get_rect_center(rect);
+                        new_particle.vel                    = Vector2.{ random_get_within_range(-100, 100), random_get_within_range(30, 100) };
+                        // new_particle.is_facing_left         = false;
+                        new_particle.bounding_rect          = rect;
+                        new_particle.sprite_rect            = rect;
+                        new_particle.time_remaining_ms      = 10000;
+                        // new_particle.texture_map_source_pos = get_texture_map_source_coords_for_entity(new_torch);
+                        // new_particle.health_max             = 1;
+                        // new_particle.health_curr            = 1;
+
+                        array_add(*particles, new_particle);
+                    }
+                }
+            }
+
+            // Update particles
+            {
+                for particles {
+                    it.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+
+                    it.pos.x += it.vel.x * dt;
+                    it.pos.y += it.vel.y * dt;
+
+                    it.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
+
+                    if it.time_remaining_ms <= 0 {
+                        destroy_entity(it, *player);
+                    } else {
+                        it.time_remaining_ms -= xx dt;
+                    }
+                }
+            }
         }
 
         //
@@ -1114,6 +1164,10 @@ main :: () {
                 // Draw torches
                 for torches {
                     draw_torch(it);
+                }
+
+                for particles {
+                    DrawRectangleRec(it.sprite_rect, RED);
                 }
 
                 // Draw player
@@ -4187,6 +4241,10 @@ destroy_entity :: (entity: *Entity, player: *Player) {
             table_remove(*global_torch_pos_to_torch, vector2_to_string_temp(entity.pos));
             array_unordered_remove_by_value(*torches, cast(*Torch) entity);
             update_block_shadows_around_pos(entity.pos);
+            free(entity);
+
+        case Particle;
+            array_unordered_remove_by_value(*particles, cast(*Particle) entity);
             free(entity);
 
         case;
