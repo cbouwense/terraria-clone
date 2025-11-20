@@ -21,7 +21,6 @@
 - [sound_effects] placing blocks
 - [sound_effects] attacking blocks
 
-- rock wall texture
 - game saves
 - background image
 - background parallax

@@ -530,7 +530,7 @@ main :: () {
         for row: 0..(100 - ground_dirt_blocks) {
             defer y += BLOCK_WORLD_HEIGHT;
             
-            generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
+            generate_block(.WALL_ROCK, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
 
             noise_index := row * (WORLD_GRID_COLS-1) + col;
             if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
