@@ -261,6 +261,10 @@ TORCH_TEXTURE_WIDTH     :: 14;
 TORCH_TEXTURE_HEIGHT    :: 16;
 TORCH_STACK_CAPACITY    :: 64;
 TORCH_MINING_MULTIPLIER :: 1;
+TORCH_COOLDOWN_SPAWN_SPARK_MS :: 3000;
+
+SPARK_WORLD_WIDTH  :: 7.5;
+SPARK_WORLD_HEIGHT :: 7.5;
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_TORCH_WORLD_LENGTH :: 30;
@@ -380,6 +384,7 @@ Block :: struct {
 
 Torch :: struct {
     #as using entity : Entity;
+    cooldown_spawn_spark_ms : s32;
 }
 
 Particle :: struct {
@@ -573,7 +578,7 @@ main :: () {
     controls.jump[0]              = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SPACE           };
     controls.attack[0]            = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_LEFT   };
     controls.interact[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_RIGHT  };
-    controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE };
+    controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE }; 
     controls.hotbar_slot_1[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_ONE             };
     controls.hotbar_slot_2[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_TWO             };
     controls.hotbar_slot_3[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_THREE           };
@@ -1087,23 +1092,26 @@ main :: () {
             {
                 for torches {
                     // Generate spark particles
-                    if cast(int)time % 1000 < 10 {
-                        print("pooped out a spark!");
-                        rect := Rectangle.{  it.pos.x, it.pos.y, 5, 5 };
+                    if it.cooldown_spawn_spark_ms <= 0 {
+                        rect := Rectangle.{ it.pos.x, it.pos.y, SPARK_WORLD_WIDTH, SPARK_WORLD_HEIGHT };
 
                         new_particle := New(Particle);
-                        new_particle.type                   = Particle;
-                        new_particle.pos                    = get_rect_center(rect);
-                        new_particle.vel                    = Vector2.{ random_get_within_range(-100, 100), random_get_within_range(30, 100) };
-                        // new_particle.is_facing_left         = false;
-                        new_particle.bounding_rect          = rect;
-                        new_particle.sprite_rect            = rect;
-                        new_particle.time_remaining_ms      = 10000;
+                        new_particle.type              = Particle;
+                        new_particle.pos               = get_rect_center(rect);
+                        new_particle.vel               = Vector2.{ random_get_within_range(-40, 40), random_get_within_range(-300, -1000) };
+                        // new_particle.is_facing_left    = false;
+                        new_particle.bounding_rect     = rect;
+                        new_particle.sprite_rect       = rect;
+                        new_particle.time_remaining_ms = 1200;
                         // new_particle.texture_map_source_pos = get_texture_map_source_coords_for_entity(new_torch);
                         // new_particle.health_max             = 1;
                         // new_particle.health_curr            = 1;
 
                         array_add(*particles, new_particle);
+
+                        it.cooldown_spawn_spark_ms = xx random_get_within_range(TORCH_COOLDOWN_SPAWN_SPARK_MS / 3, TORCH_COOLDOWN_SPAWN_SPARK_MS);
+                    } else {
+                        it.cooldown_spawn_spark_ms -= xx (dt * 1000);
                     }
                 }
             }
@@ -1111,17 +1119,23 @@ main :: () {
             // Update particles
             {
                 for particles {
-                    it.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
-
-                    it.pos.x += it.vel.x * dt;
-                    it.pos.y += it.vel.y * dt;
-
-                    it.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
-
                     if it.time_remaining_ms <= 0 {
                         destroy_entity(it, *player);
                     } else {
-                        it.time_remaining_ms -= xx dt;
+                        it.time_remaining_ms -= xx (dt * 1000);
+
+                        it.vel.y += ACCEL_DUE_TO_GRAVITY/4.0 * dt * 0.5;
+
+                        it.pos.x += it.vel.x * dt;
+                        it.pos.y += it.vel.y * dt;
+
+                        it.vel.y += ACCEL_DUE_TO_GRAVITY/4.0 * dt * 0.5;
+
+                        // Update position-dependent fields on player entity
+                        it.bounding_rect.x = it.pos.x - SPARK_WORLD_WIDTH  / 2.0;
+                        it.bounding_rect.y = it.pos.y - SPARK_WORLD_HEIGHT / 2.0;
+                        it.sprite_rect.x   = it.pos.x - SPARK_WORLD_WIDTH  / 2.0;
+                        it.sprite_rect.y   = it.pos.y - SPARK_WORLD_HEIGHT / 2.0;
                     }
                 }
             }
@@ -1166,8 +1180,19 @@ main :: () {
                     draw_torch(it);
                 }
 
+                // Draw particles
                 for particles {
-                    DrawRectangleRec(it.sprite_rect, RED);
+                    t := it.time_remaining_ms * 0.0008;
+
+                    DrawRectangleV(
+                        it.pos,
+                        Vector2.{
+                            xx (SPARK_WORLD_WIDTH * t),
+                            xx (SPARK_WORLD_WIDTH * t)
+                        },
+                        Color.{ 255, xx (255 * t), 0, 255 }
+                        // RED
+                    );
                 }
 
                 // Draw player
@@ -4104,15 +4129,16 @@ generate_torch :: (x: float32, y: float32) -> *Torch {
 
     new_torch := New(Torch);
     // new_torch.id                     = s32;
-    new_torch.type                   = Torch;
-    new_torch.pos                    = get_rect_center(rect);
-    new_torch.vel                    = Vector2.{ 0, 0 };
-    new_torch.is_facing_left         = false;
-    new_torch.bounding_rect          = rect;
-    new_torch.sprite_rect            = rect;
-    new_torch.texture_map_source_pos = get_texture_map_source_coords_for_entity(new_torch);
-    new_torch.health_max             = 1;
-    new_torch.health_curr            = 1;
+    new_torch.type                    = Torch;
+    new_torch.pos                     = get_rect_center(rect);
+    new_torch.vel                     = Vector2.{ 0, 0 };
+    new_torch.is_facing_left          = false;
+    new_torch.bounding_rect           = rect;
+    new_torch.sprite_rect             = rect;
+    new_torch.texture_map_source_pos  = get_texture_map_source_coords_for_entity(new_torch);
+    new_torch.health_max              = 1;
+    new_torch.health_curr             = 1;
+    new_torch.cooldown_spawn_spark_ms = TORCH_COOLDOWN_SPAWN_SPARK_MS;
 
     table_add(*global_torch_pos_to_torch, vector2_to_string_permanent(new_torch.pos), new_torch);
     array_add(*torches, new_torch);
