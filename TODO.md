@@ -1,7 +1,5 @@
 # In progress
 
-- [juice] particles
-
 # Game
 
 - crafting

@@ -263,8 +263,11 @@ TORCH_STACK_CAPACITY    :: 64;
 TORCH_MINING_MULTIPLIER :: 1;
 TORCH_COOLDOWN_SPAWN_SPARK_MS :: 3000;
 
-SPARK_WORLD_WIDTH  :: 7.5;
-SPARK_WORLD_HEIGHT :: 7.5;
+PARTICLE_SPARK_WORLD_WIDTH  :: 7.5;
+PARTICLE_SPARK_WORLD_HEIGHT :: 7.5;
+
+PARTICLE_BLOCK_BIT_WORLD_WIDTH  :: 10;
+PARTICLE_BLOCK_BIT_WORLD_HEIGHT :: 10;
 
 WIELDED_TOOL_WORLD_LENGTH  :: 65;
 WIELDED_TORCH_WORLD_LENGTH :: 30;
@@ -387,8 +390,14 @@ Torch :: struct {
     cooldown_spawn_spark_ms : s32;
 }
 
+ParticleType :: enum {
+    SPARK;
+    BLOCK_BIT;
+}
+
 Particle :: struct {
     #as using entity  : Entity;
+    particle_type     : ParticleType;
     time_remaining_ms : s32;
 }
 
@@ -1093,19 +1102,16 @@ main :: () {
                 for torches {
                     // Generate spark particles
                     if it.cooldown_spawn_spark_ms <= 0 {
-                        rect := Rectangle.{ it.pos.x, it.pos.y, SPARK_WORLD_WIDTH, SPARK_WORLD_HEIGHT };
+                        rect := Rectangle.{ it.bounding_rect.x, it.bounding_rect.y, PARTICLE_SPARK_WORLD_WIDTH, PARTICLE_SPARK_WORLD_HEIGHT };
 
                         new_particle := New(Particle);
                         new_particle.type              = Particle;
+                        new_particle.particle_type     = .SPARK;
                         new_particle.pos               = get_rect_center(rect);
                         new_particle.vel               = Vector2.{ random_get_within_range(-40, 40), random_get_within_range(-300, -1000) };
-                        // new_particle.is_facing_left    = false;
                         new_particle.bounding_rect     = rect;
                         new_particle.sprite_rect       = rect;
                         new_particle.time_remaining_ms = 1200;
-                        // new_particle.texture_map_source_pos = get_texture_map_source_coords_for_entity(new_torch);
-                        // new_particle.health_max             = 1;
-                        // new_particle.health_curr            = 1;
 
                         array_add(*particles, new_particle);
 
@@ -1122,20 +1128,21 @@ main :: () {
                     if it.time_remaining_ms <= 0 {
                         destroy_entity(it, *player);
                     } else {
+
                         it.time_remaining_ms -= xx (dt * 1000);
 
-                        it.vel.y += ACCEL_DUE_TO_GRAVITY/4.0 * dt * 0.5;
+                        it.vel.y += ACCEL_DUE_TO_GRAVITY/2.0 * dt * 0.5;
 
                         it.pos.x += it.vel.x * dt;
                         it.pos.y += it.vel.y * dt;
 
-                        it.vel.y += ACCEL_DUE_TO_GRAVITY/4.0 * dt * 0.5;
+                        it.vel.y += ACCEL_DUE_TO_GRAVITY/2.0 * dt * 0.5;
 
                         // Update position-dependent fields on player entity
-                        it.bounding_rect.x = it.pos.x - SPARK_WORLD_WIDTH  / 2.0;
-                        it.bounding_rect.y = it.pos.y - SPARK_WORLD_HEIGHT / 2.0;
-                        it.sprite_rect.x   = it.pos.x - SPARK_WORLD_WIDTH  / 2.0;
-                        it.sprite_rect.y   = it.pos.y - SPARK_WORLD_HEIGHT / 2.0;
+                        it.bounding_rect.x = it.pos.x - it.bounding_rect.width  / 2.0;
+                        it.bounding_rect.y = it.pos.y - it.bounding_rect.height / 2.0;
+                        it.sprite_rect.x   = it.pos.x - it.bounding_rect.width  / 2.0;
+                        it.sprite_rect.y   = it.pos.y - it.bounding_rect.height / 2.0;
                     }
                 }
             }
@@ -1182,17 +1189,21 @@ main :: () {
 
                 // Draw particles
                 for particles {
-                    t := it.time_remaining_ms * 0.0008;
+                    if #complete it.particle_type == {
+                        case .SPARK;
+                            t := it.time_remaining_ms * 0.001;
 
-                    DrawRectangleV(
-                        it.pos,
-                        Vector2.{
-                            xx (SPARK_WORLD_WIDTH * t),
-                            xx (SPARK_WORLD_WIDTH * t)
-                        },
-                        Color.{ 255, xx (255 * t), 0, 255 }
-                        // RED
-                    );
+                            DrawRectangleV(
+                                it.pos,
+                                Vector2.{
+                                    xx (it.sprite_rect.width  * t),
+                                    xx (it.sprite_rect.height * t)
+                                },
+                                Color.{ 255, xx (255 * t), 0, 255 }
+                            );
+                        case .BLOCK_BIT;
+                            DrawRectangleRec(it.sprite_rect, DARKBROWN);
+                    }
                 }
 
                 // Draw player
@@ -4314,6 +4325,23 @@ destroy_block :: (block: *Block, player: *Player) {
         if torch_exists_west destroy_torch_if_it_has_no_anchor(torch_west, player);
     }
     
+    // Spawn particles
+    for 1..10 {
+        size_modifier := random_get_within_range(0.2, 1);
+        rect := Rectangle.{ block.pos.x, block.pos.y, PARTICLE_BLOCK_BIT_WORLD_WIDTH * size_modifier, PARTICLE_BLOCK_BIT_WORLD_HEIGHT * size_modifier };
+
+        new_particle := New(Particle);
+        new_particle.type              = Particle;
+        new_particle.particle_type     = .BLOCK_BIT;
+        new_particle.pos               = get_rect_center(rect);
+        new_particle.vel               = Vector2.{ random_get_within_range(-200, 200), random_get_within_range(-350, 100) };
+        new_particle.bounding_rect     = rect;
+        new_particle.sprite_rect       = rect;
+        new_particle.time_remaining_ms = 1000;
+
+        array_add(*particles, new_particle);
+    }
+
     free(block);
 }
 
