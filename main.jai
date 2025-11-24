@@ -151,6 +151,9 @@ PLAYER_COLOR_SHOES      :: RED;
 INVENTORY_EMPTY_SLOT :: -1;
 INVENTORY_SLOTS      :: 50;
 INVENTORY_ROWS       :: 5;
+// The number of inventory rows should probably be a divisor of the number total rows (although, maybe it doesn't? There's no special reason I'm enforing this, it's just an assumption I have while writing this.).
+#assert(INVENTORY_SLOTS % INVENTORY_ROWS == 0);
+INVENTORY_SLOTS_PER_ROW :: INVENTORY_SLOTS / INVENTORY_ROWS;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -1097,11 +1100,14 @@ main :: () {
                 // Update inventory
                 {
                     if hotbar_swap_next {
-                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % INVENTORY_ROWS;
+                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % INVENTORY_SLOTS_PER_ROW;
                     }
 
                     if hotbar_swap_prev {
-                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack - 1) % INVENTORY_ROWS;
+                        // Can't simply modulo this because of underflow.
+                        player.inventory.selected_item_stack = ifx player.inventory.selected_item_stack == 0
+                            then INVENTORY_SLOTS_PER_ROW - 1
+                            else player.inventory.selected_item_stack - 1;
                     }
 
                     if open_inventory {
@@ -4347,9 +4353,6 @@ destroy_torch_if_it_has_no_anchor :: (torch: *Torch, player: *Player) {
 }
 
 draw_inventory_slot :: (slot_index: u32, player: Player, draw_hotbar_slot: bool) {
-    assert(INVENTORY_SLOTS % INVENTORY_ROWS == 0, "The number of inventory rows should probably be a divisor of the number total rows (although, maybe it doesn't? There's no special reason I'm enforcing this, it's just an assumption I have while writing this.).");
-    
-    INVENTORY_SLOTS_PER_ROW :: INVENTORY_SLOTS / INVENTORY_ROWS;
     HOTBAR_PANE_LENGTH    :: 50;
     HOTBAR_PANE_THICKNESS :: 3.0;
     HOTBAR_PANE_MARGIN    :: 2;
