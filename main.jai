@@ -30,6 +30,7 @@ move_player_right : bool;
 try_to_jump       : bool;
 try_to_attack     : bool;
 try_to_interact   : bool;
+open_inventory    : bool;
 drag_cam          : bool;
 scroll_as_zoom    : bool;
 hotbar_swap_next  : bool;
@@ -148,8 +149,8 @@ PLAYER_COLOR_PANTS      :: BLUE;
 PLAYER_COLOR_SHOES      :: RED;
 
 INVENTORY_EMPTY_SLOT :: -1;
-INVENTORY_SLOTS      :: 32;
-HOTBAR_SLOTS         :: 8;
+INVENTORY_SLOTS      :: 50;
+INVENTORY_ROWS       :: 5;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -339,6 +340,7 @@ EMPTY_ITEM_SLOT :: ItemStack.{ -1, -1, -1 };
 Inventory :: struct {
     item_stacks         : [INVENTORY_SLOTS] ItemStack;
     selected_item_stack : u32;
+    is_inventory_open   : bool;
 }
 
 Entity :: struct {
@@ -412,6 +414,7 @@ Controls :: struct {
     jump              : [3] Control;
     attack            : [3] Control;
     interact          : [3] Control;
+    open_inventory    : [3] Control;
     drag_cam          : [3] Control;
     scroll_as_zoom    : [3] Control;
     hotbar_slot_1     : [3] Control;
@@ -587,6 +590,8 @@ main :: () {
     controls.jump[0]              = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SPACE           };
     controls.attack[0]            = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_LEFT   };
     controls.interact[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_RIGHT  };
+    controls.open_inventory[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_TAB             };
+    controls.open_inventory[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_I               };
     controls.drag_cam[0]          = Control.{ type = MouseButton, value = cast(s32) MouseButton.MOUSE_BUTTON_MIDDLE }; 
     controls.hotbar_slot_1[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_ONE             };
     controls.hotbar_slot_2[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_TWO             };
@@ -625,12 +630,14 @@ main :: () {
         try_to_jump     = false;
         try_to_attack   = false;
         try_to_interact = false;
+        open_inventory  = false;
         scroll_as_zoom  = false;
 
         //
         // Input
         //
         {
+            // Meta controls
             if IsKeyPressed(.KEY_P) paused          = !paused;
             if IsKeyPressed(.KEY_G) debug_mode      = !debug_mode;
             if IsKeyPressed(.KEY_L) shadows_enabled = !shadows_enabled;
@@ -643,8 +650,12 @@ main :: () {
             try_to_jump        = control_pressed(controls.jump);
             try_to_attack      = control_down(controls.attack);
             try_to_interact    = control_down(controls.interact); // place blocks, open doors, etc.
+            open_inventory     = control_pressed(controls.open_inventory);
             drag_cam           = control_down(controls.drag_cam);
             scroll_as_zoom     = control_down(controls.scroll_as_zoom); // modifier to hold down to use scroll wheel as zoom.
+            hotbar_swap_next   = mouse_wheel_move < 0 && !scroll_as_zoom; // scroll down to shift one up (think shifting right on minecraft hotbar).
+            hotbar_swap_prev   = mouse_wheel_move > 0 && !scroll_as_zoom; // scroll up to shift one down (think shifting left on minecraft hotbar).
+
             hotbar_slot_1     := control_pressed(controls.hotbar_slot_1);
             hotbar_slot_2     := control_pressed(controls.hotbar_slot_2);
             hotbar_slot_3     := control_pressed(controls.hotbar_slot_3);
@@ -653,8 +664,6 @@ main :: () {
             hotbar_slot_6     := control_pressed(controls.hotbar_slot_6);
             hotbar_slot_7     := control_pressed(controls.hotbar_slot_7);
             hotbar_slot_8     := control_pressed(controls.hotbar_slot_8);
-            hotbar_swap_next   = mouse_wheel_move < 0 && !scroll_as_zoom; // scroll down to shift one up (think shifting right on minecraft hotbar).
-            hotbar_swap_prev   = mouse_wheel_move > 0 && !scroll_as_zoom; // scroll up to shift one down (think shifting left on minecraft hotbar).
         
             if hotbar_slot_1 { player.inventory.selected_item_stack = 0; }
             if hotbar_slot_2 { player.inventory.selected_item_stack = 1; }
@@ -1088,11 +1097,15 @@ main :: () {
                 // Update inventory
                 {
                     if hotbar_swap_next {
-                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % HOTBAR_SLOTS;
+                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % INVENTORY_ROWS;
                     }
 
                     if hotbar_swap_prev {
-                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack - 1) % HOTBAR_SLOTS;
+                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack - 1) % INVENTORY_ROWS;
+                    }
+
+                    if open_inventory {
+                        player.inventory.is_inventory_open = !player.inventory.is_inventory_open;
                     }
                 }
             }
@@ -1303,7 +1316,8 @@ main :: () {
                     }
                 }
 
-                if debug_mode {
+                // if debug_mode {
+                #if false {
                     for col: -7..7 {
                         for row: -7..7 {
                             block_to_update_pos := Vector2.{ mouse_pos_in_world.x + col * BLOCK_WORLD_WIDTH, mouse_pos_in_world.y + row * BLOCK_WORLD_HEIGHT };
@@ -1328,44 +1342,15 @@ main :: () {
             {
                 DrawFPS(GetScreenWidth() - 100, 10);
 
-                // Hotbar
-                HOTBAR_PANE_LENGTH    :: 50;
-                HOTBAR_PANE_THICKNESS :: 3.0;
-                for 0..7 {
-                    hotbar_pane_rect := Rectangle.{
-                        it * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + 2 * HOTBAR_PANE_THICKNESS,
-                        0 + 2 * HOTBAR_PANE_THICKNESS,
-                        HOTBAR_PANE_LENGTH,
-                        HOTBAR_PANE_LENGTH,
-                    };
-                    hotbar_pane_color := ifx player.inventory.selected_item_stack == it then WHITE else LIGHTGRAY;
-                    
-                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+                // Draw hotbar
+                for 0..9 draw_inventory_slot(xx it, player, true);
 
-                    item_stack_in_slot := player.inventory.item_stacks[it];
-                    if !item_stack_is_empty(item_stack_in_slot) {
-                        
-                        item_texture_map, item_source_rect := get_texture_map_by_item_type(item_stack_in_slot.item_type);
-                        DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                        
-                        if item_type_is_stackable(item_stack_in_slot.item_type) {
-                            DrawText(
-                                tprint("%\0", item_stack_in_slot.stack_count).data,
-                                xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
-                                xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
-                                18,
-                                WHITE,
-                            );
-                        }
-                    }
-
-                    DrawText(
-                        tprint("%\0", it + 1).data,
-                        xx (hotbar_pane_rect.x + HOTBAR_PANE_THICKNESS * 1.5),
-                        xx (hotbar_pane_rect.y + HOTBAR_PANE_THICKNESS * 1.5),
-                        18,
-                        WHITE,
-                    );
+                // Draw inventory
+                if player.inventory.is_inventory_open {
+                    for 10..19 draw_inventory_slot(xx it, player, false);
+                    for 20..29 draw_inventory_slot(xx it, player, false);
+                    for 30..39 draw_inventory_slot(xx it, player, false);
+                    for 40..49 draw_inventory_slot(xx it, player, false);
                 }
 
                 if debug_mode {
@@ -1916,6 +1901,7 @@ animation_get_total_duration_ms :: (animation: AnimatedSprite) -> u32 {
 }
 
 respawn_player :: () -> Player {
+    // Initialize player
     pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
 
     player := Player.{
@@ -1948,12 +1934,15 @@ respawn_player :: () -> Player {
 
     // Initialize inventory
     {
+        player.inventory.is_inventory_open = false;
+
         // Fill in the rest of the item stacks with invalid data
         for *player.inventory.item_stacks {
             it.* = EMPTY_ITEM_SLOT;
         }
 
-        player.inventory.selected_item_stack = 2;
+        // Add in various items for dev purposes
+        player.inventory.selected_item_stack = 0;
         
         player.inventory.item_stacks[0] = ItemStack.{
             item_type     = .SWORD,
@@ -4354,5 +4343,54 @@ destroy_torch_if_it_has_no_anchor :: (torch: *Torch, player: *Player) {
     if !neighbor_block_exists_south && !neighbor_block_exists_east && !neighbor_block_exists_west && !neighbor_wall_exists_center {
         try_to_add_to_inventory(*player.inventory, .TORCH);
         destroy_entity(torch, player);
+    }
+}
+
+draw_inventory_slot :: (slot_index: u32, player: Player, draw_hotbar_slot: bool) {
+    assert(INVENTORY_SLOTS % INVENTORY_ROWS == 0, "The number of inventory rows should probably be a divisor of the number total rows (although, maybe it doesn't? There's no special reason I'm enforcing this, it's just an assumption I have while writing this.).");
+    
+    INVENTORY_SLOTS_PER_ROW :: INVENTORY_SLOTS / INVENTORY_ROWS;
+    HOTBAR_PANE_LENGTH    :: 50;
+    HOTBAR_PANE_THICKNESS :: 3.0;
+    HOTBAR_PANE_MARGIN    :: 2;
+
+    x := slot_index % INVENTORY_SLOTS_PER_ROW;
+    y := cast(int) slot_index / INVENTORY_SLOTS_PER_ROW;
+
+    hotbar_pane_rect := Rectangle.{
+        x * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
+        y * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
+        HOTBAR_PANE_LENGTH,
+        HOTBAR_PANE_LENGTH,
+    };
+    hotbar_pane_color := ifx player.inventory.selected_item_stack == slot_index then WHITE else LIGHTGRAY;
+    
+    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+
+    item_stack_in_slot := player.inventory.item_stacks[slot_index];
+    if !item_stack_is_empty(item_stack_in_slot) {
+        
+        item_texture_map, item_source_rect := get_texture_map_by_item_type(item_stack_in_slot.item_type);
+        DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+        
+        if item_type_is_stackable(item_stack_in_slot.item_type) {
+            DrawText(
+                tprint("%\0", item_stack_in_slot.stack_count).data,
+                xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
+                xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
+                18,
+                WHITE,
+            );
+        }
+    }
+
+    if draw_hotbar_slot {
+        DrawText(
+            tprint("%\0", slot_index + 1).data,
+            xx (hotbar_pane_rect.x + HOTBAR_PANE_THICKNESS * 1.5),
+            xx (hotbar_pane_rect.y + HOTBAR_PANE_THICKNESS * 1.5),
+            18,
+            WHITE,
+        );
     }
 }
