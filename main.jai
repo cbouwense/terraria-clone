@@ -286,15 +286,15 @@ MAX_BLOCKS_PER_TYPE :: 50_000;
 Sprite :: struct {
     map         : Texture;
     active      : bool;
-    first_frame : u32; // Starts from 0
+    first_frame : s32; // Starts from 0
     color       : Color;
 }
 
 AnimatedSprite :: struct {
     #as using sprite  : Sprite;
-    frame_count       : u32;
-    frame_duration_ms : u32;
-    timer_ms          : u32;
+    frame_count       : s32;
+    frame_duration_ms : s32;
+    timer_ms          : s32;
     loops             : bool;
 }
 
@@ -342,7 +342,7 @@ EMPTY_ITEM_SLOT :: ItemStack.{ -1, -1, -1 };
 
 Inventory :: struct {
     item_stacks         : [INVENTORY_SLOTS] ItemStack;
-    selected_item_stack : u32;
+    selected_item_stack : s32;
     is_inventory_open   : bool;
 }
 
@@ -449,6 +449,7 @@ data_folder: string;
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
 global_torch_pos_to_torch : Table(string, *Torch);
+global_item_stack_selected_by_mouse : ItemStack;
 
 // Placeable entities
 
@@ -607,7 +608,7 @@ main :: () {
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
 
-    global_swing_timer_ms : u32;
+    global_swing_timer_ms : s32;
 
     active_blocks: [..] *Block;
     active_blocks.allocator = temp;
@@ -1405,7 +1406,9 @@ read_then_increment :: (x: *s32, increment: s32 = 1) -> s32 {
 }
 
 // @TODO: have function for getting width and height
-draw_sprite :: (sprite: $T/Sprite, entity: Entity, texture_map_tile_width: u32, texture_map_tile_height: u32) {
+draw_sprite :: (sprite: $T/Sprite, entity: Entity, texture_map_tile_width: s32, texture_map_tile_height: s32) {
+    assert(texture_map_tile_width > 0,  "You probably want a positive width. If not, delete this assertion");
+    assert(texture_map_tile_height > 0, "You probably want a positive height. If not, delete this assertion");
     if !sprite.active return;
 
     frame        := animation_get_current_frame(sprite);
@@ -1891,7 +1894,7 @@ array_unordered_remove_entity_by_id :: inline (array: *[] $Entity, item: Entity,
     return removed;
 }
 
-animation_get_current_frame :: (sprite: $T/Sprite) -> u32 {
+animation_get_current_frame :: (sprite: $T/Sprite) -> s32 {
     #if type_of(sprite) == Sprite {
         return sprite.first_frame;
     } else {
@@ -1902,7 +1905,7 @@ animation_get_current_frame :: (sprite: $T/Sprite) -> u32 {
 
 // Returns the duration of one full playing of the animation. So, if there are 10 frames, each 50 ms long, the
 // duration would be 500ms
-animation_get_total_duration_ms :: (animation: AnimatedSprite) -> u32 {
+animation_get_total_duration_ms :: (animation: AnimatedSprite) -> s32 {
     return animation.frame_count * animation.frame_duration_ms;
 }
 
@@ -1996,7 +1999,10 @@ respawn_player :: () -> Player {
     return player;
 }
 
-perlin_noise_1d :: (desired_values: u32, starting_frequency: u32, starting_amplitude: float32, octaves: u32, min_value := 0.0) -> [..] float {
+perlin_noise_1d :: (desired_values: s32, starting_frequency: s32, starting_amplitude: float32, octaves: s32, min_value := 0.0) -> [..] float {
+    assert(desired_values > 0,     "You probably want a positive desired_values. If not, delete this assertion.");
+    assert(starting_frequency > 0, "You probably want a positive starting_frequency. If not, delete this assertion.");
+    assert(octaves > 0,            "You probably want a positive octaves. If not, delete this assertion.");
     assert(desired_values % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
 
     results : [..] float;
@@ -2047,7 +2053,10 @@ perlin_noise_1d :: (desired_values: u32, starting_frequency: u32, starting_ampli
 /**
  * frequency: how many blocks before the next gradient. The higher the frequency, the less blocks in between gradients
  */
-perlin_noise_2d :: ($DESIRED_VALUES: u32, starting_frequency: u32 = 1, starting_amplitude: float32 = 1.0, octaves: u32 = 1) -> perlin_2d: [] float {
+perlin_noise_2d :: ($DESIRED_VALUES: s32, starting_frequency: s32 = 1, starting_amplitude: float32 = 1.0, octaves: s32 = 1) -> perlin_2d: [] float {
+    assert(DESIRED_VALUES > 0,     "You probably want a positive DESIRED_VALUES. If not, delete this assertion.");
+    assert(starting_frequency > 0, "You probably want a positive starting_frequency. If not, delete this assertion.");
+    assert(octaves > 0,            "You probably want a positive octaves. If not, delete this assertion.");
     assert(DESIRED_VALUES % starting_frequency == 0, "The perlin noise frequency must be a divisor of the number of desired values.");
 
     results : [..] float;
@@ -4352,7 +4361,9 @@ destroy_torch_if_it_has_no_anchor :: (torch: *Torch, player: *Player) {
     }
 }
 
-draw_inventory_slot :: (slot_index: u32, player: Player, draw_hotbar_slot: bool) {
+draw_inventory_slot :: (slot_index: s32, player: Player, draw_hotbar_slot: bool) {
+    assert(slot_index >= 0, "You probably want a non-negative slot_index. If not, delete this assertion.");
+
     HOTBAR_PANE_LENGTH    :: 50;
     HOTBAR_PANE_THICKNESS :: 3.0;
     HOTBAR_PANE_MARGIN    :: 2;
