@@ -480,7 +480,7 @@ main :: () {
     init_textures();
     init_sprites();
     
-    player := spawn_player();
+    player := respawn_player();
 
     WORLD_GRID_COLS :: 1000;
 
@@ -636,7 +636,7 @@ main :: () {
             if IsKeyPressed(.KEY_L) shadows_enabled = !shadows_enabled;
             if IsKeyPressed(.KEY_N) render_blocks   = !render_blocks;
             if IsKeyPressed(.KEY_M) render_walls    = !render_walls;
-            if IsKeyPressed(.KEY_R) player          = spawn_player();
+            if IsKeyPressed(.KEY_R) player          = respawn_player();
 
             move_player_left   = control_down(controls.move_player_left);
             move_player_right  = control_down(controls.move_player_right);
@@ -741,7 +741,7 @@ main :: () {
 
                     // Respawn player if they fall through the world
                     if player.pos.y > 500000 {
-                        player = spawn_player();
+                        player = respawn_player();
                     }
 
                     // Update position-dependent fields on player entity
@@ -1915,7 +1915,7 @@ animation_get_total_duration_ms :: (animation: AnimatedSprite) -> u32 {
     return animation.frame_count * animation.frame_duration_ms;
 }
 
-spawn_player :: () -> Player {
+respawn_player :: () -> Player {
     pos := Vector2.{ GetScreenWidth() / 2.0, -1.0 * GetScreenHeight() };
 
     player := Player.{

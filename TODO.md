@@ -1,10 +1,10 @@
 # In progress
 
+- [ui] inventory
+
 # Game
 
 - crafting
-
-- [ui] inventory
 
 - [world_gen] trees
 - [world_gen] dirt cave gen
@@ -29,6 +29,7 @@
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
+- [juice] cursor
 
 # Tech
 
