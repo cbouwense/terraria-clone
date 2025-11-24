@@ -154,6 +154,9 @@ INVENTORY_ROWS       :: 5;
 // The number of inventory rows should probably be a divisor of the number total rows (although, maybe it doesn't? There's no special reason I'm enforing this, it's just an assumption I have while writing this.).
 #assert(INVENTORY_SLOTS % INVENTORY_ROWS == 0);
 INVENTORY_SLOTS_PER_ROW :: INVENTORY_SLOTS / INVENTORY_ROWS;
+HOTBAR_PANE_LENGTH    :: 50;
+HOTBAR_PANE_THICKNESS :: 3.0;
+HOTBAR_PANE_MARGIN    :: 2;
 
 ACCEL_DUE_TO_GRAVITY :: PLAYER_WORLD_BOUNDING_HEIGHT * 25;
 
@@ -428,6 +431,8 @@ Controls :: struct {
     hotbar_slot_6     : [3] Control;
     hotbar_slot_7     : [3] Control;
     hotbar_slot_8     : [3] Control;
+    hotbar_slot_9     : [3] Control;
+    hotbar_slot_10    : [3] Control;
 }
 
 vector2_equal :: (v1: Vector2, v2: Vector2) -> bool {
@@ -605,6 +610,8 @@ main :: () {
     controls.hotbar_slot_6[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SIX             };
     controls.hotbar_slot_7[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_SEVEN           };
     controls.hotbar_slot_8[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_EIGHT           };
+    controls.hotbar_slot_9[0]     = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_NINE            };
+    controls.hotbar_slot_10[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_ZERO            };
     controls.scroll_as_zoom[0]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_LEFT_CONTROL    };
     controls.scroll_as_zoom[1]    = Control.{ type = KeyboardKey, value = cast(s32) KeyboardKey.KEY_RIGHT_CONTROL   };
 
@@ -627,7 +634,8 @@ main :: () {
         player_is_grounded : bool; // updated in player update to reduce calls to is_grounded to once for the player per frame.
         player_is_swinging : bool;
 
-        mouse_pos_in_world := GetScreenToWorld2D(GetMousePosition(), camera);
+        mouse_pos_in_ui    := GetMousePosition();
+        mouse_pos_in_world := GetScreenToWorld2D(mouse_pos_in_ui, camera);
         mouse_wheel_move   := GetMouseWheelMove();
 
         // Reset controls that need to be.
@@ -668,15 +676,27 @@ main :: () {
             hotbar_slot_6     := control_pressed(controls.hotbar_slot_6);
             hotbar_slot_7     := control_pressed(controls.hotbar_slot_7);
             hotbar_slot_8     := control_pressed(controls.hotbar_slot_8);
+            hotbar_slot_9     := control_pressed(controls.hotbar_slot_9);
+            hotbar_slot_10    := control_pressed(controls.hotbar_slot_10);
         
-            if hotbar_slot_1 { player.inventory.selected_item_stack = 0; }
-            if hotbar_slot_2 { player.inventory.selected_item_stack = 1; }
-            if hotbar_slot_3 { player.inventory.selected_item_stack = 2; }
-            if hotbar_slot_4 { player.inventory.selected_item_stack = 3; }
-            if hotbar_slot_5 { player.inventory.selected_item_stack = 4; }
-            if hotbar_slot_6 { player.inventory.selected_item_stack = 5; }
-            if hotbar_slot_7 { player.inventory.selected_item_stack = 6; }
-            if hotbar_slot_8 { player.inventory.selected_item_stack = 7; }
+            if hotbar_slot_1  { player.inventory.selected_item_stack = 0; }
+            if hotbar_slot_2  { player.inventory.selected_item_stack = 1; }
+            if hotbar_slot_3  { player.inventory.selected_item_stack = 2; }
+            if hotbar_slot_4  { player.inventory.selected_item_stack = 3; }
+            if hotbar_slot_5  { player.inventory.selected_item_stack = 4; }
+            if hotbar_slot_6  { player.inventory.selected_item_stack = 5; }
+            if hotbar_slot_7  { player.inventory.selected_item_stack = 6; }
+            if hotbar_slot_8  { player.inventory.selected_item_stack = 7; }
+            if hotbar_slot_9  { player.inventory.selected_item_stack = 8; }
+            if hotbar_slot_10 { player.inventory.selected_item_stack = 9; }
+
+            interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
+            for 0..interactable_inventory_slots {
+                slot_pane := build_inventory_slot_rect(it);
+                if CheckCollisionPointRec(mouse_pos_in_ui, slot_pane) {
+                    print("hovering over %\n", it);
+                }
+            }
         }
 
         //
@@ -4263,7 +4283,7 @@ initialize_block :: (block: *Block) {
             min(block.neighbor_north_count, block.neighbor_south_count),
             min(block.neighbor_east_count,  block.neighbor_west_count)
         );
-        // print_vars(wall, min_neighbor_count);
+
         block.shadow = ifx min_neighbor_count < 8 then cast(u8) min_neighbor_count else 7;
     }
 
@@ -4364,19 +4384,7 @@ destroy_torch_if_it_has_no_anchor :: (torch: *Torch, player: *Player) {
 draw_inventory_slot :: (slot_index: s32, player: Player, draw_hotbar_slot: bool) {
     assert(slot_index >= 0, "You probably want a non-negative slot_index. If not, delete this assertion.");
 
-    HOTBAR_PANE_LENGTH    :: 50;
-    HOTBAR_PANE_THICKNESS :: 3.0;
-    HOTBAR_PANE_MARGIN    :: 2;
-
-    x := slot_index % INVENTORY_SLOTS_PER_ROW;
-    y := cast(int) slot_index / INVENTORY_SLOTS_PER_ROW;
-
-    hotbar_pane_rect := Rectangle.{
-        x * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
-        y * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
-        HOTBAR_PANE_LENGTH,
-        HOTBAR_PANE_LENGTH,
-    };
+    hotbar_pane_rect  := build_inventory_slot_rect(slot_index);
     hotbar_pane_color := ifx player.inventory.selected_item_stack == slot_index then WHITE else LIGHTGRAY;
     
     DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
@@ -4407,4 +4415,16 @@ draw_inventory_slot :: (slot_index: s32, player: Player, draw_hotbar_slot: bool)
             WHITE,
         );
     }
+}
+
+build_inventory_slot_rect :: (slot_index: int) -> Rectangle {
+    x := slot_index % INVENTORY_SLOTS_PER_ROW;
+    y := cast(int) slot_index / INVENTORY_SLOTS_PER_ROW;
+
+    return Rectangle.{
+        x * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
+        y * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
+        HOTBAR_PANE_LENGTH,
+        HOTBAR_PANE_LENGTH,
+    };
 }
