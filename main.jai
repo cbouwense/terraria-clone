@@ -451,11 +451,18 @@ vector2_to_string_temp :: (v: Vector2) -> string {
 
 data_folder: string;
 
+//
+// Globals
+//
+
 global_block_pos_to_block : Table(string, *Block);
 global_wall_pos_to_wall   : Table(string, *Block);
 global_torch_pos_to_torch : Table(string, *Torch);
+
+global_item_stack_hovered_by_mouse  : ItemStack;
 global_item_stack_selected_by_mouse : ItemStack;
 
+// TODO: should I prepend these with global_?
 // Placeable entities
 
 blocks_grass : [..] *Block;
@@ -623,7 +630,7 @@ main :: () {
     active_walls: [..] *Block;
     active_walls.allocator = temp;
 
-    derive_active_blocks(*active_blocks, *active_walls, camera);
+    derive_active_entities(*active_blocks, *active_walls, camera);
 
     while !WindowShouldClose() {
         defer reset_temporary_storage();
@@ -693,8 +700,13 @@ main :: () {
             interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
             for 0..interactable_inventory_slots {
                 slot_pane := build_inventory_slot_rect(it);
+
                 if CheckCollisionPointRec(mouse_pos_in_ui, slot_pane) {
-                    print("hovering over %\n", it);
+                    global_item_stack_hovered_by_mouse = player.inventory.item_stacks[it];
+
+                    if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
+                        global_item_stack_selected_by_mouse = player.inventory.item_stacks[it];
+                    }
                 }
             }
         }
@@ -726,7 +738,7 @@ main :: () {
                 }
             }
 
-            derive_active_blocks(*active_blocks, *active_walls, camera);
+            derive_active_entities(*active_blocks, *active_walls, camera);
 
             should_update_player := true;
             if debug_mode {
@@ -1378,6 +1390,11 @@ main :: () {
                     for 20..29 draw_inventory_slot(xx it, player, false);
                     for 30..39 draw_inventory_slot(xx it, player, false);
                     for 40..49 draw_inventory_slot(xx it, player, false);
+                }
+
+                // Draw selected item
+                if global_item_stack_selected_by_mouse.{
+
                 }
 
                 if debug_mode {
@@ -2245,7 +2262,16 @@ can_item_break_walls :: (item_type: ItemType) -> bool {
     }
 }
 
-derive_active_blocks :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
+/**
+ * derive_active_entities determines which entities should be processed each frame based on if they fall within the
+ * viewport or not. If they don't they are neither updated nor drawn to save frames. Every time there is a new entity
+ * type, it should probably be added to this function. It clears the arrays of active entities passed into it and adds
+ * in the entities that should be processed that frame.
+ * 
+ * This function has to be called every frame, so it has to be reasonably performant. There is a tradeoff between
+ * accurate culling and not spending too much time processing what should be culled.
+ */
+derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
     window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
     window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
 

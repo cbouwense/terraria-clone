@@ -35,7 +35,6 @@
 
 - hot reloading
 - metaprogram for required fields
-- remap curly brackets, underscore, esc
 - lighting shader
 
 # Bugs
