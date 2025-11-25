@@ -46,3 +46,4 @@
 - worlds with ~2000 or greater columns get stack overflowed (I think because of the recursive shadow stuff
 - 1d perlin noise looks fucked up on some seeds
 - after a certain zoom level, inventory scrolling no longer works
+- torch texture is fucked up

@@ -341,7 +341,7 @@ ItemStack :: struct {
     stack_count    : s32;
 }
 
-EMPTY_ITEM_SLOT :: ItemStack.{ -1, -1, -1 };
+EMPTY_ITEM_STACK :: ItemStack.{ -1, -1, -1 };
 
 Inventory :: struct {
     item_stacks         : [INVENTORY_SLOTS] ItemStack;
@@ -482,11 +482,21 @@ main :: () {
     //
     random_seed(123456779);
 
-    init(*global_block_pos_to_block);
-    defer deinit(*global_block_pos_to_block);
+    // Initialize globals
+    {
+        init(*global_block_pos_to_block);
+        defer deinit(*global_block_pos_to_block);
 
-    init(*global_wall_pos_to_wall);
-    defer deinit(*global_wall_pos_to_wall);
+        init(*global_wall_pos_to_wall);
+        defer deinit(*global_wall_pos_to_wall);
+
+        // TODO: why did I seemingly not need this?...
+        init(*global_torch_pos_to_torch);
+        defer deinit(*global_torch_pos_to_torch);
+
+        global_item_stack_hovered_by_mouse  = EMPTY_ITEM_STACK;
+        global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
+    }
 
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
@@ -530,65 +540,93 @@ main :: () {
 
     initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0);// + 8.0;
 
-    // Initialize blocks
-    x := cast(int) initial_x;
+    WORLD_GEN_ENABLED :: false;
 
-    for col: 0..WORLD_GRID_COLS-1 {
-        y := 0;
-       
-        // Generate hills
-        hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
-        for row: 0..hill_dirt_blocks {
-            generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
+    // Generate blocks
+    #if WORLD_GEN_ENABLED {
+        x := cast(int) initial_x;
 
-            block_type := ifx row == hill_dirt_blocks then BlockType.GRASS else BlockType.DIRT;
-            generate_block(block_type, xx x, xx y);
+        for col: 0..WORLD_GRID_COLS-1 {
+            y := 0;
+        
+            // Generate hills
+            hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
+            for row: 0..hill_dirt_blocks {
+                generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
 
-            y -= BLOCK_WORLD_HEIGHT;
-        }
+                block_type := ifx row == hill_dirt_blocks then BlockType.GRASS else BlockType.DIRT;
+                generate_block(block_type, xx x, xx y);
 
-        // Generate ground dirt
-        ground_dirt_blocks := cast(int) abs(rock_depths[col]);
-        y = 0;
-
-        for row: 0..ground_dirt_blocks-1 {
-            defer y += BLOCK_WORLD_HEIGHT;
-
-            generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
-
-            noise_index := row * (WORLD_GRID_COLS-1) + col;
-            if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
-                continue;
+                y -= BLOCK_WORLD_HEIGHT;
             }
 
-            generate_block(.DIRT, xx x, xx y);     
-        }
+            // Generate ground dirt
+            ground_dirt_blocks := cast(int) abs(rock_depths[col]);
+            y = 0;
 
-        // Generate rock
-        rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
+            for row: 0..ground_dirt_blocks-1 {
+                defer y += BLOCK_WORLD_HEIGHT;
 
-        for row: 0..(100 - ground_dirt_blocks) {
-            defer y += BLOCK_WORLD_HEIGHT;
-            
-            generate_block(.WALL_ROCK, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
+                generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
 
-            noise_index := row * (WORLD_GRID_COLS-1) + col;
-            if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
-                continue;
+                noise_index := row * (WORLD_GRID_COLS-1) + col;
+                if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
+                    continue;
+                }
+
+                generate_block(.DIRT, xx x, xx y);     
             }
 
-            generate_block(.ROCK, xx x, xx y);        
-        }
+            // Generate rock
+            rock_blocks := cast(int) abs(cast(float) rock_depths[col]);
 
-        x += BLOCK_WORLD_WIDTH;
+            for row: 0..(100 - ground_dirt_blocks) {
+                defer y += BLOCK_WORLD_HEIGHT;
+                
+                generate_block(.WALL_ROCK, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
+
+                noise_index := row * (WORLD_GRID_COLS-1) + col;
+                if cave_spaghetti_noise[noise_index] >= cave_spaghetti_cutoff_min && cave_spaghetti_noise[noise_index] <= cave_spaghetti_cutoff_max {
+                    continue;
+                }
+
+                generate_block(.ROCK, xx x, xx y);        
+            }
+
+            x += BLOCK_WORLD_WIDTH;
+        }
+    } else {
+        // Generate a simple platform for debugging, much faster than generating a world
+        x := 0;
+
+        for col: 0..49 {
+            y := 0;
+
+            for row: 0..49 {
+                if row < 25 {
+                    generate_block(.WALL_DIRT, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
+                    generate_block(.DIRT, xx x, xx y);
+                } else {
+                    generate_block(.WALL_ROCK, xx (x + BLOCK_WORLD_WIDTH / 2), xx (y + BLOCK_WORLD_HEIGHT / 2));
+                    generate_block(.ROCK, xx x, xx y);
+                }
+
+                y += BLOCK_WORLD_HEIGHT;
+            }
+
+            x += BLOCK_WORLD_WIDTH;
+        }
     }
 
-    for walls_dirt initialize_block(it);
-    for walls_rock initialize_block(it);
+    // Initialize blocks (shadows and stuff)
+    {
+        for walls_dirt initialize_block(it);
+        for walls_rock initialize_block(it);
 
-    for blocks_dirt  initialize_block(it);
-    for blocks_grass initialize_block(it);
-    for blocks_rock  initialize_block(it);
+        for blocks_dirt  initialize_block(it);
+        for blocks_grass initialize_block(it);
+        for blocks_rock  initialize_block(it);
+    }
 
     // Initialize camera
     camera: Camera2D;
@@ -696,19 +734,6 @@ main :: () {
             if hotbar_slot_8  { player.inventory.selected_item_stack = 7; }
             if hotbar_slot_9  { player.inventory.selected_item_stack = 8; }
             if hotbar_slot_10 { player.inventory.selected_item_stack = 9; }
-
-            interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
-            for 0..interactable_inventory_slots {
-                slot_pane := build_inventory_slot_rect(it);
-
-                if CheckCollisionPointRec(mouse_pos_in_ui, slot_pane) {
-                    global_item_stack_hovered_by_mouse = player.inventory.item_stacks[it];
-
-                    if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
-                        global_item_stack_selected_by_mouse = player.inventory.item_stacks[it];
-                    }
-                }
-            }
         }
 
         //
@@ -1198,6 +1223,24 @@ main :: () {
                     }
                 }
             }
+
+            // Update inventory
+            {
+                // TODO: account for already holding an item
+                interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
+                for 0..interactable_inventory_slots {
+                    slot_pane := build_inventory_slot_rect(it);
+
+                    if CheckCollisionPointRec(mouse_pos_in_ui, slot_pane) {
+                        global_item_stack_hovered_by_mouse = player.inventory.item_stacks[it];
+
+                        if !item_stack_is_empty(global_item_stack_hovered_by_mouse) && IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
+                            global_item_stack_selected_by_mouse = player.inventory.item_stacks[it];
+                            player.inventory.item_stacks[it] = EMPTY_ITEM_STACK;
+                        }
+                    }
+                }
+            }
         }
 
         //
@@ -1393,8 +1436,14 @@ main :: () {
                 }
 
                 // Draw selected item
-                if global_item_stack_selected_by_mouse.{
-
+                if !item_stack_is_empty(global_item_stack_selected_by_mouse) {
+                    item_texture_map, item_source_rect := get_texture_map_by_item_type(global_item_stack_selected_by_mouse.item_type);
+                    south_east_of_cursor := Rectangle.{
+                        mouse_pos_in_ui.x + 10,
+                        mouse_pos_in_ui.y + 10,
+                        HOTBAR_PANE_LENGTH, HOTBAR_PANE_LENGTH,
+                    };
+                    DrawTexturePro(item_texture_map, item_source_rect, south_east_of_cursor, Vector2.{ 0, 0 }, 0.0, WHITE);
                 }
 
                 if debug_mode {
@@ -1984,7 +2033,7 @@ respawn_player :: () -> Player {
 
         // Fill in the rest of the item stacks with invalid data
         for *player.inventory.item_stacks {
-            it.* = EMPTY_ITEM_SLOT;
+            it.* = EMPTY_ITEM_STACK;
         }
 
         // Add in various items for dev purposes
@@ -2337,9 +2386,9 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
 
 item_stack_is_empty :: (item_stack: ItemStack) -> bool {
     return (
-        item_stack.item_type      == EMPTY_ITEM_SLOT.item_type && 
-        item_stack.stack_capacity == EMPTY_ITEM_SLOT.stack_capacity &&
-        item_stack.stack_count    == EMPTY_ITEM_SLOT.stack_count
+        item_stack.item_type      == EMPTY_ITEM_STACK.item_type && 
+        item_stack.stack_capacity == EMPTY_ITEM_STACK.stack_capacity &&
+        item_stack.stack_count    == EMPTY_ITEM_STACK.stack_count
     );
 }
 
@@ -4432,6 +4481,7 @@ draw_inventory_slot :: (slot_index: s32, player: Player, draw_hotbar_slot: bool)
         }
     }
 
+    // Draw hotbar number
     if draw_hotbar_slot {
         DrawText(
             tprint("%\0", slot_index + 1).data,
