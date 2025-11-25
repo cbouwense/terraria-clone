@@ -1397,27 +1397,6 @@ main :: () {
                         // DrawCircleV(player.pos, 3.0, RED);
                     }
                 }
-
-                // if debug_mode {
-                #if false {
-                    for col: -7..7 {
-                        for row: -7..7 {
-                            block_to_update_pos := Vector2.{ mouse_pos_in_world.x + col * BLOCK_WORLD_WIDTH, mouse_pos_in_world.y + row * BLOCK_WORLD_HEIGHT };
-                            rect := create_rect_for_tile_from_point(block_to_update_pos, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, false);
-                            pos  := get_rect_center(rect);
-                            neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(pos));
-                            if neighbor_exists {
-                                DrawText(
-                                    tprint("%\0", neighbor.shadow).data,
-                                    xx (neighbor.pos.x),    
-                                    xx (neighbor.pos.y),
-                                    18,
-                                    WHITE,
-                                );
-                            }
-                        }
-                    }
-                }
             }
 
             // Draw UI
@@ -1444,6 +1423,16 @@ main :: () {
                         HOTBAR_PANE_LENGTH, HOTBAR_PANE_LENGTH,
                     };
                     DrawTexturePro(item_texture_map, item_source_rect, south_east_of_cursor, Vector2.{ 0, 0 }, 0.0, WHITE);
+
+                    if item_type_is_stackable(global_item_stack_selected_by_mouse.item_type) {
+                        DrawText(
+                            tprint("%\0", global_item_stack_selected_by_mouse.stack_count).data,
+                            xx (south_east_of_cursor.x + 0.50 * HOTBAR_PANE_LENGTH),
+                            xx (south_east_of_cursor.y + 0.67 * HOTBAR_PANE_LENGTH),
+                            18,
+                            WHITE,
+                        );
+                    }
                 }
 
                 if debug_mode {
