@@ -1240,11 +1240,30 @@ main :: () {
                         global_item_stack_hovered_by_mouse = player.inventory.item_stacks[it];
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
-                            // Place down any stack you were just holding (if not holding anything, it'll be empty)
-                            player.inventory.item_stacks[it] = global_item_stack_selected_by_mouse;
+                            if !item_stack_is_empty(global_item_stack_selected_by_mouse) && !item_stack_is_empty(global_item_stack_hovered_by_mouse) && global_item_stack_selected_by_mouse.item_type == global_item_stack_hovered_by_mouse.item_type {
+                                potential_new_hovered_stack_count := global_item_stack_hovered_by_mouse.stack_count + global_item_stack_selected_by_mouse.stack_count;
 
-                            // Pick up the item stack you were just hovering
-                            global_item_stack_selected_by_mouse = global_item_stack_hovered_by_mouse;
+                                amount_to_transfer_to_inventory := ifx potential_new_hovered_stack_count <= global_item_stack_hovered_by_mouse.stack_capacity
+                                    then global_item_stack_selected_by_mouse.stack_count
+                                    else global_item_stack_selected_by_mouse.stack_count + global_item_stack_hovered_by_mouse.stack_capacity - potential_new_hovered_stack_count;
+
+                                player.inventory.item_stacks[it].stack_count    += amount_to_transfer_to_inventory;
+                                global_item_stack_selected_by_mouse.stack_count -= amount_to_transfer_to_inventory;
+
+                                if global_item_stack_selected_by_mouse.stack_count == 0 {
+                                    global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
+                                }
+                            }
+                            
+                            // original
+                            // {
+                            //     // Place down any stack you were just holding (if not holding anything, it'll be empty)
+                            //     player.inventory.item_stacks[it] = global_item_stack_selected_by_mouse;
+
+                            //     // Pick up the item stack you were just hovering
+                            //     global_item_stack_selected_by_mouse = global_item_stack_hovered_by_mouse;
+                            // }
+                            
                         }
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_RIGHT) {
@@ -1297,13 +1316,16 @@ main :: () {
                 }
 
                 // Sanity checks
+                // #if false {
                 #if !RELEASE {
                     // @PERF
                     for 0..interactable_inventory_slots {
                         assert(player.inventory.item_stacks[it].stack_count != 0, "There is an item stack with a 0 count in inventory slot %. Empty item stacks should have counts of -1.", it);
+                        assert(player.inventory.item_stacks[it].stack_count >= -1, "There is an item stack with a count less than -1 in inventory slot % (%). Empty item stacks should have counts of -1.", it, player.inventory.item_stacks[it].stack_count);
                     }
 
                     assert(global_item_stack_selected_by_mouse.stack_count != 0, "The item stack selected by the mouse has a count of 0 somehow. Empty item stacks should have counts of -1.");
+                    assert(global_item_stack_selected_by_mouse.stack_count >= -1, "The item stack selected by the mouse has a count less than -1 somehow. Empty item stacks should have counts of -1.");
                 }
             }
         }
