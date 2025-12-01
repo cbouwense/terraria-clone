@@ -47,3 +47,4 @@
 - 1d perlin noise looks fucked up on some seeds
 - after a certain zoom level, inventory scrolling no longer works
 - torch texture is fucked up
+- player swings when picking up items in inventory

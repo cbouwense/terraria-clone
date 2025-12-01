@@ -10,6 +10,9 @@
 
 #import "raylib";
 
+// TODO: parametrize
+RELEASE :: false;
+
 SQRT_2 : float32 : 1.4142135;
 
 window_width  := 1600;
@@ -982,6 +985,7 @@ main :: () {
 
                                             new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
 
+                                            // TODO: decrement selected item stack if not in inventory
                                             player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
 
                                             player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
@@ -1226,7 +1230,8 @@ main :: () {
 
             // Update inventory
             {
-                // TODO: account for already holding an item
+                // print_vars(global_item_stack_selected_by_mouse);
+
                 interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
                 for 0..interactable_inventory_slots {
                     slot_pane := build_inventory_slot_rect(it);
@@ -1234,11 +1239,71 @@ main :: () {
                     if CheckCollisionPointRec(mouse_pos_in_ui, slot_pane) {
                         global_item_stack_hovered_by_mouse = player.inventory.item_stacks[it];
 
-                        if !item_stack_is_empty(global_item_stack_hovered_by_mouse) && IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
-                            global_item_stack_selected_by_mouse = player.inventory.item_stacks[it];
-                            player.inventory.item_stacks[it] = EMPTY_ITEM_STACK;
+                        if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
+                            // Place down any stack you were just holding (if not holding anything, it'll be empty)
+                            player.inventory.item_stacks[it] = global_item_stack_selected_by_mouse;
+
+                            // Pick up the item stack you were just hovering
+                            global_item_stack_selected_by_mouse = global_item_stack_hovered_by_mouse;
+                        }
+
+                        if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_RIGHT) {
+                            // Pick up half the stack you are hovering
+                            if item_stack_is_empty(global_item_stack_selected_by_mouse) && !item_stack_is_empty(global_item_stack_hovered_by_mouse) {
+                                count_diff := ifx global_item_stack_hovered_by_mouse.stack_count == 1 then 1 else global_item_stack_hovered_by_mouse.stack_count / 2;
+                                
+                                global_item_stack_selected_by_mouse = ItemStack.{
+                                    item_type      = global_item_stack_hovered_by_mouse.item_type,
+                                    stack_capacity = global_item_stack_hovered_by_mouse.stack_capacity,
+                                    stack_count    = count_diff,
+                                };
+
+                                player.inventory.item_stacks[it].stack_count -= count_diff;
+
+                                if player.inventory.item_stacks[it].stack_count == 0 {
+                                    player.inventory.item_stacks[it] = EMPTY_ITEM_STACK;
+                                }
+                            }
+                            // Place down one count of what you are holding
+                            else {
+                                if item_stack_is_empty(global_item_stack_hovered_by_mouse) {
+                                    player.inventory.item_stacks[it] = ItemStack.{
+                                        item_type      = global_item_stack_selected_by_mouse.item_type,
+                                        stack_capacity = global_item_stack_selected_by_mouse.stack_capacity,
+                                        stack_count    = 1,
+                                    };
+
+                                    global_item_stack_selected_by_mouse.stack_count -= 1;
+
+                                    if global_item_stack_selected_by_mouse.stack_count == 0 {
+                                        global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
+                                    }
+                                } else if global_item_stack_hovered_by_mouse.item_type == global_item_stack_selected_by_mouse.item_type && global_item_stack_hovered_by_mouse.stack_count != global_item_stack_hovered_by_mouse.stack_capacity {
+                                    player.inventory.item_stacks[it] = ItemStack.{
+                                        item_type      = global_item_stack_selected_by_mouse.item_type,
+                                        stack_capacity = global_item_stack_selected_by_mouse.stack_capacity,
+                                        stack_count    = global_item_stack_hovered_by_mouse.stack_count + 1,
+                                    };
+
+                                    global_item_stack_selected_by_mouse.stack_count -= 1;
+
+                                    if global_item_stack_selected_by_mouse.stack_count == 0 {
+                                        global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
+                                    }
+                                }
+                            }
                         }
                     }
+                }
+
+                // Sanity checks
+                #if !RELEASE {
+                    // @PERF
+                    for 0..interactable_inventory_slots {
+                        assert(player.inventory.item_stacks[it].stack_count != 0, "There is an item stack with a 0 count in inventory slot %. Empty item stacks should have counts of -1.", it);
+                    }
+
+                    assert(global_item_stack_selected_by_mouse.stack_count != 0, "The item stack selected by the mouse has a count of 0 somehow. Empty item stacks should have counts of -1.");
                 }
             }
         }
@@ -2218,9 +2283,16 @@ ReturnStatus :: enum u16 {
 get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: ReturnStatus {
     item_stack := inventory.item_stacks[inventory.selected_item_stack];
 
-    return_status := ifx item_stack_is_empty(item_stack) then ReturnStatus.NOT_FOUND else ReturnStatus.SUCCESS;
-
-    return item_stack, return_status;
+    if item_stack_is_empty(item_stack) && item_stack_is_empty(global_item_stack_selected_by_mouse) {
+        return EMPTY_ITEM_STACK, ReturnStatus.NOT_FOUND;
+    }
+    else if !item_stack_is_empty(global_item_stack_selected_by_mouse) {
+        return global_item_stack_selected_by_mouse, ReturnStatus.SUCCESS;
+    }
+    else {
+        return item_stack, ReturnStatus.SUCCESS;
+    }
+    
 }
 
 get_block_hardness :: (block_type: BlockType) -> float {
