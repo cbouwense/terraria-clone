@@ -1240,7 +1240,11 @@ main :: () {
                         global_item_stack_hovered_by_mouse = player.inventory.item_stacks[it];
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
-                            if !item_stack_is_empty(global_item_stack_selected_by_mouse) && !item_stack_is_empty(global_item_stack_hovered_by_mouse) && global_item_stack_selected_by_mouse.item_type == global_item_stack_hovered_by_mouse.item_type {
+                            if (
+                                !item_stack_is_empty(global_item_stack_selected_by_mouse) &&
+                                !item_stack_is_empty(global_item_stack_hovered_by_mouse)  &&
+                                global_item_stack_selected_by_mouse.item_type == global_item_stack_hovered_by_mouse.item_type
+                            ) {
                                 potential_new_hovered_stack_count := global_item_stack_hovered_by_mouse.stack_count + global_item_stack_selected_by_mouse.stack_count;
 
                                 amount_to_transfer_to_inventory := ifx potential_new_hovered_stack_count <= global_item_stack_hovered_by_mouse.stack_capacity
@@ -1253,17 +1257,13 @@ main :: () {
                                 if global_item_stack_selected_by_mouse.stack_count == 0 {
                                     global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
                                 }
-                            }
-                            
-                            // original
-                            // {
-                            //     // Place down any stack you were just holding (if not holding anything, it'll be empty)
-                            //     player.inventory.item_stacks[it] = global_item_stack_selected_by_mouse;
+                            } else {
+                                // Place down any stack you were just holding (if not holding anything, it'll be empty)
+                                player.inventory.item_stacks[it] = global_item_stack_selected_by_mouse;
 
-                            //     // Pick up the item stack you were just hovering
-                            //     global_item_stack_selected_by_mouse = global_item_stack_hovered_by_mouse;
-                            // }
-                            
+                                // Pick up the item stack you were just hovering
+                                global_item_stack_selected_by_mouse = global_item_stack_hovered_by_mouse;
+                            }
                         }
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_RIGHT) {
