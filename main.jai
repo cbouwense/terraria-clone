@@ -326,6 +326,7 @@ BlockType :: enum {
 }
 
 ItemType :: enum {
+    UNSPECIFIED :: -1;
     DIRT_ITEM;
     ROCK_ITEM;
     COPPER_ORE_ITEM;
@@ -939,7 +940,7 @@ main :: () {
 
                             item_can_be_placed_down     := can_item_be_placed_down(selected_item_stack.item_type);
                             is_wall                     := get_is_wall_item(selected_item_stack.item_type);
-
+                            
                             if selected_item_stack.stack_count > 0 && item_can_be_placed_down {
 
                                 new_rect    := create_rect_for_tile_from_point(mouse_pos_in_world, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, is_wall);
@@ -1072,10 +1073,22 @@ main :: () {
 
                     // Arms swinging
                     {
-                        was_previously_active := player_animation_hands_swinging.active;
-                        player_began_action   := (try_to_attack || try_to_interact) && !was_previously_active;
-                        still_playing_out     := player_animation_hands_swinging.timer_ms <= animation_get_total_duration_ms(player_animation_hands_swinging) &&
-                                                 player_animation_hands_swinging.timer_ms > 0;
+                        // TODO: this is duplicated, can/should this be a function?
+                        interacting_with_inventory := false;
+                        interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
+                        for 0..interactable_inventory_slots {
+                            slot_pane := build_inventory_slot_rect(it);
+
+                            if CheckCollisionPointRec(mouse_pos_in_ui, slot_pane) {
+                                interacting_with_inventory = true;
+                                break;
+                            }
+                        }
+
+                        was_previously_active      := player_animation_hands_swinging.active;
+                        player_began_action        := !interacting_with_inventory && (try_to_attack || try_to_interact) && !was_previously_active;
+                        still_playing_out          := player_animation_hands_swinging.timer_ms <= animation_get_total_duration_ms(player_animation_hands_swinging) &&
+                                                      player_animation_hands_swinging.timer_ms > 0;
                         should_start_now := player_began_action;
                         should_continue  := was_previously_active && still_playing_out;
                         
@@ -1211,7 +1224,6 @@ main :: () {
 
             // Update inventory
             {
-                // print_vars(global_item_stack_selected_by_mouse);
                 if hotbar_swap_next {
                     player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % INVENTORY_SLOTS_PER_ROW;
                 }
@@ -1236,9 +1248,11 @@ main :: () {
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
                             if (
-                                !item_stack_is_empty(*global_item_stack_selected_by_mouse) &&
-                                !item_stack_is_empty(*global_item_stack_hovered_by_mouse)  &&
-                                global_item_stack_selected_by_mouse.item_type == global_item_stack_hovered_by_mouse.item_type
+                                !item_stack_is_empty(*global_item_stack_selected_by_mouse)            &&
+                                !item_stack_is_empty(*global_item_stack_hovered_by_mouse)             &&
+                                item_type_is_stackable(global_item_stack_selected_by_mouse.item_type) &&
+                                item_type_is_stackable(global_item_stack_hovered_by_mouse.item_type)  &&
+                                global_item_stack_selected_by_mouse.item_type == global_item_stack_hovered_by_mouse.item_type 
                             ) {
                                 potential_new_hovered_stack_count := global_item_stack_hovered_by_mouse.stack_count + global_item_stack_selected_by_mouse.stack_count;
 
@@ -1259,16 +1273,18 @@ main :: () {
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_RIGHT) {
                             // Pick up half the stack you are hovering
-                            if item_stack_is_empty(*global_item_stack_selected_by_mouse) && !item_stack_is_empty(*global_item_stack_hovered_by_mouse) {
-                                count_diff := ifx global_item_stack_hovered_by_mouse.stack_count == 1 then 1 else global_item_stack_hovered_by_mouse.stack_count / 2;
-                                
-                                global_item_stack_selected_by_mouse = ItemStack.{
-                                    item_type      = global_item_stack_hovered_by_mouse.item_type,
-                                    stack_capacity = global_item_stack_hovered_by_mouse.stack_capacity,
-                                    stack_count    = count_diff,
-                                };
+                            if item_stack_is_empty(*global_item_stack_selected_by_mouse) {
+                                if !item_stack_is_empty(*global_item_stack_hovered_by_mouse) {
+                                    count_diff := ifx global_item_stack_hovered_by_mouse.stack_count == 1 then 1 else global_item_stack_hovered_by_mouse.stack_count / 2;
+                                    
+                                    global_item_stack_selected_by_mouse = ItemStack.{
+                                        item_type      = global_item_stack_hovered_by_mouse.item_type,
+                                        stack_capacity = global_item_stack_hovered_by_mouse.stack_capacity,
+                                        stack_count    = count_diff,
+                                    };
 
-                                player.inventory.item_stacks[it].stack_count -= count_diff;
+                                    player.inventory.item_stacks[it].stack_count -= count_diff;
+                                }
                             }
                             // Place down one count of what you are holding
                             else {
@@ -1279,15 +1295,23 @@ main :: () {
                                         stack_count    = 1,
                                     };
 
-                                    global_item_stack_selected_by_mouse.stack_count -= 1;
-                                } else if global_item_stack_hovered_by_mouse.item_type == global_item_stack_selected_by_mouse.item_type && global_item_stack_hovered_by_mouse.stack_count != global_item_stack_hovered_by_mouse.stack_capacity {
-                                    player.inventory.item_stacks[it] = ItemStack.{
-                                        item_type      = global_item_stack_selected_by_mouse.item_type,
-                                        stack_capacity = global_item_stack_selected_by_mouse.stack_capacity,
-                                        stack_count    = global_item_stack_hovered_by_mouse.stack_count + 1,
-                                    };
+                                    if item_type_is_stackable(global_item_stack_selected_by_mouse.item_type) {
+                                        global_item_stack_selected_by_mouse.stack_count -= 1;
+                                    } else {
+                                        global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
+                                    }
+                                } else if global_item_stack_hovered_by_mouse.item_type == global_item_stack_selected_by_mouse.item_type {
+                                    if item_type_is_stackable(global_item_stack_selected_by_mouse.item_type) {
+                                        if global_item_stack_hovered_by_mouse.stack_count != global_item_stack_hovered_by_mouse.stack_capacity {
+                                            player.inventory.item_stacks[it] = ItemStack.{
+                                                item_type      = global_item_stack_selected_by_mouse.item_type,
+                                                stack_capacity = global_item_stack_selected_by_mouse.stack_capacity,
+                                                stack_count    = global_item_stack_hovered_by_mouse.stack_count + 1,
+                                            };
 
-                                    global_item_stack_selected_by_mouse.stack_count -= 1;
+                                            global_item_stack_selected_by_mouse.stack_count -= 1;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1295,10 +1319,8 @@ main :: () {
                 }
 
                 // Sanity checks
-                // #if false {
                 #if !RELEASE {
                     // @PERF
-                    print_vars(player.inventory.item_stacks);
                     for 0..interactable_inventory_slots {
                         assert(player.inventory.item_stacks[it].stack_count >= -1, "There is an item stack with a count less than -1 in inventory slot % (got %).", it, player.inventory.item_stacks[it].stack_count);
                     }
@@ -2133,7 +2155,11 @@ respawn_player :: () -> Player {
             stack_capacity = TORCH_STACK_CAPACITY,
             stack_count    = TORCH_STACK_CAPACITY,
         };
-    
+        player.inventory.item_stacks[8] = ItemStack.{
+            item_type     = .AXE,
+            stack_capacity = AXE_STACK_CAPACITY,
+            stack_count    = AXE_STACK_CAPACITY,
+        };
     }
 
     return player;
@@ -3827,7 +3853,7 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
 }
 
 item_type_is_stackable :: (item_type: ItemType) -> bool {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return true;
         case .ROCK_ITEM;       return true;
         case .COPPER_ORE_ITEM; return true;
@@ -3839,7 +3865,9 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
         case .HAMMER;          return false;
         case .TORCH;           return true;
 
+        case .UNSPECIFIED; #through;
         case;
+            print_vars(item_type);
             assert(false, "Forgot an item type in your switch statement");
             return false; // Unreachable
     } 
