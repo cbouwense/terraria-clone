@@ -3751,48 +3751,23 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
         // Items
         case .PICKAXE;
             map_texture = pickaxe_texture;
-            map_source  = Rectangle.{
-                PICKAXE_TEXTURE_HEIGHT, // @TODO: wait what
-                PICKAXE_TEXTURE_HEIGHT,
-                PICKAXE_TEXTURE_HEIGHT,
-                PICKAXE_TEXTURE_HEIGHT,
-            };
+            map_source  = Rectangle.{ 0, 0, PICKAXE_TEXTURE_WIDTH, PICKAXE_TEXTURE_HEIGHT };
 
         case .AXE;
             map_texture = axe_texture;
-            map_source  = Rectangle.{
-                AXE_TEXTURE_HEIGHT, // @TODO: wait what
-                AXE_TEXTURE_HEIGHT,
-                AXE_TEXTURE_HEIGHT,
-                AXE_TEXTURE_HEIGHT,
-            };
+            map_source  = Rectangle.{ 0, 0, AXE_TEXTURE_WIDTH, AXE_TEXTURE_HEIGHT };
 
         case .SWORD;
             map_texture = sword_texture;
-            map_source  = Rectangle.{
-                SWORD_TEXTURE_HEIGHT, // @TODO: wait what
-                SWORD_TEXTURE_HEIGHT,
-                SWORD_TEXTURE_HEIGHT,
-                SWORD_TEXTURE_HEIGHT,
-            };
+            map_source  = Rectangle.{ 0, 0, SWORD_TEXTURE_WIDTH, SWORD_TEXTURE_HEIGHT };
 
         case .HAMMER;
             map_texture = hammer_texture;
-            map_source  = Rectangle.{
-                HAMMER_TEXTURE_HEIGHT, // @TODO: wait what
-                HAMMER_TEXTURE_HEIGHT,
-                HAMMER_TEXTURE_HEIGHT,
-                HAMMER_TEXTURE_HEIGHT,
-            };
+            map_source  = Rectangle.{ 0, 0, HAMMER_TEXTURE_WIDTH, HAMMER_TEXTURE_HEIGHT };
 
         case .TORCH;
             map_texture = torch_texture;
-            map_source  = Rectangle.{
-                TORCH_TEXTURE_HEIGHT, // @TODO: wait what
-                TORCH_TEXTURE_HEIGHT,
-                TORCH_TEXTURE_HEIGHT,
-                TORCH_TEXTURE_HEIGHT,
-            };
+            map_source  = Rectangle.{ 0, 0, TORCH_TEXTURE_WIDTH, TORCH_TEXTURE_HEIGHT };
 
         case .DIRT_ITEM;
             map_texture = dirt_item_texture;
