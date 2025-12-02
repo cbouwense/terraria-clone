@@ -1,6 +1,6 @@
 # In progress
 
-- switching mid swing shows different wielded item
+
 
 # Game
 

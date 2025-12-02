@@ -53,12 +53,14 @@ player_shoes_map          : Texture;
 dirt_map                  : Texture;
 grass_map                 : Texture;
 rock_map                  : Texture;
+wood_map                  : Texture;
 copper_ore_map            : Texture;
 wall_dirt_map             : Texture;
 wall_rock_map             : Texture;
 damage_map                : Texture;
 dirt_item_texture         : Texture;
 rock_item_texture         : Texture;
+wood_item_texture         : Texture;
 copper_ore_item_texture   : Texture;
 wall_dirt_item_texture    : Texture;
 wall_rock_item_texture    : Texture;
@@ -103,10 +105,12 @@ player_animations : [..] *AnimatedSprite;
 block_sprite_dirt       : Sprite;
 block_sprite_grass      : Sprite;
 block_sprite_rock       : Sprite;
+block_sprite_wood       : Sprite;
 block_sprite_copper_ore : Sprite;
 
 item_sprite_dirt       : Sprite;
 item_sprite_rock       : Sprite;
+item_sprite_wood       : Sprite;
 item_sprite_copper_ore : Sprite;
 item_sprite_wall_dirt  : Sprite;
 item_sprite_wall_rock  : Sprite;
@@ -211,6 +215,14 @@ ROCK_MAP_TILE_PADDING :: 2;
 ROCK_STACK_CAPACITY :: 64;
 ROCK_HARDNESS :: 3.0;
 
+WOOD_MAP_COLS :: 13;
+WOOD_MAP_ROWS :: 5;
+WOOD_MAP_TILE_WIDTH  :: 18;
+WOOD_MAP_TILE_HEIGHT :: 18;
+WOOD_MAP_TILE_PADDING :: 2;
+WOOD_STACK_CAPACITY :: 64;
+WOOD_HARDNESS :: 1.0;
+
 COPPER_ORE_MAP_COLS :: 16;
 COPPER_ORE_MAP_ROWS :: 15;
 COPPER_ORE_MAP_TILE_WIDTH  :: 18;
@@ -241,6 +253,11 @@ ROCK_ITEM_TEXTURE_WIDTH     :: 16;
 ROCK_ITEM_TEXTURE_HEIGHT    :: 16;
 ROCK_ITEM_STACK_CAPACITY    :: 64;
 ROCK_ITEM_MINING_MULTIPLIER :: 1;
+
+WOOD_ITEM_TEXTURE_WIDTH     :: 16;
+WOOD_ITEM_TEXTURE_HEIGHT    :: 16;
+WOOD_ITEM_STACK_CAPACITY    :: 64;
+WOOD_ITEM_MINING_MULTIPLIER :: 1;
 
 COPPER_ORE_ITEM_TEXTURE_WIDTH     :: 16;
 COPPER_ORE_ITEM_TEXTURE_HEIGHT    :: 16;
@@ -317,9 +334,11 @@ Direction :: enum {
 }
 
 BlockType :: enum {
+    UNSPECIFIED :: -1;
     DIRT;
     GRASS;
     ROCK;
+    WOOD;
     COPPER_ORE;
     WALL_DIRT;
     WALL_ROCK;
@@ -329,6 +348,7 @@ ItemType :: enum {
     UNSPECIFIED :: -1;
     DIRT_ITEM;
     ROCK_ITEM;
+    WOOD_ITEM;
     COPPER_ORE_ITEM;
     WALL_DIRT_ITEM;
     WALL_ROCK_ITEM;
@@ -474,6 +494,7 @@ global_item_type_swinging := ItemType.UNSPECIFIED;
 blocks_grass : [..] *Block;
 blocks_dirt  : [..] *Block;
 blocks_rock  : [..] *Block;
+blocks_wood  : [..] *Block;
 
 walls_dirt : [..] *Block;
 walls_rock : [..] *Block;
@@ -632,6 +653,7 @@ main :: () {
         for blocks_dirt  initialize_block(it);
         for blocks_grass initialize_block(it);
         for blocks_rock  initialize_block(it);
+        for blocks_wood  initialize_block(it);
     }
 
     // Initialize camera
@@ -1602,12 +1624,14 @@ init_textures :: () {
     dirt_map                  = LoadTexture("data/Tiles_0_debug.png");
     rock_map                  = LoadTexture("data/Tiles_1.png");
     grass_map                 = LoadTexture("data/Tiles_2.png");
+    wood_map                  = LoadTexture("data/Tiles_30.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
     wall_rock_map             = LoadTexture("data/Wall_1.png");
     wall_dirt_map             = LoadTexture("data/Wall_2.png");
     damage_map                = LoadTexture("data/Damage.png");
     dirt_item_texture         = LoadTexture("data/Dirt_Item.png");
     rock_item_texture         = LoadTexture("data/Rock_Item.png");
+    wood_item_texture         = LoadTexture("data/Wood_Item.png");
     copper_ore_item_texture   = LoadTexture("data/Copper_Ore_Item.png");
     wall_rock_item_texture    = LoadTexture("data/Rock_Wall_Item.png"); // @TODO
     wall_dirt_item_texture    = LoadTexture("data/Rock_Wall_Item.png");
@@ -1857,6 +1881,11 @@ init_sprites :: () {
 
     block_sprite_rock = Sprite.{
         map   = rock_map,
+        color = WHITE,
+    };
+
+    block_sprite_wood = Sprite.{
+        map   = wood_map,
         color = WHITE,
     };
 
@@ -2166,6 +2195,11 @@ respawn_player :: () -> Player {
             stack_capacity = AXE_STACK_CAPACITY,
             stack_count    = AXE_STACK_CAPACITY,
         };
+        player.inventory.item_stacks[9] = ItemStack.{
+            item_type     = .WOOD_ITEM,
+            stack_capacity = WOOD_ITEM_STACK_CAPACITY,
+            stack_count    = WOOD_ITEM_STACK_CAPACITY,
+        };
     }
 
     return player;
@@ -2328,26 +2362,27 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: *ItemStack, ret
 }
 
 get_block_hardness :: (block_type: BlockType) -> float {
-    if block_type == {
+    if #complete block_type == {
         case .DIRT;       return DIRT_HARDNESS;
         case .GRASS;      return GRASS_HARDNESS;
         case .ROCK;       return ROCK_HARDNESS;
+        case .WOOD;       return WOOD_HARDNESS;
         case .COPPER_ORE; return COPPER_ORE_HARDNESS;
 
         case .WALL_DIRT;  return WALL_DIRT_HARDNESS;
         case .WALL_ROCK;  return WALL_ROCK_HARDNESS;
 
-        case;
-            print_vars(block_type);
-            assert(false, "Invalid block type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified block type");
             return -1; // Unreachable
     }
 }
 
 can_item_be_placed_down :: (item_type: ItemType) -> bool {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return true;
         case .ROCK_ITEM;       return true;
+        case .WOOD_ITEM;       return true;
         case .COPPER_ORE_ITEM; return false;
         case .WALL_DIRT_ITEM;  return true;
         case .WALL_ROCK_ITEM;  return true;
@@ -2357,17 +2392,17 @@ can_item_be_placed_down :: (item_type: ItemType) -> bool {
         case .HAMMER;          return false;
         case .TORCH;           return true;
 
-        case;
-            print_vars(item_type);
+        case .UNSPECIFIED;
             assert(false, "Invalid block type");
             return false; // Unreachable
     }
 }
 
 can_item_break_blocks :: (item_type: ItemType) -> bool {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return false;
         case .ROCK_ITEM;       return false;
+        case .WOOD_ITEM;       return false;
         case .COPPER_ORE_ITEM; return false;
         case .WALL_DIRT_ITEM;  return false;
         case .WALL_ROCK_ITEM;  return false;
@@ -2377,17 +2412,17 @@ can_item_break_blocks :: (item_type: ItemType) -> bool {
         case .HAMMER;          return false;
         case .TORCH;           return false;
 
-        case;
-            print_vars(item_type);
-            assert(false, "Invalid block type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified block type");
             return false; // Unreachable
     }
 }
 
 can_item_break_walls :: (item_type: ItemType) -> bool {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return false;
         case .ROCK_ITEM;       return false;
+        case .WOOD_ITEM;       return false;
         case .COPPER_ORE_ITEM; return false;
         case .WALL_DIRT_ITEM;  return false;
         case .WALL_ROCK_ITEM;  return false;
@@ -2397,9 +2432,8 @@ can_item_break_walls :: (item_type: ItemType) -> bool {
         case .HAMMER;          return true;
         case .TORCH;           return false;
 
-        case;
-            print_vars(item_type);
-            assert(false, "Invalid block type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified block type");
             return false; // Unreachable
     }
 }
@@ -2451,6 +2485,16 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
 
             array_add(active_blocks, block);
         }
+
+        for block: blocks_wood {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+            array_add(active_blocks, block);
+        }
     }
 
     // Derive active walls
@@ -2482,9 +2526,10 @@ item_stack_is_empty :: (item_stack: *ItemStack) -> bool {
 }
 
 get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return DIRT_STACK_CAPACITY;
         case .ROCK_ITEM;       return ROCK_STACK_CAPACITY;
+        case .WOOD_ITEM;       return WOOD_STACK_CAPACITY;
         case .COPPER_ORE_ITEM; return COPPER_ORE_STACK_CAPACITY;
         case .WALL_DIRT_ITEM;  return WALL_DIRT_STACK_CAPACITY;
         case .WALL_ROCK_ITEM;  return WALL_ROCK_STACK_CAPACITY;
@@ -2494,17 +2539,18 @@ get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
         case .AXE;     #through;
         case .SWORD;   #through;
         case .HAMMER;  #through;
-        case;
-            assert(false, "Invalid item type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type");
             return -1;
     }
 }
 
 get_item_breaking_speed :: (item_type: ItemType) -> float32 {
-    if item_type == {
+    if #complete item_type == {
         // Blocks (they don't break anything any faster)
         case .DIRT_ITEM;       return 1;
         case .ROCK_ITEM;       return 1;
+        case .WOOD_ITEM;       return 1;
         case .COPPER_ORE_ITEM; return 1;
         case .WALL_DIRT_ITEM;  return 1;
         case .WALL_ROCK_ITEM;  return 1;
@@ -2516,46 +2562,46 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
         case .SWORD;   return SWORD_MINING_MULTIPLIER;
         case .HAMMER;  return HAMMER_MINING_MULTIPLIER;
 
-        case;
-            assert(false, "Invalid item type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type");
             return -1;
     }
 }
 
 get_is_wall :: (block_type: BlockType) -> bool {
-    if block_type == {
+    if #complete block_type == {
         case .DIRT;       return false;
         case .GRASS;      return false;
         case .ROCK;       return false;
+        case .WOOD;       return false;
         case .COPPER_ORE; return false;
 
         case .WALL_DIRT;  return true;
         case .WALL_ROCK;  return true;
     
-        case;
-            print_vars(block_type);
-            assert(false, "Invalid block type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified block type");
             return false; // Unreachable
     }
 }
 
 get_is_wall_item :: (item_type: ItemType) -> bool {
-    if item_type == {
+    if #complete item_type == {
         case .PICKAXE;         return false;
         case .SWORD;           return false;
         case .AXE;             return false;
         case .HAMMER;          return false;
         case .DIRT_ITEM;       return false;
         case .ROCK_ITEM;       return false;
+        case .WOOD_ITEM;       return false;
         case .COPPER_ORE_ITEM; return false;
         case .TORCH;           return false;
 
         case .WALL_DIRT_ITEM;  return true;
         case .WALL_ROCK_ITEM;  return true;
     
-        case;
-            print_vars(item_type);
-            assert(false, "Invalid item type");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type");
             return false; // Unreachable
     }
 }
@@ -2611,7 +2657,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
     y := -1;
 
     if north_exists && south_exists && east_exists && west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = cast(int) random_get_within_range(1, 3);
             y = 1;
         }
@@ -2766,7 +2812,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && south_exists && east_exists && !west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = 0;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -2852,7 +2898,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && south_exists && !east_exists && west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = 4;
             y = cast(int) random_get_within_range(0, 2);
         } else {
@@ -2942,7 +2988,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && south_exists && !east_exists && !west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = 5;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -2966,7 +3012,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && east_exists && west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = cast(int) random_get_within_range(1, 3);
             y = 2;
         }
@@ -3056,7 +3102,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && east_exists && !west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 4;
@@ -3160,7 +3206,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && !east_exists && west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 4;
@@ -3264,7 +3310,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if north_exists && !south_exists && !east_exists && !west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = cast(int) random_get_within_range(6, 8);
             y = 3;
         }
@@ -3279,7 +3325,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && east_exists && west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = cast(int) random_get_within_range(1, 3);
             y = 0;
         }
@@ -3360,7 +3406,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && east_exists && !west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT  || block.block_type == .WOOD {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 3;
@@ -3449,7 +3495,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && !east_exists && west_exists {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             random_number := cast(int) random_get_within_range(0, 2);
             
             y = 3;
@@ -3543,7 +3589,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && south_exists && !east_exists && !west_exists  {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = cast(int) random_get_within_range(6, 8);
             y = 0;
         }
@@ -3564,7 +3610,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && !south_exists && east_exists && west_exists   {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = cast(int) random_get_within_range(6, 8);
             y = 4;
         }
@@ -3603,7 +3649,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && !south_exists && east_exists && !west_exists  {
-        if block.block_type == .DIRT || block.block_type == .WALL_DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = 9;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -3624,7 +3670,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else if !north_exists && !south_exists && !east_exists && west_exists  {
-        if block.block_type == .DIRT {
+        if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
             x = 12;
             y = cast(int) random_get_within_range(0, 2);
         }
@@ -3718,6 +3764,14 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
                 ROCK_MAP_TILE_HEIGHT - ROCK_MAP_TILE_PADDING,
             };
 
+        case .WOOD;
+            map_texture = wood_map;
+            map_source  = Rectangle.{
+                source_x, source_y,
+                WOOD_MAP_TILE_WIDTH - WOOD_MAP_TILE_PADDING,
+                WOOD_MAP_TILE_HEIGHT - WOOD_MAP_TILE_PADDING,
+            };
+
         case .COPPER_ORE;
             map_texture = copper_ore_map;
             map_source  = Rectangle.{
@@ -3787,6 +3841,12 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
                 0, 0, ROCK_ITEM_TEXTURE_WIDTH, ROCK_ITEM_TEXTURE_HEIGHT,
             };
 
+        case .WOOD_ITEM;
+            map_texture = wood_item_texture;
+            map_source = Rectangle.{
+                0, 0, WOOD_ITEM_TEXTURE_WIDTH, WOOD_ITEM_TEXTURE_HEIGHT,
+            };
+
         case .COPPER_ORE_ITEM;
             map_texture = copper_ore_item_texture;
             map_source = Rectangle.{
@@ -3815,10 +3875,12 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
     return map_texture, map_source;
 }
 
+// TODO: is this even used?...
 get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return *item_sprite_dirt;
         case .ROCK_ITEM;       return *item_sprite_rock;
+        case .WOOD_ITEM;       return *item_sprite_wood;
         case .COPPER_ORE_ITEM; return *item_sprite_copper_ore;
         case .WALL_DIRT_ITEM;  return *item_sprite_wall_dirt;
         case .WALL_ROCK_ITEM;  return *item_sprite_wall_rock;
@@ -3827,8 +3889,9 @@ get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
         case .SWORD;           return *item_sprite_sword;
         case .HAMMER;          return *item_sprite_hammer;
         case .TORCH;           return *item_sprite_torch;
-        case;
-            assert(false, "You forgot an item type in your switch statement");
+
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type");
             return null;
     }
 }
@@ -3837,6 +3900,7 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
     if #complete item_type == {
         case .DIRT_ITEM;       return true;
         case .ROCK_ITEM;       return true;
+        case .WOOD_ITEM;       return true;
         case .COPPER_ORE_ITEM; return true;
         case .WALL_DIRT_ITEM;  return true;
         case .WALL_ROCK_ITEM;  return true;
@@ -3855,10 +3919,11 @@ item_type_is_stackable :: (item_type: ItemType) -> bool {
 }
 
 get_item_world_length :: (item_type: ItemType) -> float {
-    if item_type == {
+    if #complete item_type == {
         // Blocks
         case .DIRT_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
         case .ROCK_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
+        case .WOOD_ITEM;       return WIELDED_BLOCK_WORLD_LENGTH;
         case .COPPER_ORE_ITEM; return WIELDED_BLOCK_WORLD_LENGTH;
         case .WALL_DIRT_ITEM;  return WIELDED_BLOCK_WORLD_LENGTH;
         case .WALL_ROCK_ITEM;  return WIELDED_BLOCK_WORLD_LENGTH;
@@ -3870,32 +3935,34 @@ get_item_world_length :: (item_type: ItemType) -> float {
         case .HAMMER;  return WIELDED_TOOL_WORLD_LENGTH;
         case .TORCH;   return WIELDED_TORCH_WORLD_LENGTH;
 
-        case;
-            assert(false, "Forgot an item type in your switch statement");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type");
             return -1; // Unreachable
     } 
 }
 
 get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
-    if block_type == {
+    if #complete block_type == {
         case .DIRT;       return .PICKAXE;
         case .GRASS;      return .PICKAXE;
         case .ROCK;       return .PICKAXE;
+        case .WOOD;       return .AXE;
         case .COPPER_ORE; return .PICKAXE;
         
         case .WALL_DIRT;  return .HAMMER;
         case .WALL_ROCK;  return .HAMMER;
 
-        case;
-            assert(false, "Forgot a block type in your switch statement");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified block type");
             return .ROCK_ITEM; // Unreachable
     } 
 }
 
 item_type_to_entity_type :: (item_type: ItemType) -> Type {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return Block;
         case .ROCK_ITEM;       return Block;
+        case .WOOD_ITEM;       return Block;
         case .COPPER_ORE_ITEM; return Block;
         case .WALL_DIRT_ITEM;  return Block;
         case .WALL_ROCK_ITEM;  return Block;
@@ -3906,16 +3973,17 @@ item_type_to_entity_type :: (item_type: ItemType) -> Type {
         case .AXE;     #through;
         case .SWORD;   #through;
         case .HAMMER;  #through;
-        case;
-            assert(false, "Forgot an item type in your switch statement, or tried to place unplaceable thing");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type, or tried to place unplaceable thing");
             return Entity; // Unreachable
     }
 }
 
 item_type_to_block_type :: (item_type: ItemType) -> BlockType {
-    if item_type == {
+    if #complete item_type == {
         case .DIRT_ITEM;       return BlockType.DIRT;
         case .ROCK_ITEM;       return BlockType.ROCK;
+        case .WOOD_ITEM;       return BlockType.WOOD;
         case .COPPER_ORE_ITEM; return BlockType.COPPER_ORE;
         case .WALL_DIRT_ITEM;  return BlockType.WALL_DIRT;
         case .WALL_ROCK_ITEM;  return BlockType.WALL_ROCK;
@@ -3925,24 +3993,25 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
         case .AXE;     #through;
         case .SWORD;   #through;
         case .HAMMER;  #through;
-        case;
-            assert(false, "Forgot an item type in your switch statement, or tried to place unplaceable thing");
+        case .UNSPECIFIED;
+            assert(false, "Didn't specify item type to turn into a block type, or tried to place unplaceable thing");
             return BlockType.DIRT; // Unreachable
     }
 }
 
 block_type_to_item_type :: (block_type: BlockType) -> ItemType {
-    if block_type == {
+    if #complete block_type == {
         case BlockType.DIRT;       return ItemType.DIRT_ITEM;
         case BlockType.GRASS;      return ItemType.DIRT_ITEM;
         case BlockType.ROCK;       return ItemType.ROCK_ITEM;
+        case BlockType.WOOD;       return ItemType.WOOD_ITEM;
         case BlockType.COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
         case BlockType.WALL_DIRT;  return ItemType.WALL_DIRT_ITEM;
         case BlockType.WALL_ROCK;  return ItemType.WALL_ROCK_ITEM;
 
-        case;
-            assert(false, "Forgot an item type in your switch statement");
-            return ItemType.DIRT_ITEM; // Unreachable
+        case BlockType.UNSPECIFIED;
+            assert(false, "Unspecified block type");
+            return ItemType.UNSPECIFIED; // Unreachable
     }
 }
 
@@ -4356,13 +4425,16 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
         table_add(*global_block_pos_to_block, vector2_to_string_permanent(new_block.pos), new_block);
     }
 
-    if block_type == {
-        case .DIRT;      array_add(*blocks_dirt,  new_block);
-        case .GRASS;     array_add(*blocks_grass, new_block);
-        case .ROCK;      array_add(*blocks_rock,  new_block);
-        case .WALL_DIRT; array_add(*walls_dirt, new_block);
-        case .WALL_ROCK; array_add(*walls_dirt, new_block);
-        case; assert(false, "Forgot a block type");
+    if #complete block_type == {
+        case .DIRT;       array_add(*blocks_dirt,  new_block);
+        case .GRASS;      array_add(*blocks_grass, new_block);
+        case .ROCK;       array_add(*blocks_rock,  new_block);
+        case .WOOD;       array_add(*blocks_wood,  new_block);
+        case .COPPER_ORE; array_add(*blocks_rock,  new_block); // TODO: blocks_copper_ore
+        case .WALL_DIRT;  array_add(*walls_dirt, new_block);
+        case .WALL_ROCK;  array_add(*walls_dirt, new_block);
+
+        case .UNSPECIFIED; assert(false, "Unspecified block type");
     }
 
     return new_block;
@@ -4461,15 +4533,17 @@ destroy_block :: (block: *Block, player: *Player) {
     if is_wall table_remove(*global_wall_pos_to_wall,   vector2_to_string_temp(block.pos));
     else       table_remove(*global_block_pos_to_block, vector2_to_string_temp(block.pos));
 
-    if block.block_type == {
+    if #complete block.block_type == {
         case .DIRT;       array_unordered_remove_by_value(*blocks_dirt,  block);
         case .GRASS;      array_unordered_remove_by_value(*blocks_grass, block);
         case .ROCK;       array_unordered_remove_by_value(*blocks_rock,  block);
-        case .COPPER_ORE; array_unordered_remove_by_value(*blocks_rock,  block);
+        case .WOOD;       array_unordered_remove_by_value(*blocks_wood,  block);
+        case .COPPER_ORE; array_unordered_remove_by_value(*blocks_rock,  block); // TODO block_copper_ore
 
         case .WALL_DIRT;  array_unordered_remove_by_value(*walls_dirt, block);
         case .WALL_ROCK;  array_unordered_remove_by_value(*walls_rock, block);
-        case; assert(false, "forgot wall type to remove");
+
+        case .UNSPECIFIED; assert(false, "Unspecified block type to remove");
     }
 
     update_block_shadows_around_pos(block.pos);
