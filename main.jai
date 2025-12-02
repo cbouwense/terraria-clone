@@ -344,7 +344,7 @@ ItemStack :: struct {
     stack_count    : s32;
 }
 
-EMPTY_ITEM_STACK :: ItemStack.{ -1, -1, -1 };
+EMPTY_ITEM_STACK :: ItemStack.{ -1, -1, 0 };
 
 Inventory :: struct {
     item_stacks         : [INVENTORY_SLOTS] ItemStack;
@@ -985,8 +985,7 @@ main :: () {
 
                                             new_block := generate_block(new_block_type, new_rect.x, new_rect.y);
 
-                                            // TODO: decrement selected item stack if not in inventory
-                                            player.inventory.item_stacks[player.inventory.selected_item_stack].stack_count -= 1;
+                                            selected_item_stack.stack_count -= 1;
 
                                             player.cooldown_interact_current_ms = PLAYER_COOLDOWN_INTERACT_DURATION_MS;
 
@@ -1158,24 +1157,6 @@ main :: () {
                         player.cooldown_interact_current_ms -= xx (dt * 1000);
                     }
                 }
-
-                // Update inventory
-                {
-                    if hotbar_swap_next {
-                        player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % INVENTORY_SLOTS_PER_ROW;
-                    }
-
-                    if hotbar_swap_prev {
-                        // Can't simply modulo this because of underflow.
-                        player.inventory.selected_item_stack = ifx player.inventory.selected_item_stack == 0
-                            then INVENTORY_SLOTS_PER_ROW - 1
-                            else player.inventory.selected_item_stack - 1;
-                    }
-
-                    if open_inventory {
-                        player.inventory.is_inventory_open = !player.inventory.is_inventory_open;
-                    }
-                }
             }
 
             // Update torches
@@ -1231,6 +1212,20 @@ main :: () {
             // Update inventory
             {
                 // print_vars(global_item_stack_selected_by_mouse);
+                if hotbar_swap_next {
+                    player.inventory.selected_item_stack = (player.inventory.selected_item_stack + 1) % INVENTORY_SLOTS_PER_ROW;
+                }
+
+                if hotbar_swap_prev {
+                    // Can't simply modulo this because of underflow.
+                    player.inventory.selected_item_stack = ifx player.inventory.selected_item_stack == 0
+                        then INVENTORY_SLOTS_PER_ROW - 1
+                        else player.inventory.selected_item_stack - 1;
+                }
+
+                if open_inventory {
+                    player.inventory.is_inventory_open = !player.inventory.is_inventory_open;
+                }
 
                 interactable_inventory_slots := ifx player.inventory.is_inventory_open then INVENTORY_SLOTS-1 else INVENTORY_SLOTS_PER_ROW-1;
                 for 0..interactable_inventory_slots {
@@ -1241,8 +1236,8 @@ main :: () {
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT) {
                             if (
-                                !item_stack_is_empty(global_item_stack_selected_by_mouse) &&
-                                !item_stack_is_empty(global_item_stack_hovered_by_mouse)  &&
+                                !item_stack_is_empty(*global_item_stack_selected_by_mouse) &&
+                                !item_stack_is_empty(*global_item_stack_hovered_by_mouse)  &&
                                 global_item_stack_selected_by_mouse.item_type == global_item_stack_hovered_by_mouse.item_type
                             ) {
                                 potential_new_hovered_stack_count := global_item_stack_hovered_by_mouse.stack_count + global_item_stack_selected_by_mouse.stack_count;
@@ -1253,22 +1248,18 @@ main :: () {
 
                                 player.inventory.item_stacks[it].stack_count    += amount_to_transfer_to_inventory;
                                 global_item_stack_selected_by_mouse.stack_count -= amount_to_transfer_to_inventory;
-
-                                if global_item_stack_selected_by_mouse.stack_count == 0 {
-                                    global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
-                                }
                             } else {
                                 // Place down any stack you were just holding (if not holding anything, it'll be empty)
-                                player.inventory.item_stacks[it] = global_item_stack_selected_by_mouse;
+                                player.inventory.item_stacks[it] = *global_item_stack_selected_by_mouse;
 
                                 // Pick up the item stack you were just hovering
-                                global_item_stack_selected_by_mouse = global_item_stack_hovered_by_mouse;
+                                global_item_stack_selected_by_mouse = *global_item_stack_hovered_by_mouse;
                             }
                         }
 
                         if IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_RIGHT) {
                             // Pick up half the stack you are hovering
-                            if item_stack_is_empty(global_item_stack_selected_by_mouse) && !item_stack_is_empty(global_item_stack_hovered_by_mouse) {
+                            if item_stack_is_empty(*global_item_stack_selected_by_mouse) && !item_stack_is_empty(*global_item_stack_hovered_by_mouse) {
                                 count_diff := ifx global_item_stack_hovered_by_mouse.stack_count == 1 then 1 else global_item_stack_hovered_by_mouse.stack_count / 2;
                                 
                                 global_item_stack_selected_by_mouse = ItemStack.{
@@ -1278,14 +1269,10 @@ main :: () {
                                 };
 
                                 player.inventory.item_stacks[it].stack_count -= count_diff;
-
-                                if player.inventory.item_stacks[it].stack_count == 0 {
-                                    player.inventory.item_stacks[it] = EMPTY_ITEM_STACK;
-                                }
                             }
                             // Place down one count of what you are holding
                             else {
-                                if item_stack_is_empty(global_item_stack_hovered_by_mouse) {
+                                if item_stack_is_empty(*global_item_stack_hovered_by_mouse) {
                                     player.inventory.item_stacks[it] = ItemStack.{
                                         item_type      = global_item_stack_selected_by_mouse.item_type,
                                         stack_capacity = global_item_stack_selected_by_mouse.stack_capacity,
@@ -1293,10 +1280,6 @@ main :: () {
                                     };
 
                                     global_item_stack_selected_by_mouse.stack_count -= 1;
-
-                                    if global_item_stack_selected_by_mouse.stack_count == 0 {
-                                        global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
-                                    }
                                 } else if global_item_stack_hovered_by_mouse.item_type == global_item_stack_selected_by_mouse.item_type && global_item_stack_hovered_by_mouse.stack_count != global_item_stack_hovered_by_mouse.stack_capacity {
                                     player.inventory.item_stacks[it] = ItemStack.{
                                         item_type      = global_item_stack_selected_by_mouse.item_type,
@@ -1305,10 +1288,6 @@ main :: () {
                                     };
 
                                     global_item_stack_selected_by_mouse.stack_count -= 1;
-
-                                    if global_item_stack_selected_by_mouse.stack_count == 0 {
-                                        global_item_stack_selected_by_mouse = EMPTY_ITEM_STACK;
-                                    }
                                 }
                             }
                         }
@@ -1319,13 +1298,12 @@ main :: () {
                 // #if false {
                 #if !RELEASE {
                     // @PERF
+                    print_vars(player.inventory.item_stacks);
                     for 0..interactable_inventory_slots {
-                        assert(player.inventory.item_stacks[it].stack_count != 0, "There is an item stack with a 0 count in inventory slot %. Empty item stacks should have counts of -1.", it);
-                        assert(player.inventory.item_stacks[it].stack_count >= -1, "There is an item stack with a count less than -1 in inventory slot % (%). Empty item stacks should have counts of -1.", it, player.inventory.item_stacks[it].stack_count);
+                        assert(player.inventory.item_stacks[it].stack_count >= -1, "There is an item stack with a count less than -1 in inventory slot % (got %).", it, player.inventory.item_stacks[it].stack_count);
                     }
 
-                    assert(global_item_stack_selected_by_mouse.stack_count != 0, "The item stack selected by the mouse has a count of 0 somehow. Empty item stacks should have counts of -1.");
-                    assert(global_item_stack_selected_by_mouse.stack_count >= -1, "The item stack selected by the mouse has a count less than -1 somehow. Empty item stacks should have counts of -1.");
+                    assert(global_item_stack_selected_by_mouse.stack_count >= -1, "The item stack selected by the mouse has a count less than -1 somehow. (got %)", global_item_stack_selected_by_mouse.stack_count);
                 }
             }
         }
@@ -1502,7 +1480,7 @@ main :: () {
                 }
 
                 // Draw selected item
-                if !item_stack_is_empty(global_item_stack_selected_by_mouse) {
+                if !item_stack_is_empty(*global_item_stack_selected_by_mouse) {
                     item_texture_map, item_source_rect := get_texture_map_by_item_type(global_item_stack_selected_by_mouse.item_type);
                     south_east_of_cursor := Rectangle.{
                         mouse_pos_in_ui.x + 10,
@@ -2109,7 +2087,7 @@ respawn_player :: () -> Player {
 
         // Fill in the rest of the item stacks with invalid data
         for *player.inventory.item_stacks {
-            it.* = EMPTY_ITEM_STACK;
+            it = null;
         }
 
         // Add in various items for dev purposes
@@ -2302,14 +2280,14 @@ ReturnStatus :: enum u16 {
     NOT_FOUND;
 }
 
-get_selected_item_stack :: (inventory: Inventory) -> item_stack: ItemStack, return_status: ReturnStatus {
-    item_stack := inventory.item_stacks[inventory.selected_item_stack];
+get_selected_item_stack :: (inventory: Inventory) -> item_stack: *ItemStack, return_status: ReturnStatus {
+    item_stack := *inventory.item_stacks[inventory.selected_item_stack];
 
-    if item_stack_is_empty(item_stack) && item_stack_is_empty(global_item_stack_selected_by_mouse) {
-        return EMPTY_ITEM_STACK, ReturnStatus.NOT_FOUND;
+    if item_stack_is_empty(item_stack) && item_stack_is_empty(*global_item_stack_selected_by_mouse) {
+        return null, ReturnStatus.NOT_FOUND;
     }
-    else if !item_stack_is_empty(global_item_stack_selected_by_mouse) {
-        return global_item_stack_selected_by_mouse, ReturnStatus.SUCCESS;
+    else if !item_stack_is_empty(*global_item_stack_selected_by_mouse) {
+        return *global_item_stack_selected_by_mouse, ReturnStatus.SUCCESS;
     }
     else {
         return item_stack, ReturnStatus.SUCCESS;
@@ -2467,12 +2445,8 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
     }
 }
 
-item_stack_is_empty :: (item_stack: ItemStack) -> bool {
-    return (
-        item_stack.item_type      == EMPTY_ITEM_STACK.item_type && 
-        item_stack.stack_capacity == EMPTY_ITEM_STACK.stack_capacity &&
-        item_stack.stack_count    == EMPTY_ITEM_STACK.stack_count
-    );
+item_stack_is_empty :: (item_stack: *ItemStack) -> bool {
+    return item_stack == null || item_stack.stack_count == 0;
 }
 
 get_stack_capacity_by_item_type :: (item_type: ItemType) -> s32 {
@@ -3825,6 +3799,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
             };
 
         case;
+            print_vars(item_type);
             assert(false, "You forgot an item type in your switch statement");
     }
 
@@ -4548,7 +4523,7 @@ draw_inventory_slot :: (slot_index: s32, player: Player, draw_hotbar_slot: bool)
     DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
 
     item_stack_in_slot := player.inventory.item_stacks[slot_index];
-    if !item_stack_is_empty(item_stack_in_slot) {
+    if !item_stack_is_empty(*item_stack_in_slot) {
         
         item_texture_map, item_source_rect := get_texture_map_by_item_type(item_stack_in_slot.item_type);
         DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);

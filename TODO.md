@@ -1,6 +1,6 @@
 # In progress
 
-- [ui] inventory
+
 
 # Game
 
