@@ -491,10 +491,11 @@ global_item_type_swinging := ItemType.UNSPECIFIED;
 // TODO: should I prepend these with global_?
 // Placeable entities
 
-blocks_grass : [..] *Block;
-blocks_dirt  : [..] *Block;
-blocks_rock  : [..] *Block;
-blocks_wood  : [..] *Block;
+blocks_grass      : [..] *Block;
+blocks_dirt       : [..] *Block;
+blocks_rock       : [..] *Block;
+blocks_wood       : [..] *Block;
+blocks_copper_ore : [..] *Block;
 
 walls_dirt : [..] *Block;
 walls_rock : [..] *Block;
@@ -650,10 +651,11 @@ main :: () {
         for walls_dirt initialize_block(it);
         for walls_rock initialize_block(it);
 
-        for blocks_dirt  initialize_block(it);
-        for blocks_grass initialize_block(it);
-        for blocks_rock  initialize_block(it);
-        for blocks_wood  initialize_block(it);
+        for blocks_dirt       initialize_block(it);
+        for blocks_grass      initialize_block(it);
+        for blocks_rock       initialize_block(it);
+        for blocks_wood       initialize_block(it);
+        for blocks_copper_ore initialize_block(it);
     }
 
     // Initialize camera
@@ -2487,6 +2489,16 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
         }
 
         for block: blocks_wood {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+            array_add(active_blocks, block);
+        }
+
+        for block: blocks_copper_ore {
             if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
             if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
             
@@ -4426,13 +4438,13 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     }
 
     if #complete block_type == {
-        case .DIRT;       array_add(*blocks_dirt,  new_block);
-        case .GRASS;      array_add(*blocks_grass, new_block);
-        case .ROCK;       array_add(*blocks_rock,  new_block);
-        case .WOOD;       array_add(*blocks_wood,  new_block);
-        case .COPPER_ORE; array_add(*blocks_rock,  new_block); // TODO: blocks_copper_ore
-        case .WALL_DIRT;  array_add(*walls_dirt, new_block);
-        case .WALL_ROCK;  array_add(*walls_dirt, new_block);
+        case .DIRT;       array_add(*blocks_dirt,       new_block);
+        case .GRASS;      array_add(*blocks_grass,      new_block);
+        case .ROCK;       array_add(*blocks_rock,       new_block);
+        case .WOOD;       array_add(*blocks_wood,       new_block);
+        case .COPPER_ORE; array_add(*blocks_copper_ore, new_block);
+        case .WALL_DIRT;  array_add(*walls_dirt,        new_block);
+        case .WALL_ROCK;  array_add(*walls_dirt,        new_block);
 
         case .UNSPECIFIED; assert(false, "Unspecified block type");
     }
@@ -4534,11 +4546,11 @@ destroy_block :: (block: *Block, player: *Player) {
     else       table_remove(*global_block_pos_to_block, vector2_to_string_temp(block.pos));
 
     if #complete block.block_type == {
-        case .DIRT;       array_unordered_remove_by_value(*blocks_dirt,  block);
-        case .GRASS;      array_unordered_remove_by_value(*blocks_grass, block);
-        case .ROCK;       array_unordered_remove_by_value(*blocks_rock,  block);
-        case .WOOD;       array_unordered_remove_by_value(*blocks_wood,  block);
-        case .COPPER_ORE; array_unordered_remove_by_value(*blocks_rock,  block); // TODO block_copper_ore
+        case .DIRT;       array_unordered_remove_by_value(*blocks_dirt,       block);
+        case .GRASS;      array_unordered_remove_by_value(*blocks_grass,      block);
+        case .ROCK;       array_unordered_remove_by_value(*blocks_rock,       block);
+        case .WOOD;       array_unordered_remove_by_value(*blocks_wood,       block);
+        case .COPPER_ORE; array_unordered_remove_by_value(*blocks_copper_ore, block);
 
         case .WALL_DIRT;  array_unordered_remove_by_value(*walls_dirt, block);
         case .WALL_ROCK;  array_unordered_remove_by_value(*walls_rock, block);
