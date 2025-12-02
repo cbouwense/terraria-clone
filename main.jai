@@ -466,6 +466,8 @@ global_torch_pos_to_torch : Table(string, *Torch);
 global_item_stack_hovered_by_mouse  : ItemStack;
 global_item_stack_selected_by_mouse : ItemStack;
 
+global_item_type_swinging := ItemType.UNSPECIFIED;
+
 // TODO: should I prepend these with global_?
 // Placeable entities
 
@@ -1096,6 +1098,13 @@ main :: () {
 
                         player_animation_hands_swinging.active      = player_is_swinging;
                         player_animation_undershirt_swinging.active = player_is_swinging;
+
+                        // Update item type that the player is swinging
+                        if should_start_now {
+                            global_item_type_swinging = get_selected_item_stack(player.inventory).item_type;
+                        } else if was_previously_active && !should_continue {
+                            global_item_type_swinging = ItemType.UNSPECIFIED;
+                        }
                     }
 
                     // Idle (or airborne)
@@ -1395,13 +1404,10 @@ main :: () {
 
                     // Draw item wielded by player
                     if player_is_swinging {
-                        selected_item_stack, result := get_selected_item_stack(player.inventory);
-                        has_an_item_selected := result == xx ReturnStatus.SUCCESS;
+                        if global_item_type_swinging != ItemType.UNSPECIFIED {
+                            item_texture_map, item_source_rect := get_texture_map_by_item_type(global_item_type_swinging, player.is_facing_left);
 
-                        if has_an_item_selected {
-                            item_texture_map, item_source_rect := get_texture_map_by_item_type(selected_item_stack.item_type, player.is_facing_left);
-
-                            length := get_item_world_length(selected_item_stack.item_type);
+                            length := get_item_world_length(global_item_type_swinging);
                             rotation : float;
                             destination_rect : Rectangle;
                             origin   := Vector2.{ xx ifx player.is_facing_left then length else 0, length - 10.0 };
