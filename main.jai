@@ -1575,7 +1575,8 @@ main :: () {
                         HOTBAR_PANE_LENGTH,
                         HOTBAR_PANE_LENGTH,
                     };
-                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, LIGHTGRAY);
+                    hotbar_pane_color := ifx CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) then WHITE else LIGHTGRAY;
+                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
 
                     item_texture_map, item_source_rect := get_texture_map_by_item_type(it.output.item_type);
                     DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
