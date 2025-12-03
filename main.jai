@@ -507,7 +507,6 @@ torches : [..] *Torch;
 particles : [..] *Particle;
 
 main :: () {
-    print_vars(RECIPE_TORCH);
     //
     // Initialization
     //
@@ -696,14 +695,18 @@ main :: () {
     global_swing_timer_ms : s32;
 
     active_blocks: [..] *Block;
-    active_blocks.allocator = temp;
+    active_blocks.allocator = temp; // TODO: this is wrong
 
     active_walls: [..] *Block;
-    active_walls.allocator = temp;
+    active_walls.allocator = temp; // TODO: this is wrong
+
+    craftable_recipes : [..] CraftingRecipe;
+    craftable_recipes.allocator = temp; // TODO: this is wrong
 
     derive_active_entities(*active_blocks, *active_walls, camera);
 
     while !WindowShouldClose() {
+        defer array_reset(*craftable_recipes); // TODO: I feel like I shouldn't have to do this with temp storage...
         defer reset_temporary_storage();
 
         time := GetTime();
@@ -1364,6 +1367,36 @@ main :: () {
                     assert(global_item_stack_selected_by_mouse.stack_count >= -1, "The item stack selected by the mouse has a count less than -1 somehow. (got %)", global_item_stack_selected_by_mouse.stack_count);
                 }
             }
+
+            // Update crafting
+            if player.inventory.is_inventory_open {
+                // Determine which recipes are craftable with the item stacks in the player's inventory.
+                for recipe: CRAFTING_RECIPES {
+
+                    inventory_has_all_ingredients := true;
+
+                    for ingredient: recipe.ingredients {
+                        
+                        // Assume the inventory does not have this ingredient until proven otherwise.
+                        inventory_has_this_ingredient := false;
+
+                        for inventory_stack: player.inventory.item_stacks {
+                            if inventory_stack.item_type == ingredient.item_type && inventory_stack.stack_count >= ingredient.item_count {
+                                inventory_has_this_ingredient = true;
+                                break;
+                            }
+                        }
+
+                        if !inventory_has_this_ingredient {
+                            inventory_has_all_ingredients = false;
+                            break;
+                        }
+                    }
+
+                    if inventory_has_all_ingredients array_add(*craftable_recipes, recipe);
+                }
+            }
+
         }
 
         //
@@ -1532,6 +1565,30 @@ main :: () {
                     for 20..29 draw_inventory_slot(xx it, player, false);
                     for 30..39 draw_inventory_slot(xx it, player, false);
                     for 40..49 draw_inventory_slot(xx it, player, false);
+                }
+
+                // Draw crafting tiles
+                for craftable_recipes {
+                    hotbar_pane_rect := Rectangle.{
+                        GetScreenWidth()  / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
+                        GetScreenHeight() / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
+                        HOTBAR_PANE_LENGTH,
+                        HOTBAR_PANE_LENGTH,
+                    };
+                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, LIGHTGRAY);
+
+                    item_texture_map, item_source_rect := get_texture_map_by_item_type(it.output.item_type);
+                    DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                    
+                    if item_type_is_stackable(it.output.item_type) {
+                        DrawText(
+                            tprint("%\0", it.output.stack_count).data,
+                            xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
+                            xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
+                            18,
+                            WHITE,
+                        );
+                    }
                 }
 
                 // Draw selected item

@@ -34,6 +34,7 @@
 - hot reloading
 - metaprogram for required fields
 - lighting shader
+- should I put globals into a gamestate struct?
 
 # Bugs
 

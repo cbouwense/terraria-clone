@@ -1,5 +1,5 @@
 CraftingRecipe :: struct {
-    inputs : [] CraftingIngredient;
+    ingredients : [] CraftingIngredient;
     output : ItemStack;
 }
 
@@ -9,7 +9,7 @@ CraftingIngredient :: struct {
 }
 
 RECIPE_TORCH :: CraftingRecipe.{
-    inputs = CraftingIngredient.[
+    ingredients = CraftingIngredient.[
         CraftingIngredient.{
             item_type  = ItemType.WOOD_ITEM,
             item_count = 1,
@@ -18,7 +18,7 @@ RECIPE_TORCH :: CraftingRecipe.{
         // CraftingIngredient.{
         //     item_type  = ItemType.GEL;
         //     item_count = 1;
-        // }
+        // }    
     ],
     output = ItemStack.{
         item_type      = ItemType.TORCH,
@@ -26,3 +26,7 @@ RECIPE_TORCH :: CraftingRecipe.{
         stack_count    = 3,
     },
 };
+
+CRAFTING_RECIPES :: CraftingRecipe.[
+    RECIPE_TORCH,
+];
