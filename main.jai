@@ -10,6 +10,8 @@
 
 #import "raylib";
 
+#load "crafting-recipes.jai";
+
 // TODO: parametrize
 RELEASE :: false;
 
@@ -505,6 +507,7 @@ torches : [..] *Torch;
 particles : [..] *Particle;
 
 main :: () {
+    print_vars(RECIPE_TORCH);
     //
     // Initialization
     //

@@ -1,10 +1,8 @@
 # In progress
 
-
+- crafting
 
 # Game
-
-- crafting
 
 - [world_gen] trees
 - [world_gen] dirt cave gen
