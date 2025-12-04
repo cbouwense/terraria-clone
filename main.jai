@@ -1402,12 +1402,7 @@ main :: () {
 
                 // Select crafting pane if a user clicks one
                 for recipe: craftable_recipes {
-                    hotbar_pane_rect := Rectangle.{
-                        GetScreenWidth()  / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
-                        GetScreenHeight() / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
-                        HOTBAR_PANE_LENGTH,
-                        HOTBAR_PANE_LENGTH,
-                    };
+                    hotbar_pane_rect := build_inventory_slot_rect(INVENTORY_SLOTS + INVENTORY_SLOTS_PER_ROW + it_index);
 
                     array_add(*ui_crafting_rects, hotbar_pane_rect);
 
@@ -1417,7 +1412,6 @@ main :: () {
                         CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) &&
                         IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT)
                     ) {
-                        // TODO: clean this up a bit, logic is duped.
                         if item_stack_is_empty(*global_item_stack_selected_by_mouse) {
                             // Give them the output of the recipe.
                             global_item_stack_selected_by_mouse = recipe.output;
