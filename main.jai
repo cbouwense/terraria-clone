@@ -694,19 +694,23 @@ main :: () {
 
     global_swing_timer_ms : s32;
 
-    active_blocks: [..] *Block;
+    active_blocks : [..] *Block;
     active_blocks.allocator = temp; // TODO: this is wrong
 
-    active_walls: [..] *Block;
+    active_walls : [..] *Block;
     active_walls.allocator = temp; // TODO: this is wrong
 
     craftable_recipes : [..] CraftingRecipe;
     craftable_recipes.allocator = temp; // TODO: this is wrong
 
+    ui_crafting_rects : [..] Rectangle;
+    ui_crafting_rects.allocator = temp; // TODO: this is wrong
+
     derive_active_entities(*active_blocks, *active_walls, camera);
 
     while !WindowShouldClose() {
         defer array_reset(*craftable_recipes); // TODO: I feel like I shouldn't have to do this with temp storage...
+        defer array_reset(*ui_crafting_rects); // TODO: I feel like I shouldn't have to do this with temp storage...
         defer reset_temporary_storage();
 
         time := GetTime();
@@ -1395,6 +1399,51 @@ main :: () {
 
                     if inventory_has_all_ingredients array_add(*craftable_recipes, recipe);
                 }
+
+                // Select crafting pane if a user clicks one
+                for recipe: craftable_recipes {
+                    hotbar_pane_rect := Rectangle.{
+                        GetScreenWidth()  / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
+                        GetScreenHeight() / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
+                        HOTBAR_PANE_LENGTH,
+                        HOTBAR_PANE_LENGTH,
+                    };
+
+                    array_add(*ui_crafting_rects, hotbar_pane_rect);
+
+                    // If the user clicks on this crafting panel and they aren't holding anything then they should
+                    // pick up the output of the recipe, we should remove the ingredients from their inventory, etc.
+                    if (
+                        CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) &&
+                        IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT)       &&
+                        item_stack_is_empty(*global_item_stack_selected_by_mouse)
+                    ) {
+                        // Give them the output of the recipe.
+                        global_item_stack_selected_by_mouse = recipe.output;
+
+                        // Remove the ingredients from their inventory.
+                        // @PERF lots of nested loops here
+                        for recipe.ingredients {
+                            remove_from_inventory(*player.inventory, it.item_type, it.item_count);
+                        }
+                    }
+
+                    hotbar_pane_color := ifx CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) then WHITE else LIGHTGRAY;
+                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+
+                    item_texture_map, item_source_rect := get_texture_map_by_item_type(recipe.output.item_type);
+                    DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                    
+                    if item_type_is_stackable(recipe.output.item_type) {
+                        DrawText(
+                            tprint("%\0", recipe.output.stack_count).data,
+                            xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
+                            xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
+                            18,
+                            WHITE,
+                        );
+                    }
+                }
             }
 
         }
@@ -1568,29 +1617,7 @@ main :: () {
                 }
 
                 // Draw crafting tiles
-                for craftable_recipes {
-                    hotbar_pane_rect := Rectangle.{
-                        GetScreenWidth()  / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
-                        GetScreenHeight() / 2.0 - HOTBAR_PANE_LENGTH / 2.0,
-                        HOTBAR_PANE_LENGTH,
-                        HOTBAR_PANE_LENGTH,
-                    };
-                    hotbar_pane_color := ifx CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) then WHITE else LIGHTGRAY;
-                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
-
-                    item_texture_map, item_source_rect := get_texture_map_by_item_type(it.output.item_type);
-                    DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                    
-                    if item_type_is_stackable(it.output.item_type) {
-                        DrawText(
-                            tprint("%\0", it.output.stack_count).data,
-                            xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
-                            xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
-                            18,
-                            WHITE,
-                        );
-                    }
-                }
+                // TODO
 
                 // Draw selected item
                 if !item_stack_is_empty(*global_item_stack_selected_by_mouse) {
@@ -4119,6 +4146,30 @@ try_to_add_to_inventory :: (inventory: *Inventory, item_type : ItemType) -> TryT
     // If there are neither existing stacks with space nor empty slots, we can't add the
     // block to the inventory.
     return TryToAddToInventoryReturnStatus.INVENTORY_FULL;
+}
+
+// This function assumes that there are enough mats in your inventory to fully remove the item_count and
+// crashes the program if it can't.
+remove_from_inventory :: (inventory: *Inventory, item_type: ItemType, item_count: s32) {
+    count_to_remove := item_count;
+    
+    // First, try to find an existing stack that has room.
+    for *inventory.item_stacks {
+        if it.item_type == item_type {
+            // If the stack has more count than we need to remove, then we wanna remove the whole count_to_remove.
+            // If it doesn't, then we want to remove the stack's count and continue onto the next stack.
+            to_remove_from_this_stack := min(count_to_remove, it.stack_count);
+            
+            count_to_remove -= to_remove_from_this_stack;
+            it.stack_count  -= to_remove_from_this_stack;
+
+            assert(count_to_remove >= 0, "Count to remove is negative, you fucked up your math or something");
+
+            if count_to_remove == 0 break;
+        }
+    }
+
+    assert(count_to_remove == 0, "Ended remove_from_inventory with more count to remove. remove_from_inventory assumes that the inventory contains enough mats to remove the supplied count. item_type: %, item_count: %, count_to_remove: %", item_type, item_count, count_to_remove);
 }
 
 get_neighbor :: (pos: Vector2, direction: Direction, is_wall: bool) -> neighbor_exists: bool, neighbor: *Block {
