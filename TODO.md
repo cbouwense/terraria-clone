@@ -30,6 +30,7 @@
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
+- [juice] inventory back
 
 # Tech
 
