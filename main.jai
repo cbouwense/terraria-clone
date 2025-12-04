@@ -1415,16 +1415,36 @@ main :: () {
                     // pick up the output of the recipe, we should remove the ingredients from their inventory, etc.
                     if (
                         CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) &&
-                        IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT)       &&
-                        item_stack_is_empty(*global_item_stack_selected_by_mouse)
+                        IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT)
                     ) {
-                        // Give them the output of the recipe.
-                        global_item_stack_selected_by_mouse = recipe.output;
+                        // TODO: clean this up a bit, logic is duped.
+                        if item_stack_is_empty(*global_item_stack_selected_by_mouse) {
+                            // Give them the output of the recipe.
+                            global_item_stack_selected_by_mouse = recipe.output;
 
-                        // Remove the ingredients from their inventory.
-                        // @PERF lots of nested loops here
-                        for recipe.ingredients {
-                            remove_from_inventory(*player.inventory, it.item_type, it.item_count);
+                            // Remove the ingredients from their inventory.
+                            // @PERF lots of nested loops here
+                            for recipe.ingredients {
+                                remove_from_inventory(*player.inventory, it.item_type, it.item_count);
+                            }
+                        }
+                        else if global_item_stack_selected_by_mouse.item_type == recipe.output.item_type {
+                            new_count := min(
+                                global_item_stack_selected_by_mouse.stack_capacity,
+                                global_item_stack_selected_by_mouse.stack_count + recipe.output.stack_count,
+                            );
+
+                            count_to_add := new_count - global_item_stack_selected_by_mouse.stack_count;
+
+                            if count_to_add > 0 {
+                                global_item_stack_selected_by_mouse.stack_count += count_to_add;
+
+                                // Remove the ingredients from their inventory.
+                                // @PERF lots of nested loops here
+                                for recipe.ingredients {
+                                    remove_from_inventory(*player.inventory, it.item_type, it.item_count);
+                                }
+                            }
                         }
                     }
 
