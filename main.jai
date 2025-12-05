@@ -565,7 +565,7 @@ main :: () {
 
     initial_x := ((BLOCK_WORLD_WIDTH * WORLD_GRID_COLS + GetScreenWidth()) / 2.0 * -1.0);// + 8.0;
 
-    WORLD_GEN_ENABLED :: false;
+    WORLD_GEN_ENABLED :: true;
 
     // Generate blocks
     #if WORLD_GEN_ENABLED {
@@ -583,6 +583,21 @@ main :: () {
                 generate_block(block_type, xx x, xx y);
 
                 y -= BLOCK_WORLD_HEIGHT;
+            }
+
+            // Maybe generate a tree
+            {
+                potential_tree_base_rect := create_rect_for_tile_from_point(Vector2.{ xx x, xx y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, false);
+                potential_tree_base_pos  := get_rect_center(potential_tree_base_rect);
+                neighbor_exists_east, _  := get_neighbor(potential_tree_base_pos, .EAST, false);
+                neighbor_exists_west, _  := get_neighbor(potential_tree_base_pos, .WEST, false);
+                
+                if !neighbor_exists_east && !neighbor_exists_west {
+                    tree_rng := random_get_within_range(0, 100);
+                    if tree_rng <= 15 {
+                        generate_block(BlockType.ROCK, xx x, xx y);
+                    }
+                }
             }
 
             // Generate ground dirt
