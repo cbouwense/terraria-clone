@@ -1375,7 +1375,7 @@ main :: () {
             // Update crafting
             if player.inventory.is_inventory_open {
                 // Determine which recipes are craftable with the item stacks in the player's inventory.
-                for recipe: CRAFTING_RECIPES {
+                for recipe: CRAFTING_RECIPES_WITHOUT_WORKBENCH {
 
                     inventory_has_all_ingredients := true;
 
@@ -1398,6 +1398,34 @@ main :: () {
                     }
 
                     if inventory_has_all_ingredients array_add(*craftable_recipes, recipe);
+                }
+
+                near_workbench := false; // TODO
+                if near_workbench {
+                    for recipe: CRAFTING_RECIPES_WITH_WORKBENCH {
+
+                        inventory_has_all_ingredients := true;
+
+                        for ingredient: recipe.ingredients {
+                            
+                            // Assume the inventory does not have this ingredient until proven otherwise.
+                            inventory_has_this_ingredient := false;
+
+                            for inventory_stack: player.inventory.item_stacks {
+                                if inventory_stack.item_type == ingredient.item_type && inventory_stack.stack_count >= ingredient.item_count {
+                                    inventory_has_this_ingredient = true;
+                                    break;
+                                }
+                            }
+
+                            if !inventory_has_this_ingredient {
+                                inventory_has_all_ingredients = false;
+                                break;
+                            }
+                        }
+
+                        if inventory_has_all_ingredients array_add(*craftable_recipes, recipe);
+                    }
                 }
 
                 // Select crafting pane if a user clicks one

@@ -1,6 +1,6 @@
 CraftingRecipe :: struct {
     ingredients : [] CraftingIngredient;
-    output : ItemStack;
+    output      : ItemStack;
 }
 
 CraftingIngredient :: struct {
@@ -27,6 +27,10 @@ RECIPE_TORCH :: CraftingRecipe.{
     },
 };
 
-CRAFTING_RECIPES :: CraftingRecipe.[
+CRAFTING_RECIPES_WITHOUT_WORKBENCH :: CraftingRecipe.[
     RECIPE_TORCH,
+];
+
+CRAFTING_RECIPES_WITH_WORKBENCH :: CraftingRecipe.[
+    
 ];
