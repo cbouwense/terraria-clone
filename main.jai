@@ -73,6 +73,7 @@ sword_texture             : Texture;
 hammer_texture            : Texture;
 torch_texture             : Texture;
 cursor_texture            : Texture;
+inventory_back_texture    : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -277,6 +278,8 @@ TORCH_COOLDOWN_SPAWN_SPARK_MS :: 3000;
 
 CURSOR_TEXTURE_WIDTH  :: 14;
 CURSOR_TEXTURE_HEIGHT :: 14;
+CURSOR_WORLD_WIDTH    :: CURSOR_TEXTURE_WIDTH  * SCALE;
+CURSOR_WORLD_HEIGHT   :: CURSOR_TEXTURE_HEIGHT * SCALE;
 
 PARTICLE_SPARK_WORLD_WIDTH  :: 7.5;
 PARTICLE_SPARK_WORLD_HEIGHT :: 7.5;
@@ -517,6 +520,7 @@ main :: () {
     InitWindow(1600, 900, "Terraria Clone");
     defer CloseWindow();
 
+    HideCursor(); // We render a custom one from a texture.
     SetTargetFPS(144);
 
     base_path := path_strip_filename(get_path_of_running_executable());
@@ -1701,6 +1705,16 @@ main :: () {
                 if paused {
 
                 }
+
+                // Draw cursor
+                DrawTexturePro(
+                    cursor_texture,
+                    Rectangle.{ 0, 0, CURSOR_TEXTURE_WIDTH, CURSOR_TEXTURE_HEIGHT },
+                    Rectangle.{ mouse_pos_in_ui.x, mouse_pos_in_ui.y, CURSOR_WORLD_WIDTH, CURSOR_WORLD_HEIGHT },
+                    Vector2.{ 0, 0 },
+                    0.0,
+                    RED,
+                );
             }
         }
     }

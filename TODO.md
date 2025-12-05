@@ -1,6 +1,6 @@
 # In progress
 
-- [juice] cursor
+- [juice] inventory back
 
 # Game
 
@@ -30,7 +30,7 @@
 - [juice] be able to walk up ramps
 - [juice] Celeste movement
 - [juice] grass regrow
-- [juice] inventory back
+- [juice] different cursors for feedback
 
 # Tech
 
