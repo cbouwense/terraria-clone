@@ -523,8 +523,8 @@ main :: () {
     data_folder = join(base_path, "data");
 
     init_textures();
-    init_sprites();
-    
+    init_player_sprites();
+
     player := respawn_player();
 
     WORLD_GRID_COLS :: 1000;
@@ -689,14 +689,10 @@ main :: () {
     craftable_recipes : [..] CraftingRecipe;
     craftable_recipes.allocator = temp; // TODO: this is wrong
 
-    ui_crafting_rects : [..] Rectangle;
-    ui_crafting_rects.allocator = temp; // TODO: this is wrong
-
     derive_active_entities(*active_blocks, *active_walls, camera);
 
     while !WindowShouldClose() {
         defer array_reset(*craftable_recipes); // TODO: I feel like I shouldn't have to do this with temp storage...
-        defer array_reset(*ui_crafting_rects); // TODO: I feel like I shouldn't have to do this with temp storage...
         defer reset_temporary_storage();
 
         time := GetTime();
@@ -1418,8 +1414,6 @@ main :: () {
                 for recipe: craftable_recipes {
                     hotbar_pane_rect := build_inventory_slot_rect(INVENTORY_SLOTS + INVENTORY_SLOTS_PER_ROW + it_index);
 
-                    array_add(*ui_crafting_rects, hotbar_pane_rect);
-
                     // If the user clicks on this crafting panel and they aren't holding anything then they should
                     // pick up the output of the recipe, we should remove the ingredients from their inventory, etc.
                     if (
@@ -1454,22 +1448,6 @@ main :: () {
                                 }
                             }
                         }
-                    }
-
-                    hotbar_pane_color := ifx CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) then WHITE else LIGHTGRAY;
-                    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
-
-                    item_texture_map, item_source_rect := get_texture_map_by_item_type(recipe.output.item_type);
-                    DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
-                    
-                    if item_type_is_stackable(recipe.output.item_type) {
-                        DrawText(
-                            tprint("%\0", recipe.output.stack_count).data,
-                            xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
-                            xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
-                            18,
-                            WHITE,
-                        );
                     }
                 }
             }
@@ -1645,7 +1623,27 @@ main :: () {
                 }
 
                 // Draw crafting tiles
-                // TODO
+                if player.inventory.is_inventory_open {
+                    for recipe: craftable_recipes {
+                        hotbar_pane_rect := build_inventory_slot_rect(INVENTORY_SLOTS + INVENTORY_SLOTS_PER_ROW + it_index);
+
+                        hotbar_pane_color := ifx CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) then WHITE else LIGHTGRAY;
+                        DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+
+                        item_texture_map, item_source_rect := get_texture_map_by_item_type(recipe.output.item_type);
+                        DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
+                        
+                        if item_type_is_stackable(recipe.output.item_type) {
+                            DrawText(
+                                tprint("%\0", recipe.output.stack_count).data,
+                                xx (hotbar_pane_rect.x + 0.50 * HOTBAR_PANE_LENGTH),    
+                                xx (hotbar_pane_rect.y + 0.67 * HOTBAR_PANE_LENGTH),    
+                                18,
+                                WHITE,
+                            );
+                        }
+                    }
+                }
 
                 // Draw selected item
                 if !item_stack_is_empty(*global_item_stack_selected_by_mouse) {
@@ -1713,7 +1711,6 @@ read_then_increment :: (x: *s32, increment: s32 = 1) -> s32 {
     return x.*;
 }
 
-// @TODO: have function for getting width and height
 draw_sprite :: (sprite: $T/Sprite, entity: Entity, texture_map_tile_width: s32, texture_map_tile_height: s32) {
     assert(texture_map_tile_width > 0,  "You probably want a positive width. If not, delete this assertion");
     assert(texture_map_tile_height > 0, "You probably want a positive height. If not, delete this assertion");
@@ -1762,7 +1759,7 @@ init_textures :: () {
     cursor_texture            = LoadTexture("data/Cursor_0.png");
 }
 
-init_sprites :: () {
+init_player_sprites :: () {
     player_sprite_head_idle = Sprite.{
         map               = player_head_map,
         first_frame       = PLAYER_ANIMATION_FIRST_FRAME_IDLE,
@@ -1987,56 +1984,6 @@ init_sprites :: () {
     array_add(*player_animations, *player_animation_hands_running);
     array_add(*player_animations, *player_animation_hands_swinging);
     array_add(*player_animations, *player_animation_shoes_running);
-
-    // block_sprite_dirt = Sprite.{
-    //     map   = dirt_map,
-    //     color = WHITE,
-    // };
-
-    // block_sprite_grass = Sprite.{
-    //     map   = grass_map,
-    //     color = WHITE,
-    // };
-
-    // block_sprite_rock = Sprite.{
-    //     map   = rock_map,
-    //     color = WHITE,
-    // };
-
-    // block_sprite_wood = Sprite.{
-    //     map   = wood_map,
-    //     color = WHITE,
-    // };
-
-    // block_sprite_copper_ore = Sprite.{
-    //     map   = copper_ore_map,
-    //     color = WHITE,
-    // };
-
-    // item_sprite_pickaxe = Sprite.{
-    //     map   = pickaxe_texture,
-    //     color = WHITE,
-    // };
-
-    // item_sprite_axe = Sprite.{
-    //     map   = axe_texture,
-    //     color = WHITE,
-    // };
-
-    // item_sprite_sword = Sprite.{
-    //     map   = sword_texture,
-    //     color = WHITE,
-    // };
-
-    // item_sprite_hammer = Sprite.{
-    //     map   = hammer_texture,
-    //     color = WHITE,
-    // };
-
-    // item_sprite_torch = Sprite.{
-    //     map   = torch_texture,
-    //     color = WHITE,
-    // };
 }
 
 control_down :: (haystack: [] Control) -> bool {
@@ -3936,8 +3883,7 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
     map_texture : Texture;
     map_source  : Rectangle;
 
-    if item_type == {
-        // Items
+    if #complete item_type == {
         case .PICKAXE;
             map_texture = pickaxe_texture;
             map_source  = Rectangle.{ 0, 0, PICKAXE_TEXTURE_WIDTH, PICKAXE_TEXTURE_HEIGHT };
@@ -3994,9 +3940,8 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
                 0, 0, ROCK_ITEM_TEXTURE_WIDTH, ROCK_ITEM_TEXTURE_HEIGHT,
             };
 
-        case;
-            print_vars(item_type);
-            assert(false, "You forgot an item type in your switch statement");
+        case .UNSPECIFIED;
+            assert(false, "Unspecified item type");
     }
 
     if is_facing_left map_source.width *= -1;
