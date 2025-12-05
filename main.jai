@@ -60,6 +60,7 @@ copper_ore_map            : Texture;
 wall_dirt_map             : Texture;
 wall_rock_map             : Texture;
 damage_map                : Texture;
+torch_map                 : Texture;
 dirt_item_texture         : Texture;
 rock_item_texture         : Texture;
 wood_item_texture         : Texture;
@@ -71,7 +72,7 @@ axe_texture               : Texture;
 sword_texture             : Texture;
 hammer_texture            : Texture;
 torch_texture             : Texture;
-torch_map                 : Texture;
+cursor_texture            : Texture;
 
 player_sprite_head_idle                 : Sprite;
 player_animation_head_running           : AnimatedSprite;
@@ -103,24 +104,6 @@ player_sprite_shoes_airborne            : Sprite;
 
 player_sprites    : [..] *Sprite;
 player_animations : [..] *AnimatedSprite;
-
-block_sprite_dirt       : Sprite;
-block_sprite_grass      : Sprite;
-block_sprite_rock       : Sprite;
-block_sprite_wood       : Sprite;
-block_sprite_copper_ore : Sprite;
-
-item_sprite_dirt       : Sprite;
-item_sprite_rock       : Sprite;
-item_sprite_wood       : Sprite;
-item_sprite_copper_ore : Sprite;
-item_sprite_wall_dirt  : Sprite;
-item_sprite_wall_rock  : Sprite;
-item_sprite_pickaxe    : Sprite;
-item_sprite_axe        : Sprite;
-item_sprite_sword      : Sprite;
-item_sprite_hammer     : Sprite;
-item_sprite_torch      : Sprite;
 
 SCALE :: 2;
 
@@ -291,6 +274,9 @@ TORCH_TEXTURE_HEIGHT    :: 16;
 TORCH_STACK_CAPACITY    :: 64;
 TORCH_MINING_MULTIPLIER :: 1;
 TORCH_COOLDOWN_SPAWN_SPARK_MS :: 3000;
+
+CURSOR_TEXTURE_WIDTH  :: 14;
+CURSOR_TEXTURE_HEIGHT :: 14;
 
 PARTICLE_SPARK_WORLD_WIDTH  :: 7.5;
 PARTICLE_SPARK_WORLD_HEIGHT :: 7.5;
@@ -1761,6 +1747,7 @@ init_textures :: () {
     wall_rock_map             = LoadTexture("data/Wall_1.png");
     wall_dirt_map             = LoadTexture("data/Wall_2.png");
     damage_map                = LoadTexture("data/Damage.png");
+    torch_map                 = LoadTexture("data/Tiles_4.png");
     dirt_item_texture         = LoadTexture("data/Dirt_Item.png");
     rock_item_texture         = LoadTexture("data/Rock_Item.png");
     wood_item_texture         = LoadTexture("data/Wood_Item.png");
@@ -1772,7 +1759,7 @@ init_textures :: () {
     sword_texture             = LoadTexture("data/Sword.png");
     hammer_texture            = LoadTexture("data/Hammer.png");
     torch_texture             = LoadTexture("data/Torch.png");
-    torch_map                 = LoadTexture("data/Tiles_4.png");
+    cursor_texture            = LoadTexture("data/Cursor_0.png");
 }
 
 init_sprites :: () {
@@ -2001,55 +1988,55 @@ init_sprites :: () {
     array_add(*player_animations, *player_animation_hands_swinging);
     array_add(*player_animations, *player_animation_shoes_running);
 
-    block_sprite_dirt = Sprite.{
-        map   = dirt_map,
-        color = WHITE,
-    };
+    // block_sprite_dirt = Sprite.{
+    //     map   = dirt_map,
+    //     color = WHITE,
+    // };
 
-    block_sprite_grass = Sprite.{
-        map   = grass_map,
-        color = WHITE,
-    };
+    // block_sprite_grass = Sprite.{
+    //     map   = grass_map,
+    //     color = WHITE,
+    // };
 
-    block_sprite_rock = Sprite.{
-        map   = rock_map,
-        color = WHITE,
-    };
+    // block_sprite_rock = Sprite.{
+    //     map   = rock_map,
+    //     color = WHITE,
+    // };
 
-    block_sprite_wood = Sprite.{
-        map   = wood_map,
-        color = WHITE,
-    };
+    // block_sprite_wood = Sprite.{
+    //     map   = wood_map,
+    //     color = WHITE,
+    // };
 
-    block_sprite_copper_ore = Sprite.{
-        map   = copper_ore_map,
-        color = WHITE,
-    };
+    // block_sprite_copper_ore = Sprite.{
+    //     map   = copper_ore_map,
+    //     color = WHITE,
+    // };
 
-    item_sprite_pickaxe = Sprite.{
-        map   = pickaxe_texture,
-        color = WHITE,
-    };
+    // item_sprite_pickaxe = Sprite.{
+    //     map   = pickaxe_texture,
+    //     color = WHITE,
+    // };
 
-    item_sprite_axe = Sprite.{
-        map   = axe_texture,
-        color = WHITE,
-    };
+    // item_sprite_axe = Sprite.{
+    //     map   = axe_texture,
+    //     color = WHITE,
+    // };
 
-    item_sprite_sword = Sprite.{
-        map   = sword_texture,
-        color = WHITE,
-    };
+    // item_sprite_sword = Sprite.{
+    //     map   = sword_texture,
+    //     color = WHITE,
+    // };
 
-    item_sprite_hammer = Sprite.{
-        map   = hammer_texture,
-        color = WHITE,
-    };
+    // item_sprite_hammer = Sprite.{
+    //     map   = hammer_texture,
+    //     color = WHITE,
+    // };
 
-    item_sprite_torch = Sprite.{
-        map   = torch_texture,
-        color = WHITE,
-    };
+    // item_sprite_torch = Sprite.{
+    //     map   = torch_texture,
+    //     color = WHITE,
+    // };
 }
 
 control_down :: (haystack: [] Control) -> bool {
@@ -4015,27 +4002,6 @@ get_texture_map_by_item_type :: (item_type: ItemType, is_facing_left: bool = fal
     if is_facing_left map_source.width *= -1;
 
     return map_texture, map_source;
-}
-
-// TODO: is this even used?...
-get_sprite_by_item_type :: (item_type: ItemType) -> *Sprite {
-    if #complete item_type == {
-        case .DIRT_ITEM;       return *item_sprite_dirt;
-        case .ROCK_ITEM;       return *item_sprite_rock;
-        case .WOOD_ITEM;       return *item_sprite_wood;
-        case .COPPER_ORE_ITEM; return *item_sprite_copper_ore;
-        case .WALL_DIRT_ITEM;  return *item_sprite_wall_dirt;
-        case .WALL_ROCK_ITEM;  return *item_sprite_wall_rock;
-        case .PICKAXE;         return *item_sprite_pickaxe;
-        case .AXE;             return *item_sprite_axe;
-        case .SWORD;           return *item_sprite_sword;
-        case .HAMMER;          return *item_sprite_hammer;
-        case .TORCH;           return *item_sprite_torch;
-
-        case .UNSPECIFIED;
-            assert(false, "Unspecified item type");
-            return null;
-    }
 }
 
 item_type_is_stackable :: (item_type: ItemType) -> bool {
