@@ -281,6 +281,11 @@ CURSOR_TEXTURE_HEIGHT :: 14;
 CURSOR_WORLD_WIDTH    :: CURSOR_TEXTURE_WIDTH  * SCALE;
 CURSOR_WORLD_HEIGHT   :: CURSOR_TEXTURE_HEIGHT * SCALE;
 
+INVENTORY_BACK_TEXTURE_WIDTH  :: 52;
+INVENTORY_BACK_TEXTURE_HEIGHT :: 52;
+INVENTORY_BACK_WORLD_WIDTH    :: INVENTORY_BACK_TEXTURE_WIDTH ; //* SCALE;
+INVENTORY_BACK_WORLD_HEIGHT   :: INVENTORY_BACK_TEXTURE_HEIGHT; //* SCALE;
+
 PARTICLE_SPARK_WORLD_WIDTH  :: 7.5;
 PARTICLE_SPARK_WORLD_HEIGHT :: 7.5;
 
@@ -1629,10 +1634,21 @@ main :: () {
                 // Draw crafting tiles
                 if player.inventory.is_inventory_open {
                     for recipe: craftable_recipes {
-                        hotbar_pane_rect := build_inventory_slot_rect(INVENTORY_SLOTS + INVENTORY_SLOTS_PER_ROW + it_index);
+                        slot_index := INVENTORY_SLOTS + INVENTORY_SLOTS_PER_ROW + it_index;
+                        hotbar_pane_rect := build_inventory_slot_rect(slot_index);
 
-                        hotbar_pane_color := ifx CheckCollisionPointRec(mouse_pos_in_ui, hotbar_pane_rect) then WHITE else LIGHTGRAY;
-                        DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+                        DrawTexturePro(
+                            inventory_back_texture,
+                            Rectangle.{ 0, 0, INVENTORY_BACK_TEXTURE_WIDTH, INVENTORY_BACK_TEXTURE_HEIGHT },
+                            hotbar_pane_rect,
+                            Vector2.{ 0, 0 },
+                            0.0,
+                            Color.{ 255, 255, 255, 200 },
+                        );
+
+                        if player.inventory.selected_item_stack == slot_index {
+                            DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, WHITE);
+                        }
 
                         item_texture_map, item_source_rect := get_texture_map_by_item_type(recipe.output.item_type);
                         DrawTexturePro(item_texture_map, item_source_rect, hotbar_pane_rect, Vector2.{ 0, 0 }, 0.0, WHITE);
@@ -1771,6 +1787,7 @@ init_textures :: () {
     hammer_texture            = LoadTexture("data/Hammer.png");
     torch_texture             = LoadTexture("data/Torch.png");
     cursor_texture            = LoadTexture("data/Cursor_0.png");
+    inventory_back_texture    = LoadTexture("data/Inventory_Back.png");
 }
 
 init_player_sprites :: () {
@@ -4692,9 +4709,19 @@ draw_inventory_slot :: (slot_index: s32, player: Player, draw_hotbar_slot: bool)
     assert(slot_index >= 0, "You probably want a non-negative slot_index. If not, delete this assertion.");
 
     hotbar_pane_rect  := build_inventory_slot_rect(slot_index);
-    hotbar_pane_color := ifx player.inventory.selected_item_stack == slot_index then WHITE else LIGHTGRAY;
     
-    DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, hotbar_pane_color);
+    DrawTexturePro(
+        inventory_back_texture,
+        Rectangle.{ 0, 0, INVENTORY_BACK_TEXTURE_WIDTH, INVENTORY_BACK_TEXTURE_HEIGHT },
+        hotbar_pane_rect,
+        Vector2.{ 0, 0 },
+        0.0,
+        Color.{ 255, 255, 255, 200 },
+    );
+    
+    if player.inventory.selected_item_stack == slot_index {
+        DrawRectangleRoundedLinesEx(hotbar_pane_rect, 0.1, 1, HOTBAR_PANE_THICKNESS, WHITE);
+    }
 
     item_stack_in_slot := player.inventory.item_stacks[slot_index];
     if !item_stack_is_empty(*item_stack_in_slot) {
@@ -4730,9 +4757,9 @@ build_inventory_slot_rect :: (slot_index: int) -> Rectangle {
     y := cast(int) slot_index / INVENTORY_SLOTS_PER_ROW;
 
     return Rectangle.{
-        x * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
-        y * (HOTBAR_PANE_LENGTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
-        HOTBAR_PANE_LENGTH,
-        HOTBAR_PANE_LENGTH,
+        x * (INVENTORY_BACK_WORLD_WIDTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
+        y * (INVENTORY_BACK_WORLD_WIDTH + 3 * HOTBAR_PANE_THICKNESS) + HOTBAR_PANE_MARGIN * HOTBAR_PANE_THICKNESS,
+        INVENTORY_BACK_WORLD_WIDTH,// HOTBAR_PANE_LENGTH,
+        INVENTORY_BACK_WORLD_WIDTH,// HOTBAR_PANE_LENGTH,
     };
 }
