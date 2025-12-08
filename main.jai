@@ -606,7 +606,7 @@ main :: () {
                 if !neighbor_exists_east && !neighbor_exists_west {
                     tree_rng := random_get_within_range(0, 100);
                     if tree_rng <= 15 {
-                        generate_block(BlockType.ROCK, xx x, xx y);
+                        generate_block(.TREE, xx x, xx y);
                     }
                 }
             }
@@ -2808,6 +2808,12 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             x = cast(int) random_get_within_range(1, 3);
             y = 1;
         }
+        // else if block.block_type == .TREE {
+        //     // if north.block_type == .TREE && (south.block_type == .DIRT || south.block_type == .GRASS) && east.block_type == .TREE && west.block_type == .TREE {
+        //         x = 4;
+        //         y = cast(int) random_get_within_range(6, 8);
+        //     // }
+        // }
         // Block-entrappable blocks (rock, ore, etc).
         else {
             if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
@@ -3567,6 +3573,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 x = 4;
             }
         }
+        // else if block.block_type == .TREE {
+        //     x = 2;
+        //     y = cast(int) random_get_within_range(6, 8);
+        // }
         else {
             if south.block_type == .DIRT && east.block_type == .DIRT {
                 if block.block_type == .GRASS {
@@ -3656,6 +3666,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 x = 5;
             }
         }
+        // else if block.block_type == .TREE {
+        //     x = 1;
+        //     y = cast(int) random_get_within_range(6, 8);
+        // }
         else {
             if south.block_type == .DIRT && west.block_type == .DIRT {
                 if block.block_type == .GRASS {
@@ -3740,6 +3754,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             x = cast(int) random_get_within_range(6, 8);
             y = 0;
         }
+        // else if block.block_type == .TREE {
+        //     x = 5;
+        //     y = cast(int) random_get_within_range(0, 2);
+        // }
         else {
             if south.block_type == .DIRT {
                 if block.block_type == .GRASS {
@@ -3846,8 +3864,39 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         assert(false, "You forgot some combination of north south east west");
     }
 
-    width  := ifx is_wall then WALL_DIRT_MAP_TILE_WIDTH else GRASS_MAP_TILE_WIDTH;
-    height := ifx is_wall then WALL_DIRT_MAP_TILE_HEIGHT else GRASS_MAP_TILE_HEIGHT;
+    width  := -1;
+    height := -1;
+
+    if #complete block.block_type == {
+        case .DIRT;       
+            width  = DIRT_MAP_TILE_WIDTH;
+            height = DIRT_MAP_TILE_HEIGHT;
+        case .GRASS;      
+            width  = GRASS_MAP_TILE_WIDTH;
+            height = GRASS_MAP_TILE_HEIGHT;
+        case .ROCK;       
+            width  = ROCK_MAP_TILE_WIDTH;
+            height = ROCK_MAP_TILE_HEIGHT;
+        case .WOOD;       
+            width  = WOOD_MAP_TILE_WIDTH;
+            height = WOOD_MAP_TILE_HEIGHT;
+        case .TREE;       
+            width  = TREE_MAP_TILE_WIDTH;
+            height = TREE_MAP_TILE_HEIGHT;
+        case .COPPER_ORE; 
+            width  = COPPER_ORE_MAP_TILE_WIDTH;
+            height = COPPER_ORE_MAP_TILE_HEIGHT;
+        case .WALL_DIRT; 
+            width  = WALL_DIRT_MAP_TILE_WIDTH;
+            height = WALL_DIRT_MAP_TILE_HEIGHT;
+        case .WALL_ROCK; 
+            width  = WALL_ROCK_MAP_TILE_WIDTH;
+            height = WALL_ROCK_MAP_TILE_HEIGHT;
+        case .UNSPECIFIED;
+            assert(false, "Unspecified block type");
+    }
+
+    assert(x >= 0 && y >= 0, "Something is fucked up with your texture coordinates (%, %).", x, y);
 
     return Vector2.{ cast(float) (x * width), cast(float) (y * height) };
 }
@@ -3878,7 +3927,7 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
     map_texture : Texture;
     map_source  : Rectangle;
 
-    // TODO: dont do that twice?
+    // TODO: dont do this twice?
     source_x := ifx block.texture_map_source_pos.x == -1 && block.texture_map_source_pos.y == -1
         then get_texture_map_source_coords_for_block(block).x
         else block.texture_map_source_pos.x;
@@ -3920,6 +3969,7 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
             };
 
         case .TREE;
+            print_vars(source_x, source_y);
             map_texture = tree_map;
             map_source  = Rectangle.{
                 source_x, source_y,
@@ -4556,7 +4606,7 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     rect := Rectangle.{
         xx x,
         xx y,
-        xx ifx is_wall then WALL_WORLD_WIDTH else BLOCK_WORLD_WIDTH,
+        xx ifx is_wall then WALL_WORLD_WIDTH  else BLOCK_WORLD_WIDTH,
         xx ifx is_wall then WALL_WORLD_HEIGHT else BLOCK_WORLD_HEIGHT,
     };
 
