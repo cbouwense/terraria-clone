@@ -56,6 +56,7 @@ dirt_map                  : Texture;
 grass_map                 : Texture;
 rock_map                  : Texture;
 wood_map                  : Texture;
+tree_map                  : Texture;
 copper_ore_map            : Texture;
 wall_dirt_map             : Texture;
 wall_rock_map             : Texture;
@@ -209,6 +210,14 @@ WOOD_MAP_TILE_PADDING :: 2;
 WOOD_STACK_CAPACITY :: 64;
 WOOD_HARDNESS :: 1.0;
 
+TREE_MAP_COLS :: 8;
+TREE_MAP_ROWS :: 12;
+TREE_MAP_TILE_WIDTH  :: 22;
+TREE_MAP_TILE_HEIGHT :: 22;
+TREE_MAP_TILE_PADDING :: 2;
+// TREE_STACK_CAPACITY :: 64;
+TREE_HARDNESS :: 1.0;
+
 COPPER_ORE_MAP_COLS :: 16;
 COPPER_ORE_MAP_ROWS :: 15;
 COPPER_ORE_MAP_TILE_WIDTH  :: 18;
@@ -335,6 +344,7 @@ BlockType :: enum {
     GRASS;
     ROCK;
     WOOD;
+    TREE;
     COPPER_ORE;
     WALL_DIRT;
     WALL_ROCK;
@@ -491,6 +501,7 @@ blocks_grass      : [..] *Block;
 blocks_dirt       : [..] *Block;
 blocks_rock       : [..] *Block;
 blocks_wood       : [..] *Block;
+blocks_tree       : [..] *Block;
 blocks_copper_ore : [..] *Block;
 
 walls_dirt : [..] *Block;
@@ -667,6 +678,7 @@ main :: () {
         for blocks_grass      initialize_block(it);
         for blocks_rock       initialize_block(it);
         for blocks_wood       initialize_block(it);
+        for blocks_tree       initialize_block(it);
         for blocks_copper_ore initialize_block(it);
     }
 
@@ -1785,6 +1797,7 @@ init_textures :: () {
     rock_map                  = LoadTexture("data/Tiles_1.png");
     grass_map                 = LoadTexture("data/Tiles_2.png");
     wood_map                  = LoadTexture("data/Tiles_30.png");
+    tree_map                  = LoadTexture("data/Tiles_5.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
     wall_rock_map             = LoadTexture("data/Wall_1.png");
     wall_dirt_map             = LoadTexture("data/Wall_2.png");
@@ -2479,6 +2492,7 @@ get_block_hardness :: (block_type: BlockType) -> float {
         case .GRASS;      return GRASS_HARDNESS;
         case .ROCK;       return ROCK_HARDNESS;
         case .WOOD;       return WOOD_HARDNESS;
+        case .TREE;       return WOOD_HARDNESS;
         case .COPPER_ORE; return COPPER_ORE_HARDNESS;
 
         case .WALL_DIRT;  return WALL_DIRT_HARDNESS;
@@ -2608,6 +2622,16 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             array_add(active_blocks, block);
         }
 
+        for block: blocks_tree {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+            array_add(active_blocks, block);
+        }
+
         for block: blocks_copper_ore {
             if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
             if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
@@ -2696,6 +2720,7 @@ get_is_wall :: (block_type: BlockType) -> bool {
         case .GRASS;      return false;
         case .ROCK;       return false;
         case .WOOD;       return false;
+        case .TREE;       return false;
         case .COPPER_ORE; return false;
 
         case .WALL_DIRT;  return true;
@@ -3894,6 +3919,14 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
                 WOOD_MAP_TILE_HEIGHT - WOOD_MAP_TILE_PADDING,
             };
 
+        case .TREE;
+            map_texture = tree_map;
+            map_source  = Rectangle.{
+                source_x, source_y,
+                TREE_MAP_TILE_WIDTH  - TREE_MAP_TILE_PADDING,
+                TREE_MAP_TILE_HEIGHT - TREE_MAP_TILE_PADDING,
+            };
+
         case .COPPER_ORE;
             map_texture = copper_ore_map;
             map_source  = Rectangle.{
@@ -4046,6 +4079,7 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
         case .GRASS;      return .PICKAXE;
         case .ROCK;       return .PICKAXE;
         case .WOOD;       return .AXE;
+        case .TREE;       return .AXE;
         case .COPPER_ORE; return .PICKAXE;
         
         case .WALL_DIRT;  return .HAMMER;
@@ -4100,15 +4134,16 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
 
 block_type_to_item_type :: (block_type: BlockType) -> ItemType {
     if #complete block_type == {
-        case BlockType.DIRT;       return ItemType.DIRT_ITEM;
-        case BlockType.GRASS;      return ItemType.DIRT_ITEM;
-        case BlockType.ROCK;       return ItemType.ROCK_ITEM;
-        case BlockType.WOOD;       return ItemType.WOOD_ITEM;
-        case BlockType.COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
-        case BlockType.WALL_DIRT;  return ItemType.WALL_DIRT_ITEM;
-        case BlockType.WALL_ROCK;  return ItemType.WALL_ROCK_ITEM;
+        case .DIRT;       return ItemType.DIRT_ITEM;
+        case .GRASS;      return ItemType.DIRT_ITEM;
+        case .ROCK;       return ItemType.ROCK_ITEM;
+        case .WOOD;       return ItemType.WOOD_ITEM;
+        case .TREE;       return ItemType.WOOD_ITEM;
+        case .COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
+        case .WALL_DIRT;  return ItemType.WALL_DIRT_ITEM;
+        case .WALL_ROCK;  return ItemType.WALL_ROCK_ITEM;
 
-        case BlockType.UNSPECIFIED;
+        case .UNSPECIFIED;
             assert(false, "Unspecified block type");
             return ItemType.UNSPECIFIED; // Unreachable
     }
@@ -4553,9 +4588,10 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
         case .GRASS;      array_add(*blocks_grass,      new_block);
         case .ROCK;       array_add(*blocks_rock,       new_block);
         case .WOOD;       array_add(*blocks_wood,       new_block);
+        case .TREE;       array_add(*blocks_tree,       new_block);
         case .COPPER_ORE; array_add(*blocks_copper_ore, new_block);
         case .WALL_DIRT;  array_add(*walls_dirt,        new_block);
-        case .WALL_ROCK;  array_add(*walls_dirt,        new_block);
+        case .WALL_ROCK;  array_add(*walls_rock,        new_block);
 
         case .UNSPECIFIED; assert(false, "Unspecified block type");
     }
@@ -4661,6 +4697,7 @@ destroy_block :: (block: *Block, player: *Player) {
         case .GRASS;      array_unordered_remove_by_value(*blocks_grass,      block);
         case .ROCK;       array_unordered_remove_by_value(*blocks_rock,       block);
         case .WOOD;       array_unordered_remove_by_value(*blocks_wood,       block);
+        case .TREE;       array_unordered_remove_by_value(*blocks_tree,       block);
         case .COPPER_ORE; array_unordered_remove_by_value(*blocks_copper_ore, block);
 
         case .WALL_DIRT;  array_unordered_remove_by_value(*walls_dirt, block);
