@@ -45,4 +45,3 @@
 - player can fall into the ground, usually on corners
 - worlds with ~2000 or greater columns get stack overflowed (I think because of the recursive shadow stuff
 - 1d perlin noise looks fucked up on some seeds
-- world still has seam in between dirt and rock

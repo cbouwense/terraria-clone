@@ -581,7 +581,6 @@ main :: () {
     // Generate blocks
     #if WORLD_GEN_ENABLED {
         x := cast(int) initial_x;
-
         for col: 0..WORLD_GRID_COLS-1 {
             y := 0;
         
@@ -594,21 +593,6 @@ main :: () {
                 generate_block(block_type, xx x, xx y);
 
                 y -= BLOCK_WORLD_HEIGHT;
-            }
-
-            // Maybe generate a tree
-            {
-                potential_tree_base_rect := create_rect_for_tile_from_point(Vector2.{ xx x, xx y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, false);
-                potential_tree_base_pos  := get_rect_center(potential_tree_base_rect);
-                neighbor_exists_east, _  := get_neighbor(potential_tree_base_pos, .EAST, false);
-                neighbor_exists_west, _  := get_neighbor(potential_tree_base_pos, .WEST, false);
-                
-                if !neighbor_exists_east && !neighbor_exists_west {
-                    tree_rng := random_get_within_range(0, 100);
-                    if tree_rng <= 15 {
-                        generate_block(.TREE, xx x, xx y);
-                    }
-                }
             }
 
             // Generate ground dirt
@@ -645,6 +629,33 @@ main :: () {
             }
 
             x += BLOCK_WORLD_WIDTH;
+        }
+
+        // After we generate the base world blocks, there are things we can generate afterwards
+        // like trees.
+        // x = cast(int) initial_x;
+        for col: 0..WORLD_GRID_COLS-1 {
+
+            hill_dirt_blocks := cast(int) abs(dirt_heights[col]);
+
+            x := col * BLOCK_WORLD_WIDTH + cast(int) initial_x;
+            y := (hill_dirt_blocks * BLOCK_WORLD_HEIGHT * -1) - BLOCK_WORLD_HEIGHT;
+
+            // Maybe generate a tree
+            {
+                potential_tree_base_rect := create_rect_for_tile_from_point(Vector2.{ xx x, xx y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, false);
+                potential_tree_base_pos  := get_rect_center(potential_tree_base_rect);
+                neighbor_exists_east, _  := get_neighbor(potential_tree_base_pos, .EAST, false);
+                neighbor_exists_west, _  := get_neighbor(potential_tree_base_pos, .WEST, false);
+                
+                if !neighbor_exists_east && !neighbor_exists_west {
+                    tree_rng := random_get_within_range(0, 100);
+                    if tree_rng <= 15 {
+                        print_vars(x, y);
+                        generate_block(.TREE, xx x, xx y);
+                    }
+                }
+            }
         }
     } else {
         // Generate a simple platform for debugging, much faster than generating a world
@@ -2808,12 +2819,12 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             x = cast(int) random_get_within_range(1, 3);
             y = 1;
         }
-        // else if block.block_type == .TREE {
-        //     // if north.block_type == .TREE && (south.block_type == .DIRT || south.block_type == .GRASS) && east.block_type == .TREE && west.block_type == .TREE {
-        //         x = 4;
-        //         y = cast(int) random_get_within_range(6, 8);
-        //     // }
-        // }
+        else if block.block_type == .TREE {
+            // if north.block_type == .TREE && (south.block_type == .DIRT || south.block_type == .GRASS) && east.block_type == .TREE && west.block_type == .TREE {
+                x = 4;
+                y = cast(int) random_get_within_range(6, 8);
+            // }
+        }
         // Block-entrappable blocks (rock, ore, etc).
         else {
             if north.block_type == .DIRT && south.block_type == .DIRT && east.block_type == .DIRT && west.block_type == .DIRT {
@@ -3409,7 +3420,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                     }
                 } else {
                     x = 12;
-                    cast(int) random_get_within_range(0, 2);
+                    y = cast(int) random_get_within_range(0, 2);
                 }
             }
             else if north.block_type != .DIRT && west.block_type == .DIRT {
@@ -3573,10 +3584,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 x = 4;
             }
         }
-        // else if block.block_type == .TREE {
-        //     x = 2;
-        //     y = cast(int) random_get_within_range(6, 8);
-        // }
+        else if block.block_type == .TREE {
+            x = 2;
+            y = cast(int) random_get_within_range(6, 8);
+        }
         else {
             if south.block_type == .DIRT && east.block_type == .DIRT {
                 if block.block_type == .GRASS {
@@ -3666,10 +3677,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 x = 5;
             }
         }
-        // else if block.block_type == .TREE {
-        //     x = 1;
-        //     y = cast(int) random_get_within_range(6, 8);
-        // }
+        else if block.block_type == .TREE {
+            x = 1;
+            y = cast(int) random_get_within_range(6, 8);
+        }
         else {
             if south.block_type == .DIRT && west.block_type == .DIRT {
                 if block.block_type == .GRASS {
@@ -3754,10 +3765,10 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
             x = cast(int) random_get_within_range(6, 8);
             y = 0;
         }
-        // else if block.block_type == .TREE {
-        //     x = 5;
-        //     y = cast(int) random_get_within_range(0, 2);
-        // }
+        else if block.block_type == .TREE {
+            x = 5;
+            y = cast(int) random_get_within_range(0, 2);
+        }
         else {
             if south.block_type == .DIRT {
                 if block.block_type == .GRASS {
@@ -3969,7 +3980,6 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
             };
 
         case .TREE;
-            print_vars(source_x, source_y);
             map_texture = tree_map;
             map_source  = Rectangle.{
                 source_x, source_y,
