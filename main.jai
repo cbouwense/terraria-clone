@@ -4816,13 +4816,33 @@ draw_torch :: (torch: Torch) {
 
 draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> should_debug_block: bool {
     block_map_texture, block_map_source := get_texture_map_for_block(block);
+
+    destination_rect := block.sprite_rect;
+    if block.type == TreeBlock {
+        tree_block := cast(TreeBlock) block;
+
+        // NOTE: The tree texture tiles have transparency in them on their sides. I don't exactly understand why,
+        // I guess it's so that they appear skinnier than the normal blocks. But, this means that we need to
+        // nudge them by that transparency length when the tree tiles should conjoin. Thus, these fudges. They're
+        // also inconsistent, which is kinda funny.
+
+        if #complete tree_block.tree_block_type == {
+            case .TREE_STUMP_EAST; destination_rect.x -= 6.5;
+            case .TREE_STUMP_WEST; destination_rect.x += 6.5;
+
+            case .TREE_STUMP_CENTER; // noop
+            case .TREE_TRUNK;        // noop
+            case .TREE_LIMB;         // noop
+        }
+    }
+
     color : Color = WHITE;
     if shadows_enabled {
         color = Color.{ 255 - block.shadow * 36, 255 - block.shadow * 36, 255 - block.shadow * 36, 255 };
     }
 
     // Draw block texture
-    DrawTexturePro(block_map_texture, block_map_source, block.sprite_rect, Vector2.{ 0, 0 }, 0.0, color);
+    DrawTexturePro(block_map_texture, block_map_source, destination_rect, Vector2.{ 0, 0 }, 0.0, color);
 
     // Damage block overlay (cracks)
     if block.health_curr < block.health_max {
