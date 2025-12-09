@@ -733,10 +733,13 @@ main :: () {
     active_walls : [..] *Block;
     active_walls.allocator = temp; // TODO: this is wrong
 
+    collidable_blocks : [..] *Block;
+    collidable_blocks.allocator = temp; // TODO: this is wrong
+
     craftable_recipes : [..] CraftingRecipe;
     craftable_recipes.allocator = temp; // TODO: this is wrong
 
-    derive_active_entities(*active_blocks, *active_walls, camera);
+    derive_active_entities(*active_blocks, *active_walls, *collidable_blocks, camera);
 
     while !WindowShouldClose() {
         defer array_reset(*craftable_recipes); // TODO: I feel like I shouldn't have to do this with temp storage...
@@ -832,7 +835,7 @@ main :: () {
                 }
             }
 
-            derive_active_entities(*active_blocks, *active_walls, camera);
+            derive_active_entities(*active_blocks, *active_walls, *collidable_blocks, camera);
 
             should_update_player := true;
             if debug_mode {
@@ -868,8 +871,8 @@ main :: () {
 
                     if player.vel.y < PLAYER_SPEED_MAX player.vel.y += ACCEL_DUE_TO_GRAVITY * dt * 0.5;
 
-                    collided_horizontally := try_to_move(*player, player.vel.x * dt, active_blocks, true)  != null;
-                    collided_vertically   := try_to_move(*player, player.vel.y * dt, active_blocks, false) != null;
+                    collided_horizontally := try_to_move(*player, player.vel.x * dt, collidable_blocks, true)  != null;
+                    collided_vertically   := try_to_move(*player, player.vel.y * dt, collidable_blocks, false) != null;
 
                     if collided_horizontally player.vel.x = 0;
                     if collided_vertically {
@@ -889,7 +892,7 @@ main :: () {
                     player.sprite_rect.x   = player.pos.x - PLAYER_WORLD_HEAD_SPRITE_WIDTH  / 2.0;
                     player.sprite_rect.y   = player.pos.y - PLAYER_WORLD_HEAD_SPRITE_HEIGHT / 2.0;
 
-                    player_is_grounded = is_grounded(player, active_blocks);
+                    player_is_grounded = is_grounded(player, collidable_blocks);
                     if player_is_grounded {
                         player.jumps_remaining = player.jumps_capacity;
                         player.vel.y = 0;
@@ -2584,11 +2587,12 @@ can_item_break_walls :: (item_type: ItemType) -> bool {
  * This function has to be called every frame, so it has to be reasonably performant. There is a tradeoff between
  * accurate culling and not spending too much time processing what should be culled.
  */
-derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, camera: Camera2D) {
+derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Block, collidable_blocks: *[..] *Block, camera: Camera2D) {
     window_start := GetScreenToWorld2D(Vector2.{ 0, 0 }, camera);
     window_end   := GetScreenToWorld2D(Vector2.{ cast(float) GetScreenWidth(), cast(float) GetScreenHeight()}, camera);
 
     array_reset(active_blocks);
+    array_reset(collidable_blocks);
     array_reset(active_walls);
     
     // Derive active blocks
@@ -2601,6 +2605,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
             array_add(active_blocks, block);
+            array_add(collidable_blocks, block);
         }
 
         for block: blocks_grass {
@@ -2611,6 +2616,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
             array_add(active_blocks, block);
+            array_add(collidable_blocks, block);
         }
 
         for block: blocks_rock {
@@ -2621,6 +2627,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
             array_add(active_blocks, block);
+            array_add(collidable_blocks, block);
         }
 
         for block: blocks_wood {
@@ -2631,6 +2638,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
             array_add(active_blocks, block);
+            array_add(collidable_blocks, block);
         }
 
         for block: blocks_tree {
@@ -2641,6 +2649,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
             array_add(active_blocks, block);
+            // Trees are not collidable!
         }
 
         for block: blocks_copper_ore {
@@ -2651,6 +2660,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
 
             array_add(active_blocks, block);
+            array_add(collidable_blocks, block);
         }
     }
 
@@ -2664,6 +2674,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
             
             array_add(active_walls, wall);
+            // Walls are not collidable!
         }
 
         for wall: walls_rock {
@@ -2674,6 +2685,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
             if wall.pos.y + WALL_WORLD_HEIGHT < window_start.y continue;
             
             array_add(active_walls, wall);
+            // Walls are not collidable!
         }
     }
 }
