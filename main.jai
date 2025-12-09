@@ -427,7 +427,8 @@ TreeBlockType :: enum {
     TREE_STUMP_CENTER;
     TREE_STUMP_EAST;
     TREE_STUMP_WEST;
-    TREE_TRUNK;
+    TREE_TRUNK_MIDDLE;
+    TREE_TRUNK_TOP;
     TREE_LIMB;
 }
 
@@ -693,8 +694,24 @@ main :: () {
                         }
 
                         // Generate tree trunk
-                        {
+                        #if false {
+                            potential_trunk_pos := Vector2.{
+                                potential_tree_base_pos.x,
+                                potential_tree_base_pos.y - BLOCK_WORLD_HEIGHT,
+                            };
 
+                            add_another_trunk_rng  := random_get_within_range(0, 100);
+                            neighbor_exists_center := get_neighbor(potential_trunk_pos, .CENTER, false);
+
+                            while add_another_trunk_rng <= 90 && !neighbor_exists_center {
+                                add_another_trunk_rng  = random_get_within_range(0, 100);
+                                neighbor_exists_center = get_neighbor(potential_trunk_pos, .CENTER, false);
+
+                                will_continue := add_another_trunk_rng <= 90 && !neighbor_exists_center;
+
+                                trunk := cast(*TreeBlock) generate_block(.TREE, xx potential_trunk_pos.x, xx potential_trunk_pos.y);
+                                trunk.tree_block_type = ifx will_continue then .TREE_TRUNK_MIDDLE else .TREE_TRUNK_TOP;
+                            }
                         }
                     }
                 }
@@ -2876,104 +2893,106 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
     if block.type == TreeBlock {
         tree_block := cast(TreeBlock) block;
         // Center stump
-        if tree_block.tree_block_type == .TREE_STUMP_CENTER {
-            if north_exists && east_exists && west_exists {
-                if east.block_type == .TREE && west.block_type == .TREE {
-                    x = 4;
-                    y = cast(int) random_get_within_range(6, 8);
+        if #complete tree_block.tree_block_type == {
+            case .TREE_STUMP_CENTER;
+                if north_exists && east_exists && west_exists {
+                    if east.block_type == .TREE && west.block_type == .TREE {
+                        x = 4;
+                        y = cast(int) random_get_within_range(6, 8);
+                    }
+                    else if east.block_type == .TREE && west.block_type != .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(3, 5);
+                    }
+                    else if east.block_type != .TREE && west.block_type == .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(0, 2);
+                    } 
+                    else {
+                        x = 0;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
                 }
-                else if east.block_type == .TREE && west.block_type != .TREE {
-                    x = 7;
-                    y = cast(int) random_get_within_range(3, 5);
+                else if north_exists && east_exists && !west_exists {
+                    if east.block_type == .TREE {
+                        x = 0;
+                        y = cast(int) random_get_within_range(6, 8);
+                    } else {
+                        x = 0;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
                 }
-                else if east.block_type != .TREE && west.block_type == .TREE {
-                    x = 7;
+                else if north_exists && !east_exists && west_exists {
+                    if east.block_type == .TREE {
+                        x = 3;
+                        y = cast(int) random_get_within_range(6, 8);
+                    } else {
+                        x = 0;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
+                }
+                else if north_exists && !east_exists && !west_exists {
+                    x = 0;  
                     y = cast(int) random_get_within_range(0, 2);
-                } 
+                }
+                else if !north_exists && east_exists && west_exists {
+                    if east.block_type == .TREE && west.block_type == .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(6, 8);
+                    }
+                    else if east.block_type == .TREE && west.block_type != .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(3, 5);
+                    }
+                    else if east.block_type != .TREE && west.block_type == .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
+                    else {
+                        x = 5;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
+                }
+                else if !north_exists && east_exists && !west_exists {
+                    if east.block_type == .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(3, 5);
+                    } else {
+                        x = 5;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
+                }
+                else if !north_exists && !east_exists && west_exists {
+                    if west.block_type == .TREE {
+                        x = 7;
+                        y = cast(int) random_get_within_range(0, 2);
+                    } else {
+                        x = 5;
+                        y = cast(int) random_get_within_range(0, 2);
+                    }
+                }
+                else if !north_exists && !east_exists && !west_exists {
+                    x = 5;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
                 else {
-                    x = 0;
-                    y = cast(int) random_get_within_range(0, 2);
+                    print_vars(north_exists, south_exists, east_exists, west_exists, north, south, east, west);
+                    assert(false, "you forgot a case in the condition chain for center tree stump texture coordinates.");
                 }
-            }
-            else if north_exists && east_exists && !west_exists {
-                if east.block_type == .TREE {
-                    x = 0;
-                    y = cast(int) random_get_within_range(6, 8);
-                } else {
-                    x = 0;
-                    y = cast(int) random_get_within_range(0, 2);
-                }
-            }
-            else if north_exists && !east_exists && west_exists {
-                if east.block_type == .TREE {
-                    x = 3;
-                    y = cast(int) random_get_within_range(6, 8);
-                } else {
-                    x = 0;
-                    y = cast(int) random_get_within_range(0, 2);
-                }
-            }
-            else if north_exists && !east_exists && !west_exists {
-                x = 0;  
-                y = cast(int) random_get_within_range(0, 2);
-            }
-            else if !north_exists && east_exists && west_exists {
-                if east.block_type == .TREE && west.block_type == .TREE {
-                    x = 7;
-                    y = cast(int) random_get_within_range(6, 8);
-                }
-                else if east.block_type == .TREE && west.block_type != .TREE {
-                    x = 7;
-                    y = cast(int) random_get_within_range(3, 5);
-                }
-                else if east.block_type != .TREE && west.block_type == .TREE {
-                    x = 7;
-                    y = cast(int) random_get_within_range(0, 2);
-                }
-                else {
-                    x = 5;
-                    y = cast(int) random_get_within_range(0, 2);
-                }
-            }
-            else if !north_exists && east_exists && !west_exists {
-                if east.block_type == .TREE {
-                    x = 7;
-                    y = cast(int) random_get_within_range(3, 5);
-                } else {
-                    x = 5;
-                    y = cast(int) random_get_within_range(0, 2);
-                }
-            }
-            else if !north_exists && !east_exists && west_exists {
-                if west.block_type == .TREE {
-                    x = 7;
-                    y = cast(int) random_get_within_range(0, 2);
-                } else {
-                    x = 5;
-                    y = cast(int) random_get_within_range(0, 2);
-                }
-            }
-            else if !north_exists && !east_exists && !west_exists {
-                x = 5;
-                y = cast(int) random_get_within_range(0, 2);
-            }
-            else {
-                print_vars(north_exists, south_exists, east_exists, west_exists, north, south, east, west);
-                assert(false, "you forgot a case in the condition chain for center tree stump texture coordinates.");
-            }
-        }
-        // East stump
-        else if tree_block.tree_block_type == .TREE_STUMP_EAST {
-            x = 1;
-            y = cast(int) random_get_within_range(6, 8);
-        }
-        // West stump
-        else if tree_block.tree_block_type == .TREE_STUMP_WEST {
-            x = 2;
-            y = cast(int) random_get_within_range(6, 8);
-        }
-        else {
-            assert(false, "we get there when we get there");
+
+            case .TREE_STUMP_EAST;
+                x = 1;
+                y = cast(int) random_get_within_range(6, 8);
+
+            case .TREE_STUMP_WEST;
+                x = 2;
+                y = cast(int) random_get_within_range(6, 8);
+
+            case .TREE_TRUNK_MIDDLE; assert(false, "we get there when we get there");
+
+            case .TREE_TRUNK_TOP; assert(false, "we get there when we get there");
+
+            case .TREE_LIMB; assert(false, "we get there when we get there");
         }
     }
     else {
@@ -4831,7 +4850,8 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
             case .TREE_STUMP_WEST; destination_rect.x += 6.5;
 
             case .TREE_STUMP_CENTER; // noop
-            case .TREE_TRUNK;        // noop
+            case .TREE_TRUNK_MIDDLE; // noop
+            case .TREE_TRUNK_TOP;    // noop
             case .TREE_LIMB;         // noop
         }
     }
