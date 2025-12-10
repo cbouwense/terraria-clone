@@ -658,27 +658,32 @@ main :: () {
 
             // Maybe generate tree
             {
+                TREE_GEN_CHANCE :: 10;
+                TREE_STUMP_EXTENDED_CHANCE :: 70;
+
                 potential_tree_base_rect := create_rect_for_tile_from_point(Vector2.{ xx x, xx y }, BLOCK_WORLD_WIDTH, BLOCK_WORLD_HEIGHT, false);
                 potential_tree_base_pos  := get_rect_center(potential_tree_base_rect);
                 
-                neighbor_exists_east, neighbor_east := get_neighbor(potential_tree_base_pos, .EAST, false);
-                neighbor_exists_west, neighbor_west := get_neighbor(potential_tree_base_pos, .WEST, false);
+                tree_neighbor_exists_east := get_neighbor_tree(potential_tree_base_pos, .EAST);
+                tree_neighbor_exists_west := get_neighbor_tree(potential_tree_base_pos, .WEST);
 
-                if (!neighbor_exists_east || neighbor_east.block_type != .TREE) && (!neighbor_exists_west || neighbor_west.block_type != .TREE) {
+                if !tree_neighbor_exists_east && !tree_neighbor_exists_west {
                     plant_a_tree_rng := random_get_within_range(0, 100);
-                    if plant_a_tree_rng <= 12 {
+                    if plant_a_tree_rng <= TREE_GEN_CHANCE {
                         // Generate tree stump
                         {
                             // Put down the middle stump.
                             stump := cast(*TreeBlock) generate_block(.TREE, xx x, xx y);
                             stump.tree_block_type = .TREE_STUMP_CENTER;
 
+                            neighbor_exists_east      := get_neighbor(potential_tree_base_pos, .EAST, false);
+                            neighbor_exists_west      := get_neighbor(potential_tree_base_pos, .WEST, false);
                             neighbor_exists_southeast := get_neighbor(potential_tree_base_pos, .SOUTH_EAST, false);
                             neighbor_exists_southwest := get_neighbor(potential_tree_base_pos, .SOUTH_WEST, false);
 
                             if !neighbor_exists_east && neighbor_exists_southeast {
                                 east_stump_rng := random_get_within_range(0, 100);
-                                if east_stump_rng <= 50 {
+                                if east_stump_rng <= TREE_STUMP_EXTENDED_CHANCE {
                                     stump := cast(*TreeBlock) generate_block(.TREE, xx (x + BLOCK_WORLD_WIDTH), xx y);
                                     stump.tree_block_type = .TREE_STUMP_EAST;
                                 }
@@ -686,7 +691,7 @@ main :: () {
 
                             if !neighbor_exists_west && neighbor_exists_southwest {
                                 west_stump_rng := random_get_within_range(0, 100);
-                                if west_stump_rng <= 50 {
+                                if west_stump_rng <= TREE_STUMP_EXTENDED_CHANCE {
                                     stump := cast(*TreeBlock) generate_block(.TREE, xx (x - BLOCK_WORLD_WIDTH), xx y);
                                     stump.tree_block_type = .TREE_STUMP_WEST;
                                 }
@@ -698,18 +703,21 @@ main :: () {
                             potential_trunk_rect := potential_tree_base_rect;
                             potential_trunk_pos  := get_rect_center(potential_trunk_rect);
 
-                            add_another_trunk_rng := random_get_within_range(0, 100);
+                            mandatory_trunks_left := 7; // Always generate at least five trunks.
+                            add_another_trunk_rng := 0.0;
                             neighbor_exists_north := get_neighbor(potential_trunk_pos, .NORTH, false);
 
-                            while add_another_trunk_rng <= 90 && !neighbor_exists_north {
+                            while (mandatory_trunks_left > 0 || add_another_trunk_rng <= 75) && !neighbor_exists_north {
                                 add_another_trunk_rng = random_get_within_range(0, 100);
                                 potential_trunk_pos   = get_rect_center(potential_trunk_rect);
                                 neighbor_exists_north = get_neighbor(potential_trunk_pos, .NORTH, false);
-                                will_continue := add_another_trunk_rng <= 90 && !neighbor_exists_north;
+                                will_continue := (mandatory_trunks_left > 0 || add_another_trunk_rng <= 75) && !neighbor_exists_north;
 
                                 potential_trunk_rect.y -= BLOCK_WORLD_HEIGHT;
                                 trunk := cast(*TreeBlock) generate_block(.TREE, xx potential_trunk_rect.x, xx potential_trunk_rect.y);
                                 trunk.tree_block_type = ifx will_continue then .TREE_TRUNK_MIDDLE else .TREE_TRUNK_TOP;
+
+                                mandatory_trunks_left -= 1;
                             }
                         }
                     }
@@ -2658,7 +2666,20 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
     array_reset(active_walls);
     
     // Derive active blocks
+    // NOTE: The order in which blocks are added to active_blocks matters!
+    // The first will be furthest away in the z ordering.
     {
+        for block: blocks_tree {
+            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
+            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
+            
+            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
+            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
+
+            array_add(active_blocks, block);
+            // Trees are not collidable!
+        }
+
         for block: blocks_dirt {
             if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
             if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
@@ -2701,17 +2722,6 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
 
             array_add(active_blocks, block);
             array_add(collidable_blocks, block);
-        }
-
-        for block: blocks_tree {
-            if block.pos.x + BLOCK_WORLD_WIDTH < window_start.x continue;
-            if block.pos.x - BLOCK_WORLD_WIDTH > window_end.x continue;
-            
-            if block.pos.y - BLOCK_WORLD_HEIGHT > window_end.y continue;
-            if block.pos.y + BLOCK_WORLD_HEIGHT < window_start.y continue;
-
-            array_add(active_blocks, block);
-            // Trees are not collidable!
         }
 
         for block: blocks_copper_ore {
@@ -2878,18 +2888,16 @@ get_texture_map_source_coords_for_entity :: (entity: Entity) -> Vector2 {
 }
 
 get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
-    is_wall := get_is_wall(block.block_type);
-
-    north_exists, north := get_neighbor(block.pos, .NORTH, is_wall);
-    south_exists, south := get_neighbor(block.pos, .SOUTH, is_wall);
-    east_exists,  east  := get_neighbor(block.pos, .EAST , is_wall);
-    west_exists,  west  := get_neighbor(block.pos, .WEST , is_wall);
-    
     x := -1;
     y := -1;
 
     // Tree madness
     if block.type == TreeBlock {
+        north_exists, north := get_neighbor_tree(block.pos, .NORTH);
+        south_exists, south := get_neighbor_tree(block.pos, .SOUTH);
+        east_exists,  east  := get_neighbor_tree(block.pos, .EAST );
+        west_exists,  west  := get_neighbor_tree(block.pos, .WEST );
+
         tree_block := cast(TreeBlock) block;
         // Center stump
         if #complete tree_block.tree_block_type == {
@@ -2900,12 +2908,12 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                         y = cast(int) random_get_within_range(6, 8);
                     }
                     else if east.block_type == .TREE && west.block_type != .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(3, 5);
+                        x = 0;
+                        y = cast(int) random_get_within_range(6, 8);
                     }
                     else if east.block_type != .TREE && west.block_type == .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(0, 2);
+                        x = 3;
+                        y = cast(int) random_get_within_range(6, 8);
                     } 
                     else {
                         x = 0;
@@ -3035,6 +3043,13 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         }
     }
     else {
+        is_wall := get_is_wall(block.block_type);
+
+        north_exists, north := get_neighbor(block.pos, .NORTH, is_wall);
+        south_exists, south := get_neighbor(block.pos, .SOUTH, is_wall);
+        east_exists,  east  := get_neighbor(block.pos, .EAST , is_wall);
+        west_exists,  west  := get_neighbor(block.pos, .WEST , is_wall);
+
         if north_exists && south_exists && east_exists && west_exists {
             if block.block_type == .DIRT || block.block_type == .WALL_DIRT || block.block_type == .WOOD {
                 x = cast(int) random_get_within_range(1, 3);
@@ -4486,13 +4501,14 @@ get_neighbor :: (pos: Vector2, direction: Direction, is_wall: bool) -> neighbor_
         return neighbor_exists, neighbor;
     } else {
         neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos));
+        neighbor_exists = neighbor_exists && neighbor.type == Block; // TODO: feels like there's some elegant solution here that I'm not seeing
         return neighbor_exists, neighbor;
     }
 }
 
 get_neighbor_torch :: (pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *Torch {
     potential_neighbor_pos: Vector2;
-    if direction == {
+    if #complete direction == {
         case .NORTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y - TORCH_WORLD_HEIGHT };
         case .NORTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + TORCH_WORLD_WIDTH, pos.y - TORCH_WORLD_HEIGHT };
         case .NORTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - TORCH_WORLD_WIDTH, pos.y - TORCH_WORLD_HEIGHT };
@@ -4502,11 +4518,29 @@ get_neighbor_torch :: (pos: Vector2, direction: Direction) -> neighbor_exists: b
         case .EAST;       potential_neighbor_pos = Vector2.{ pos.x + TORCH_WORLD_WIDTH, pos.y };
         case .WEST;       potential_neighbor_pos = Vector2.{ pos.x - TORCH_WORLD_WIDTH, pos.y };
         case .CENTER;     potential_neighbor_pos = Vector2.{ pos.x,                     pos.y };
-        case;        assert(false, "Invalid direction");
     }
 
     neighbor_exists, neighbor := table_find_new(*global_torch_pos_to_torch, vector2_to_string_temp(potential_neighbor_pos));
     return neighbor_exists, neighbor;
+}
+
+get_neighbor_tree :: (pos: Vector2, direction: Direction) -> neighbor_exists: bool, neighbor: *TreeBlock {
+    potential_neighbor_pos: Vector2;
+    if #complete direction == {
+        case .NORTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y - BLOCK_WORLD_HEIGHT };
+        case .NORTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + BLOCK_WORLD_WIDTH, pos.y - BLOCK_WORLD_HEIGHT };
+        case .NORTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - BLOCK_WORLD_WIDTH, pos.y - BLOCK_WORLD_HEIGHT };
+        case .SOUTH;      potential_neighbor_pos = Vector2.{ pos.x,                     pos.y + BLOCK_WORLD_HEIGHT };
+        case .SOUTH_EAST; potential_neighbor_pos = Vector2.{ pos.x + BLOCK_WORLD_WIDTH, pos.y + BLOCK_WORLD_HEIGHT };
+        case .SOUTH_WEST; potential_neighbor_pos = Vector2.{ pos.x - BLOCK_WORLD_WIDTH, pos.y + BLOCK_WORLD_HEIGHT };
+        case .EAST;       potential_neighbor_pos = Vector2.{ pos.x + BLOCK_WORLD_WIDTH, pos.y };
+        case .WEST;       potential_neighbor_pos = Vector2.{ pos.x - BLOCK_WORLD_WIDTH, pos.y };
+        case .CENTER;     potential_neighbor_pos = Vector2.{ pos.x,                     pos.y };
+    }
+
+    neighbor_exists, neighbor := table_find_new(*global_block_pos_to_block, vector2_to_string_temp(potential_neighbor_pos));
+    neighbor_exists = neighbor_exists && neighbor.type == TreeBlock;
+    return neighbor_exists, cast(*TreeBlock) neighbor;
 }
 
 // @TODO: max_hops is probably the way to stop the stack overflows
@@ -4514,22 +4548,26 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
     neighbor_block_exists, neighbor_block := get_neighbor(block.pos, direction, false);
     neighbor_wall_exists,  neighbor_wall  := get_neighbor(block.pos, direction, true);
 
-    // @TODO: DRY this up
+    neighbor_block_is_relevant := neighbor_block_exists && neighbor_block.type != TreeBlock;
+    neighbor_wall_is_relevant  := !neighbor_block_is_relevant && neighbor_wall_exists;
+
+    // @TODO: DRY this up?
     if direction == {
         case .NORTH;
-            if neighbor_block_exists {
+            if neighbor_block_is_relevant {
                 // If this block already knows its north neighbor count, we don't need to keep going
                 if neighbor_block.neighbor_north_count > -1 {
                     result := neighbor_block.neighbor_north_count + 1;
                     block.neighbor_north_count = result;
                     return result;
-                } else {
+                }
+                else {
                     result := get_and_recursively_set_block_neighbor_counts(neighbor_block, direction) + 1;
                     block.neighbor_north_count = result;
                     return result;
                 }
             }
-            else if neighbor_wall_exists {
+            else if neighbor_wall_is_relevant {
                 // If this block already knows its north neighbor count, we don't need to keep going
                 if neighbor_wall.neighbor_north_count > -1 {
                     result := neighbor_wall.neighbor_north_count + 1;
@@ -4547,7 +4585,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .SOUTH;
-            if neighbor_block_exists {
+            if neighbor_block_is_relevant {
                 // If this block already knows its south neighbor count, we don't need to keep going
                 if neighbor_block.neighbor_south_count > -1 {
                     result := neighbor_block.neighbor_south_count + 1;
@@ -4559,7 +4597,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                     return result;
                 }
             }
-            else if neighbor_wall_exists {
+            else if neighbor_wall_is_relevant {
                 // If this block already knows its south neighbor count, we don't need to keep going
                 if neighbor_wall.neighbor_south_count > -1 {
                     result := neighbor_wall.neighbor_south_count + 1;
@@ -4577,7 +4615,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .EAST;
-            if neighbor_block_exists {
+            if neighbor_block_is_relevant {
                 // If this block already knows its east neighbor count, we don't need to keep going
                 if neighbor_block.neighbor_east_count > -1 {
                     result := neighbor_block.neighbor_east_count + 1;
@@ -4589,7 +4627,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                     return result;
                 }
             }
-            else if neighbor_wall_exists {
+            else if neighbor_wall_is_relevant {
                 // If this block already knows its east neighbor count, we don't need to keep going
                 if neighbor_wall.neighbor_east_count > -1 {
                     result := neighbor_wall.neighbor_east_count + 1;
@@ -4607,7 +4645,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                 return 0;
             }
         case .WEST;
-            if neighbor_block_exists {
+            if neighbor_block_is_relevant {
                 // If this block already knows its east neighbor count, we don't need to keep going
                 if neighbor_block.neighbor_west_count > -1 {
                     result := neighbor_block.neighbor_west_count + 1;
@@ -4619,7 +4657,7 @@ get_and_recursively_set_block_neighbor_counts :: (block: *Block, direction: Dire
                     return result;
                 }
             }
-            else if neighbor_wall_exists {
+            else if neighbor_wall_is_relevant {
                 // If this block already knows its west neighbor count, we don't need to keep going
                 if neighbor_wall.neighbor_west_count > -1 {
                     result := neighbor_wall.neighbor_west_count + 1;
@@ -4877,25 +4915,12 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
 
     destination_rect := block.sprite_rect;
     if block.type == TreeBlock {
-        tree_block := cast(TreeBlock) block;
-
         // NOTE: The tree texture tiles have transparency in them on their sides. I don't exactly understand why,
         // I guess it's so that they appear skinnier than the normal blocks. But, this means that we need to
-        // nudge them by that transparency length when the tree tiles should conjoin. Thus, these fudges. They're
-        // also inconsistent, which is kinda funny.
-
-        if #complete tree_block.tree_block_type == {
-            case .TREE_STUMP_CENTER; #through;
-            case .TREE_STUMP_EAST;   #through;
-            case .TREE_STUMP_WEST;
-                destination_rect.width *= 1.25;
-
-            case .TREE_TRUNK_MIDDLE; #through;
-            case .TREE_TRUNK_TOP;    #through;
-            case .TREE_LIMB;
-                destination_rect.width  *= 1.25;
-                destination_rect.height *= 1.25;
-        }
+        // nudge them by that transparency length when the tree tiles should conjoin. Thus, these fudges.
+        destination_rect.x      -= destination_rect.width * 0.125;
+        destination_rect.width  *= 1.25;
+        destination_rect.height *= 1.25;
     }
 
     color : Color = WHITE;
