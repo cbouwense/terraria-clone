@@ -694,22 +694,21 @@ main :: () {
                         }
 
                         // Generate tree trunk
-                        #if false {
-                            potential_trunk_pos := Vector2.{
-                                potential_tree_base_pos.x,
-                                potential_tree_base_pos.y - BLOCK_WORLD_HEIGHT,
-                            };
+                        {
+                            potential_trunk_rect := potential_tree_base_rect;
+                            potential_trunk_pos  := get_rect_center(potential_trunk_rect);
 
-                            add_another_trunk_rng  := random_get_within_range(0, 100);
-                            neighbor_exists_center := get_neighbor(potential_trunk_pos, .CENTER, false);
+                            add_another_trunk_rng := random_get_within_range(0, 100);
+                            neighbor_exists_north := get_neighbor(potential_trunk_pos, .NORTH, false);
 
-                            while add_another_trunk_rng <= 90 && !neighbor_exists_center {
-                                add_another_trunk_rng  = random_get_within_range(0, 100);
-                                neighbor_exists_center = get_neighbor(potential_trunk_pos, .CENTER, false);
+                            while add_another_trunk_rng <= 90 && !neighbor_exists_north {
+                                add_another_trunk_rng = random_get_within_range(0, 100);
+                                potential_trunk_pos   = get_rect_center(potential_trunk_rect);
+                                neighbor_exists_north = get_neighbor(potential_trunk_pos, .NORTH, false);
+                                will_continue := add_another_trunk_rng <= 90 && !neighbor_exists_north;
 
-                                will_continue := add_another_trunk_rng <= 90 && !neighbor_exists_center;
-
-                                trunk := cast(*TreeBlock) generate_block(.TREE, xx potential_trunk_pos.x, xx potential_trunk_pos.y);
+                                potential_trunk_rect.y -= BLOCK_WORLD_HEIGHT;
+                                trunk := cast(*TreeBlock) generate_block(.TREE, xx potential_trunk_rect.x, xx potential_trunk_rect.y);
                                 trunk.tree_block_type = ifx will_continue then .TREE_TRUNK_MIDDLE else .TREE_TRUNK_TOP;
                             }
                         }
@@ -2923,7 +2922,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                     }
                 }
                 else if north_exists && !east_exists && west_exists {
-                    if east.block_type == .TREE {
+                    if west.block_type == .TREE {
                         x = 3;
                         y = cast(int) random_get_within_range(6, 8);
                     } else {
@@ -2988,9 +2987,49 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                 x = 2;
                 y = cast(int) random_get_within_range(6, 8);
 
-            case .TREE_TRUNK_MIDDLE; assert(false, "we get there when we get there");
+            case .TREE_TRUNK_MIDDLE;
+                if east_exists && west_exists {
+                    x = 5;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                if east_exists && !west_exists {
+                    x = 3;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                if !east_exists && west_exists {
+                    x = 4;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else {
+                    x = cast(int) random_get_within_range(0, 2);
+                    if x == 0 {
+                        y = cast(int) random_get_within_range(3, 5);
+                    }
+                    else if x == 1 {
+                        y = cast(int) random_get_within_range(0, 5);
+                    }
+                    else {
+                        y = cast(int) random_get_within_range(3, 5);
+                    }
+                }
 
-            case .TREE_TRUNK_TOP; assert(false, "we get there when we get there");
+            case .TREE_TRUNK_TOP;
+                if east_exists && west_exists {
+                    x = 6;
+                    y = cast(int) random_get_within_range(6, 8);
+                }
+                if east_exists && !west_exists {
+                    x = 6;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                if !east_exists && west_exists {
+                    x = 6;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else {
+                    x = 0;
+                    y = cast(int) random_get_within_range(9, 11);
+                }
 
             case .TREE_LIMB; assert(false, "we get there when we get there");
         }
@@ -4846,13 +4885,16 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
         // also inconsistent, which is kinda funny.
 
         if #complete tree_block.tree_block_type == {
-            case .TREE_STUMP_EAST; destination_rect.x -= 6.5;
-            case .TREE_STUMP_WEST; destination_rect.x += 6.5;
+            case .TREE_STUMP_CENTER; #through;
+            case .TREE_STUMP_EAST;   #through;
+            case .TREE_STUMP_WEST;
+                destination_rect.width *= 1.25;
 
-            case .TREE_STUMP_CENTER; // noop
-            case .TREE_TRUNK_MIDDLE; // noop
-            case .TREE_TRUNK_TOP;    // noop
-            case .TREE_LIMB;         // noop
+            case .TREE_TRUNK_MIDDLE; #through;
+            case .TREE_TRUNK_TOP;    #through;
+            case .TREE_LIMB;
+                destination_rect.width  *= 1.25;
+                destination_rect.height *= 1.25;
         }
     }
 
