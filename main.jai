@@ -57,6 +57,7 @@ grass_map                 : Texture;
 rock_map                  : Texture;
 wood_map                  : Texture;
 tree_map                  : Texture;
+tree_top_map              : Texture;
 copper_ore_map            : Texture;
 wall_dirt_map             : Texture;
 wall_rock_map             : Texture;
@@ -218,6 +219,12 @@ TREE_MAP_TILE_PADDING :: 2;
 // TREE_STACK_CAPACITY :: 64;
 TREE_HARDNESS :: 1.0;
 
+TREE_TOP_MAP_COLS :: 3;
+TREE_TOP_MAP_ROWS :: 1;
+TREE_TOP_MAP_TILE_WIDTH  :: 82;
+TREE_TOP_MAP_TILE_HEIGHT :: 82;
+TREE_TOP_MAP_TILE_PADDING :: 2;
+
 COPPER_ORE_MAP_COLS :: 16;
 COPPER_ORE_MAP_ROWS :: 15;
 COPPER_ORE_MAP_TILE_WIDTH  :: 18;
@@ -345,6 +352,7 @@ BlockType :: enum {
     ROCK;
     WOOD;
     TREE;
+    TREE_TOP;
     COPPER_ORE;
     WALL_DIRT;
     WALL_ROCK;
@@ -429,6 +437,7 @@ TreeBlockType :: enum {
     TREE_STUMP_WEST;
     TREE_TRUNK_MIDDLE;
     TREE_TRUNK_TOP;
+    TREE_TOP;
     TREE_LIMB;
 }
 
@@ -719,6 +728,11 @@ main :: () {
 
                                 mandatory_trunks_left -= 1;
                             }
+                        }
+
+                        // Generate tree tops
+                        {
+                            
                         }
                     }
                 }
@@ -1882,6 +1896,7 @@ init_textures :: () {
     grass_map                 = LoadTexture("data/Tiles_2.png");
     wood_map                  = LoadTexture("data/Tiles_30.png");
     tree_map                  = LoadTexture("data/Tiles_5.png");
+    tree_top_map              = LoadTexture("data/Tree_Tops.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
     wall_rock_map             = LoadTexture("data/Wall_1.png");
     wall_dirt_map             = LoadTexture("data/Wall_2.png");
@@ -2577,6 +2592,7 @@ get_block_hardness :: (block_type: BlockType) -> float {
         case .ROCK;       return ROCK_HARDNESS;
         case .WOOD;       return WOOD_HARDNESS;
         case .TREE;       return WOOD_HARDNESS;
+        case .TREE_TOP;   return WOOD_HARDNESS;
         case .COPPER_ORE; return COPPER_ORE_HARDNESS;
 
         case .WALL_DIRT;  return WALL_DIRT_HARDNESS;
@@ -2816,6 +2832,7 @@ get_is_wall :: (block_type: BlockType) -> bool {
         case .ROCK;       return false;
         case .WOOD;       return false;
         case .TREE;       return false;
+        case .TREE_TOP;   return false;
         case .COPPER_ORE; return false;
 
         case .WALL_DIRT;  return true;
@@ -3038,6 +3055,7 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
                     x = 0;
                     y = cast(int) random_get_within_range(9, 11);
                 }
+            case .TREE_TOP; assert(false, "we get there when we get there");
 
             case .TREE_LIMB; assert(false, "we get there when we get there");
         }
@@ -4114,6 +4132,9 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         case .TREE;       
             width  = TREE_MAP_TILE_WIDTH;
             height = TREE_MAP_TILE_HEIGHT;
+        case .TREE_TOP;
+            width  = TREE_TOP_MAP_TILE_WIDTH;
+            height = TREE_TOP_MAP_TILE_HEIGHT;
         case .COPPER_ORE; 
             width  = COPPER_ORE_MAP_TILE_WIDTH;
             height = COPPER_ORE_MAP_TILE_HEIGHT;
@@ -4201,6 +4222,14 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
                 source_pos.x, source_pos.y,
                 TREE_MAP_TILE_WIDTH  - TREE_MAP_TILE_PADDING,
                 TREE_MAP_TILE_HEIGHT - TREE_MAP_TILE_PADDING,
+            };
+
+        case .TREE_TOP;
+            map_texture = tree_top_map;
+            map_source  = Rectangle.{
+                source_pos.x, source_pos.y,
+                TREE_TOP_MAP_TILE_WIDTH  - TREE_TOP_MAP_TILE_PADDING,
+                TREE_TOP_MAP_TILE_HEIGHT - TREE_TOP_MAP_TILE_PADDING,
             };
 
         case .COPPER_ORE;
@@ -4356,6 +4385,7 @@ get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
         case .ROCK;       return .PICKAXE;
         case .WOOD;       return .AXE;
         case .TREE;       return .AXE;
+        case .TREE_TOP;   return .AXE;
         case .COPPER_ORE; return .PICKAXE;
         
         case .WALL_DIRT;  return .HAMMER;
@@ -4415,6 +4445,7 @@ block_type_to_item_type :: (block_type: BlockType) -> ItemType {
         case .ROCK;       return ItemType.ROCK_ITEM;
         case .WOOD;       return ItemType.WOOD_ITEM;
         case .TREE;       return ItemType.WOOD_ITEM;
+        case .TREE_TOP;   return ItemType.WOOD_ITEM;
         case .COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
         case .WALL_DIRT;  return ItemType.WALL_DIRT_ITEM;
         case .WALL_ROCK;  return ItemType.WALL_ROCK_ITEM;
@@ -4894,6 +4925,7 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
         case .ROCK;       array_add(*blocks_rock,       new_block);
         case .WOOD;       array_add(*blocks_wood,       new_block);
         case .TREE;       array_add(*blocks_tree,       new_block);
+        case .TREE_TOP;   array_add(*blocks_tree,       new_block);
         case .COPPER_ORE; array_add(*blocks_copper_ore, new_block);
         case .WALL_DIRT;  array_add(*walls_dirt,        new_block);
         case .WALL_ROCK;  array_add(*walls_rock,        new_block);
@@ -4923,7 +4955,7 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
         destination_rect.height *= 1.25;
     }
 
-    color : Color = WHITE;
+    color: Color = WHITE;
     if shadows_enabled {
         color = Color.{ 255 - block.shadow * 36, 255 - block.shadow * 36, 255 - block.shadow * 36, 255 };
     }
@@ -4939,7 +4971,7 @@ draw_block :: (block: Block, player: Player, mouse_pos_in_world: Vector2) -> sho
     }
 
     // Mouse block overlay (hover)
-    is_within_reach  := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
+    is_within_reach := Vector2Distance(mouse_pos_in_world, player.pos) < PLAYER_REACH_DISTANCE;
 
     selected_item_stack, result := get_selected_item_stack(player.inventory);
     has_an_item_selected := result == xx ReturnStatus.SUCCESS;
@@ -5014,6 +5046,7 @@ destroy_block :: (block: *Block, player: *Player) {
         case .ROCK;       array_unordered_remove_by_value(*blocks_rock,       block);
         case .WOOD;       array_unordered_remove_by_value(*blocks_wood,       block);
         case .TREE;       array_unordered_remove_by_value(*blocks_tree,       block);
+        case .TREE_TOP;   array_unordered_remove_by_value(*blocks_tree,       block);
         case .COPPER_ORE; array_unordered_remove_by_value(*blocks_copper_ore, block);
 
         case .WALL_DIRT;  array_unordered_remove_by_value(*walls_dirt, block);
