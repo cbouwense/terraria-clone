@@ -2920,80 +2920,32 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         if #complete tree_block.tree_block_type == {
             case .TREE_STUMP_CENTER;
                 if north_exists && east_exists && west_exists {
-                    if east.block_type == .TREE && west.block_type == .TREE {
-                        x = 4;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if east.block_type == .TREE && west.block_type != .TREE {
-                        x = 0;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if east.block_type != .TREE && west.block_type == .TREE {
-                        x = 3;
-                        y = cast(int) random_get_within_range(6, 8);
-                    } 
-                    else {
-                        x = 0;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
+                    x = 4;
+                    y = cast(int) random_get_within_range(6, 8);
                 }
                 else if north_exists && east_exists && !west_exists {
-                    if east.block_type == .TREE {
-                        x = 0;
-                        y = cast(int) random_get_within_range(6, 8);
-                    } else {
-                        x = 0;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
+                    x = 0;
+                    y = cast(int) random_get_within_range(6, 8);
                 }
                 else if north_exists && !east_exists && west_exists {
-                    if west.block_type == .TREE {
-                        x = 3;
-                        y = cast(int) random_get_within_range(6, 8);
-                    } else {
-                        x = 0;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
+                    x = 3;
+                    y = cast(int) random_get_within_range(6, 8);
                 }
                 else if north_exists && !east_exists && !west_exists {
                     x = 0;  
                     y = cast(int) random_get_within_range(0, 2);
                 }
                 else if !north_exists && east_exists && west_exists {
-                    if east.block_type == .TREE && west.block_type == .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if east.block_type == .TREE && west.block_type != .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(3, 5);
-                    }
-                    else if east.block_type != .TREE && west.block_type == .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
-                    else {
-                        x = 5;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
+                    x = 7;
+                    y = cast(int) random_get_within_range(6, 8);
                 }
                 else if !north_exists && east_exists && !west_exists {
-                    if east.block_type == .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(3, 5);
-                    } else {
-                        x = 5;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
+                    x = 7;
+                    y = cast(int) random_get_within_range(3, 5);
                 }
                 else if !north_exists && !east_exists && west_exists {
-                    if west.block_type == .TREE {
-                        x = 7;
-                        y = cast(int) random_get_within_range(0, 2);
-                    } else {
-                        x = 5;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
+                    x = 7;
+                    y = cast(int) random_get_within_range(0, 2);
                 }
                 else if !north_exists && !east_exists && !west_exists {
                     x = 5;
