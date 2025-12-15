@@ -57,6 +57,7 @@ grass_map                 : Texture;
 rock_map                  : Texture;
 wood_map                  : Texture;
 tree_map                  : Texture;
+tree_branch_map           : Texture;
 tree_top_map              : Texture;
 copper_ore_map            : Texture;
 wall_dirt_map             : Texture;
@@ -219,6 +220,14 @@ TREE_MAP_TILE_PADDING :: 2;
 // TREE_STACK_CAPACITY :: 64;
 TREE_HARDNESS :: 1.0;
 
+TREE_BRANCH_MAP_COLS :: 2;
+TREE_BRANCH_MAP_ROWS :: 3;
+TREE_BRANCH_MAP_TILE_WIDTH  :: 42;
+TREE_BRANCH_MAP_TILE_HEIGHT :: 42;
+TREE_BRANCH_MAP_TILE_PADDING :: 2;
+// TREE_BRANCH_WORLD_WIDTH  :: BLOCK_WORLD_WIDTH;
+// TREE_BRANCH_WORLD_HEIGHT :: BLOCK_WORLD_HEIGHT;
+
 TREE_TOP_MAP_COLS :: 3;
 TREE_TOP_MAP_ROWS :: 1;
 TREE_TOP_MAP_TILE_WIDTH  :: 82;
@@ -354,6 +363,7 @@ BlockType :: enum {
     ROCK;
     WOOD;
     TREE;
+    TREE_BRANCH;
     TREE_TOP;
     COPPER_ORE;
     WALL_DIRT;
@@ -440,7 +450,7 @@ TreeBlockType :: enum {
     TREE_TRUNK_MIDDLE;
     TREE_TRUNK_TOP;
     TREE_TOP;
-    TREE_LIMB;
+    TREE_BRANCH;
 }
 
 TreeBlock :: struct {
@@ -682,7 +692,8 @@ main :: () {
                 if !tree_neighbor_exists_east && !tree_neighbor_exists_west {
 
                     plant_a_tree_rng := random_get_within_range(0, 100);
-                    
+                    // TODO: keep track whether there is a tree within 2 blocks of here.
+
                     if plant_a_tree_rng <= TREE_GEN_CHANCE {
                         // Generate tree stump
                         {
@@ -1914,6 +1925,7 @@ init_textures :: () {
     grass_map                 = LoadTexture("data/Tiles_2.png");
     wood_map                  = LoadTexture("data/Tiles_30.png");
     tree_map                  = LoadTexture("data/Tiles_5.png");
+    tree_branch_map           = LoadTexture("data/Tree_Branches.png");
     tree_top_map              = LoadTexture("data/Tree_Tops.png");
     copper_ore_map            = LoadTexture("data/Tiles_7.png");
     wall_rock_map             = LoadTexture("data/Wall_1.png");
@@ -2605,16 +2617,17 @@ get_selected_item_stack :: (inventory: Inventory) -> item_stack: *ItemStack, ret
 
 get_block_hardness :: (block_type: BlockType) -> float {
     if #complete block_type == {
-        case .DIRT;       return DIRT_HARDNESS;
-        case .GRASS;      return GRASS_HARDNESS;
-        case .ROCK;       return ROCK_HARDNESS;
-        case .WOOD;       return WOOD_HARDNESS;
-        case .TREE;       return WOOD_HARDNESS;
-        case .TREE_TOP;   return WOOD_HARDNESS;
-        case .COPPER_ORE; return COPPER_ORE_HARDNESS;
+        case .DIRT;        return DIRT_HARDNESS;
+        case .GRASS;       return GRASS_HARDNESS;
+        case .ROCK;        return ROCK_HARDNESS;
+        case .WOOD;        return WOOD_HARDNESS;
+        case .TREE;        return WOOD_HARDNESS;
+        case .TREE_BRANCH; return WOOD_HARDNESS;
+        case .TREE_TOP;    return WOOD_HARDNESS;
+        case .COPPER_ORE;  return COPPER_ORE_HARDNESS;
 
-        case .WALL_DIRT;  return WALL_DIRT_HARDNESS;
-        case .WALL_ROCK;  return WALL_ROCK_HARDNESS;
+        case .WALL_DIRT;   return WALL_DIRT_HARDNESS;
+        case .WALL_ROCK;   return WALL_ROCK_HARDNESS;
 
         case .UNSPECIFIED;
             assert(false, "Unspecified block type");
@@ -2704,6 +2717,7 @@ derive_active_entities :: (active_blocks: *[..] *Block, active_walls: *[..] *Blo
     // The first will be furthest away in the z ordering.
     {
         for block: blocks_tree {
+            // Notice that these widths and heights are different than the other blocks.
             if block.pos.x + TREE_TOP_WORLD_WIDTH < window_start.x continue;
             if block.pos.x - TREE_TOP_WORLD_WIDTH > window_end.x continue;
             
@@ -2845,16 +2859,17 @@ get_item_breaking_speed :: (item_type: ItemType) -> float32 {
 
 get_is_wall :: (block_type: BlockType) -> bool {
     if #complete block_type == {
-        case .DIRT;       return false;
-        case .GRASS;      return false;
-        case .ROCK;       return false;
-        case .WOOD;       return false;
-        case .TREE;       return false;
-        case .TREE_TOP;   return false;
-        case .COPPER_ORE; return false;
+        case .DIRT;        return false;
+        case .GRASS;       return false;
+        case .ROCK;        return false;
+        case .WOOD;        return false;
+        case .TREE;        return false;
+        case .TREE_BRANCH; return false;
+        case .TREE_TOP;    return false;
+        case .COPPER_ORE;  return false;
 
-        case .WALL_DIRT;  return true;
-        case .WALL_ROCK;  return true;
+        case .WALL_DIRT;   return true;
+        case .WALL_ROCK;   return true;
     
         case .UNSPECIFIED;
             assert(false, "Unspecified block type");
@@ -2928,115 +2943,123 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
 
     // Tree madness
     if block.type == TreeBlock {
-        if block.block_type == .TREE {
-            north_exists, north := get_neighbor_tree(block.pos, .NORTH);
-            south_exists, south := get_neighbor_tree(block.pos, .SOUTH);
-            east_exists,  east  := get_neighbor_tree(block.pos, .EAST );
-            west_exists,  west  := get_neighbor_tree(block.pos, .WEST );
+        north_exists, north := get_neighbor_tree(block.pos, .NORTH);
+        south_exists, south := get_neighbor_tree(block.pos, .SOUTH);
+        east_exists,  east  := get_neighbor_tree(block.pos, .EAST );
+        west_exists,  west  := get_neighbor_tree(block.pos, .WEST );
 
-            tree_block := cast(TreeBlock) block;
-            // Center stump
-            if #complete tree_block.tree_block_type == {
-                case .TREE_STUMP_CENTER;
-                    if north_exists && east_exists && west_exists {
-                        x = 4;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if north_exists && east_exists && !west_exists {
-                        x = 0;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if north_exists && !east_exists && west_exists {
-                        x = 3;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if north_exists && !east_exists && !west_exists {
-                        x = 0;  
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
-                    else if !north_exists && east_exists && west_exists {
-                        x = 7;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    else if !north_exists && east_exists && !west_exists {
-                        x = 7;
+        tree_block := cast(TreeBlock) block;
+        // Center stump
+        if #complete tree_block.tree_block_type == {
+            case .TREE_STUMP_CENTER;
+                if north_exists && east_exists && west_exists {
+                    x = 4;
+                    y = cast(int) random_get_within_range(6, 8);
+                }
+                else if north_exists && east_exists && !west_exists {
+                    x = 0;
+                    y = cast(int) random_get_within_range(6, 8);
+                }
+                else if north_exists && !east_exists && west_exists {
+                    x = 3;
+                    y = cast(int) random_get_within_range(6, 8);
+                }
+                else if north_exists && !east_exists && !west_exists {
+                    x = 0;  
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else if !north_exists && east_exists && west_exists {
+                    x = 7;
+                    y = cast(int) random_get_within_range(6, 8);
+                }
+                else if !north_exists && east_exists && !west_exists {
+                    x = 7;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                else if !north_exists && !east_exists && west_exists {
+                    x = 7;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else if !north_exists && !east_exists && !west_exists {
+                    x = 5;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else {
+                    print_vars(north_exists, south_exists, east_exists, west_exists, north, south, east, west);
+                    assert(false, "you forgot a case in the condition chain for center tree stump texture coordinates.");
+                }
+
+            case .TREE_STUMP_EAST;
+                x = 1;
+                y = cast(int) random_get_within_range(6, 8);
+
+            case .TREE_STUMP_WEST;
+                x = 2;
+                y = cast(int) random_get_within_range(6, 8);
+
+            case .TREE_TRUNK_MIDDLE;
+                if east_exists && west_exists {
+                    x = 5;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                if east_exists && !west_exists {
+                    x = 3;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                if !east_exists && west_exists {
+                    x = 4;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else {
+                    x = cast(int) random_get_within_range(0, 2);
+                    if x == 0 {
                         y = cast(int) random_get_within_range(3, 5);
                     }
-                    else if !north_exists && !east_exists && west_exists {
-                        x = 7;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
-                    else if !north_exists && !east_exists && !west_exists {
-                        x = 5;
-                        y = cast(int) random_get_within_range(0, 2);
+                    else if x == 1 {
+                        y = cast(int) random_get_within_range(0, 5);
                     }
                     else {
-                        print_vars(north_exists, south_exists, east_exists, west_exists, north, south, east, west);
-                        assert(false, "you forgot a case in the condition chain for center tree stump texture coordinates.");
+                        y = cast(int) random_get_within_range(3, 5);
                     }
+                }
 
-                case .TREE_STUMP_EAST;
+            case .TREE_TRUNK_TOP;
+                if east_exists && west_exists {
+                    x = 6;
+                    y = cast(int) random_get_within_range(6, 8);
+                }
+                if east_exists && !west_exists {
+                    x = 6;
+                    y = cast(int) random_get_within_range(3, 5);
+                }
+                if !east_exists && west_exists {
+                    x = 6;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else {
+                    x = 0;
+                    y = cast(int) random_get_within_range(9, 11);
+                }
+
+            case .TREE_TOP;
+                x = cast(int) random_get_within_range(0, 2);
+                y = 0;
+
+            case .TREE_BRANCH;
+                if east_exists && west_exists {
+                    assert(false, "Found a branch with tree blocks on both sides. At the time of writing this, I am assuming this is undesirable because how will we know which way to draw the branch? However, it's possible that drawing trees is not as simple as just checking the tiles around whatever block is in question (e.g. we may need designated tree structures with IDs and associated blocks, etc).");
+                }
+                else if east_exists && !west_exists {
+                    x = 0;
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else if !east_exists && west_exists {
                     x = 1;
-                    y = cast(int) random_get_within_range(6, 8);
-
-                case .TREE_STUMP_WEST;
-                    x = 2;
-                    y = cast(int) random_get_within_range(6, 8);
-
-                case .TREE_TRUNK_MIDDLE;
-                    if east_exists && west_exists {
-                        x = 5;
-                        y = cast(int) random_get_within_range(3, 5);
-                    }
-                    if east_exists && !west_exists {
-                        x = 3;
-                        y = cast(int) random_get_within_range(3, 5);
-                    }
-                    if !east_exists && west_exists {
-                        x = 4;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
-                    else {
-                        x = cast(int) random_get_within_range(0, 2);
-                        if x == 0 {
-                            y = cast(int) random_get_within_range(3, 5);
-                        }
-                        else if x == 1 {
-                            y = cast(int) random_get_within_range(0, 5);
-                        }
-                        else {
-                            y = cast(int) random_get_within_range(3, 5);
-                        }
-                    }
-
-                case .TREE_TRUNK_TOP;
-                    if east_exists && west_exists {
-                        x = 6;
-                        y = cast(int) random_get_within_range(6, 8);
-                    }
-                    if east_exists && !west_exists {
-                        x = 6;
-                        y = cast(int) random_get_within_range(3, 5);
-                    }
-                    if !east_exists && west_exists {
-                        x = 6;
-                        y = cast(int) random_get_within_range(0, 2);
-                    }
-                    else {
-                        x = 0;
-                        y = cast(int) random_get_within_range(9, 11);
-                    }
-                case .TREE_TOP; assert(false, "we get there when we get there");
-
-                case .TREE_LIMB; assert(false, "we get there when we get there");
-            }
-        }
-        else if block.block_type == .TREE_TOP {
-            x = cast(int) random_get_within_range(0, 2);
-            y = 0;
-        }
-        else {
-            assert(false, "Was trying to find the texture map source coords for a tree block, but the block type received was neither a .TREE nor .TREE_TOP. Is there some new tree block type you forgot to specify? %", block);
+                    y = cast(int) random_get_within_range(0, 2);
+                }
+                else { // !east_exists && !west_exists
+                    assert(false, "Found a branch without tree blocks on either side.");
+                }
         }
     }
     else {
@@ -4111,6 +4134,9 @@ get_texture_map_source_coords_for_block :: (block: Block) -> Vector2 {
         case .TREE;       
             width  = TREE_MAP_TILE_WIDTH;
             height = TREE_MAP_TILE_HEIGHT;
+        case .TREE_BRANCH;
+            width  = TREE_BRANCH_MAP_TILE_WIDTH;
+            height = TREE_BRANCH_MAP_TILE_HEIGHT;
         case .TREE_TOP;
             width  = TREE_TOP_MAP_TILE_WIDTH;
             height = TREE_TOP_MAP_TILE_HEIGHT;
@@ -4201,6 +4227,14 @@ get_texture_map_for_block :: (block: Block) -> texture: Texture, source: Rectang
                 source_pos.x, source_pos.y,
                 TREE_MAP_TILE_WIDTH  - TREE_MAP_TILE_PADDING,
                 TREE_MAP_TILE_HEIGHT - TREE_MAP_TILE_PADDING,
+            };
+
+        case .TREE_BRANCH;
+            map_texture = tree_branch_map;
+            map_source  = Rectangle.{
+                source_pos.x, source_pos.y,
+                TREE_BRANCH_MAP_TILE_WIDTH  - TREE_BRANCH_MAP_TILE_PADDING,
+                TREE_BRANCH_MAP_TILE_HEIGHT - TREE_BRANCH_MAP_TILE_PADDING,
             };
 
         case .TREE_TOP;
@@ -4359,16 +4393,17 @@ get_item_world_length :: (item_type: ItemType) -> float {
 
 get_block_weak_to_tool :: (block_type: BlockType) -> ItemType {
     if #complete block_type == {
-        case .DIRT;       return .PICKAXE;
-        case .GRASS;      return .PICKAXE;
-        case .ROCK;       return .PICKAXE;
-        case .WOOD;       return .AXE;
-        case .TREE;       return .AXE;
-        case .TREE_TOP;   return .AXE;
-        case .COPPER_ORE; return .PICKAXE;
+        case .DIRT;        return .PICKAXE;
+        case .GRASS;       return .PICKAXE;
+        case .ROCK;        return .PICKAXE;
+        case .WOOD;        return .AXE;
+        case .TREE;        return .AXE;
+        case .TREE_BRANCH; return .AXE;
+        case .TREE_TOP;    return .AXE;
+        case .COPPER_ORE;  return .PICKAXE;
         
-        case .WALL_DIRT;  return .HAMMER;
-        case .WALL_ROCK;  return .HAMMER;
+        case .WALL_DIRT;   return .HAMMER;
+        case .WALL_ROCK;   return .HAMMER;
 
         case .UNSPECIFIED;
             assert(false, "Unspecified block type");
@@ -4419,15 +4454,16 @@ item_type_to_block_type :: (item_type: ItemType) -> BlockType {
 
 block_type_to_item_type :: (block_type: BlockType) -> ItemType {
     if #complete block_type == {
-        case .DIRT;       return ItemType.DIRT_ITEM;
-        case .GRASS;      return ItemType.DIRT_ITEM;
-        case .ROCK;       return ItemType.ROCK_ITEM;
-        case .WOOD;       return ItemType.WOOD_ITEM;
-        case .TREE;       return ItemType.WOOD_ITEM;
-        case .TREE_TOP;   return ItemType.WOOD_ITEM;
-        case .COPPER_ORE; return ItemType.COPPER_ORE_ITEM;
-        case .WALL_DIRT;  return ItemType.WALL_DIRT_ITEM;
-        case .WALL_ROCK;  return ItemType.WALL_ROCK_ITEM;
+        case .DIRT;        return ItemType.DIRT_ITEM;
+        case .GRASS;       return ItemType.DIRT_ITEM;
+        case .ROCK;        return ItemType.ROCK_ITEM;
+        case .WOOD;        return ItemType.WOOD_ITEM;
+        case .TREE;        return ItemType.WOOD_ITEM;
+        case .TREE_BRANCH; return ItemType.WOOD_ITEM;
+        case .TREE_TOP;    return ItemType.WOOD_ITEM;
+        case .COPPER_ORE;  return ItemType.COPPER_ORE_ITEM;
+        case .WALL_DIRT;   return ItemType.WALL_DIRT_ITEM;
+        case .WALL_ROCK;   return ItemType.WALL_ROCK_ITEM;
 
         case .UNSPECIFIED;
             assert(false, "Unspecified block type");
@@ -4881,7 +4917,7 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     rect := Rectangle.{ xx x, xx y, width, height, };
 
     new_block : *Block;
-    if block_type == .TREE || block_type == .TREE_TOP {
+    if block_type == .TREE || block_type == .TREE_BRANCH || block_type == .TREE_TOP {
         new_block      = New(TreeBlock);
         new_block.type = TreeBlock;
     } else {
@@ -4911,15 +4947,16 @@ generate_block :: (block_type: BlockType, x: float32, y: float32) -> *Block {
     }
 
     if #complete block_type == {
-        case .DIRT;       array_add(*blocks_dirt,       new_block);
-        case .GRASS;      array_add(*blocks_grass,      new_block);
-        case .ROCK;       array_add(*blocks_rock,       new_block);
-        case .WOOD;       array_add(*blocks_wood,       new_block);
-        case .TREE;       array_add(*blocks_tree,       new_block);
-        case .TREE_TOP;   array_add(*blocks_tree,       new_block);
-        case .COPPER_ORE; array_add(*blocks_copper_ore, new_block);
-        case .WALL_DIRT;  array_add(*walls_dirt,        new_block);
-        case .WALL_ROCK;  array_add(*walls_rock,        new_block);
+        case .DIRT;        array_add(*blocks_dirt,       new_block);
+        case .GRASS;       array_add(*blocks_grass,      new_block);
+        case .ROCK;        array_add(*blocks_rock,       new_block);
+        case .WOOD;        array_add(*blocks_wood,       new_block);
+        case .TREE;        array_add(*blocks_tree,       new_block);
+        case .TREE_BRANCH; array_add(*blocks_tree,       new_block);
+        case .TREE_TOP;    array_add(*blocks_tree,       new_block);
+        case .COPPER_ORE;  array_add(*blocks_copper_ore, new_block);
+        case .WALL_DIRT;   array_add(*walls_dirt,        new_block);
+        case .WALL_ROCK;   array_add(*walls_rock,        new_block);
 
         case .UNSPECIFIED; assert(false, "Unspecified block type");
     }
@@ -5032,16 +5069,17 @@ destroy_block :: (block: *Block, player: *Player) {
     else       table_remove(*global_block_pos_to_block, vector2_to_string_temp(block.pos));
 
     if #complete block.block_type == {
-        case .DIRT;       array_unordered_remove_by_value(*blocks_dirt,       block);
-        case .GRASS;      array_unordered_remove_by_value(*blocks_grass,      block);
-        case .ROCK;       array_unordered_remove_by_value(*blocks_rock,       block);
-        case .WOOD;       array_unordered_remove_by_value(*blocks_wood,       block);
-        case .TREE;       array_unordered_remove_by_value(*blocks_tree,       block);
-        case .TREE_TOP;   array_unordered_remove_by_value(*blocks_tree,       block);
-        case .COPPER_ORE; array_unordered_remove_by_value(*blocks_copper_ore, block);
+        case .DIRT;        array_unordered_remove_by_value(*blocks_dirt,       block);
+        case .GRASS;       array_unordered_remove_by_value(*blocks_grass,      block);
+        case .ROCK;        array_unordered_remove_by_value(*blocks_rock,       block);
+        case .WOOD;        array_unordered_remove_by_value(*blocks_wood,       block);
+        case .TREE;        array_unordered_remove_by_value(*blocks_tree,       block);
+        case .TREE_BRANCH; array_unordered_remove_by_value(*blocks_tree,       block);
+        case .TREE_TOP;    array_unordered_remove_by_value(*blocks_tree,       block);
+        case .COPPER_ORE;  array_unordered_remove_by_value(*blocks_copper_ore, block);
 
-        case .WALL_DIRT;  array_unordered_remove_by_value(*walls_dirt, block);
-        case .WALL_ROCK;  array_unordered_remove_by_value(*walls_rock, block);
+        case .WALL_DIRT;   array_unordered_remove_by_value(*walls_dirt, block);
+        case .WALL_ROCK;   array_unordered_remove_by_value(*walls_rock, block);
 
         case .UNSPECIFIED; assert(false, "Unspecified block type to remove");
     }
